@@ -62,6 +62,96 @@ AGENT_MAP = {
     "portfolio_management_agent": {"icon": "📂", "name": "投资组合管理"}
 }
 
+# 字段名中英文映射
+FIELD_NAME_MAP = {
+    # 通用字段
+    "signal": "信号",
+    "confidence": "置信度",
+    "reasoning": "推理",
+    "action": "行动",
+    "quantity": "数量",
+
+    # 风险管理字段
+    "max_position_size": "最大持仓规模",
+    "risk_score": "风险评分",
+    "trading_action": "交易行动",
+    "risk_metrics": "风险指标",
+    "volatility": "波动率",
+    "value_at_risk_95": "95%风险价值",
+    "max_drawdown": "最大回撤",
+    "market_risk_score": "市场风险评分",
+    "stress_test_results": "压力测试结果",
+    "debate_analysis": "辩论分析",
+    "bull_confidence": "多方置信度",
+    "bear_confidence": "空方置信度",
+    "debate_confidence": "辩论置信度",
+    "debate_signal": "辩论信号",
+    "potential_loss": "潜在损失",
+    "portfolio_impact": "组合影响",
+
+    # 压力测试场景
+    "market_crash": "市场崩盘",
+    "moderate_decline": "中度下跌",
+    "slight_decline": "轻度下跌",
+
+    # 技术分析字段
+    "strategy_signals": "策略信号",
+    "trend_following": "趋势跟踪",
+    "mean_reversion": "均值回归",
+    "momentum": "动量",
+    "volatility": "波动性",
+    "statistical_arbitrage": "统计套利",
+    "metrics": "指标",
+    "adx": "ADX",
+    "trend_strength": "趋势强度",
+    "z_score": "Z分数",
+    "price_vs_bb": "价格vs布林带",
+    "rsi_14": "RSI(14)",
+    "rsi_28": "RSI(28)",
+    "momentum_1m": "1月动量",
+    "momentum_3m": "3月动量",
+    "momentum_6m": "6月动量",
+    "volume_momentum": "成交量动量",
+    "historical_volatility": "历史波动率",
+    "volatility_regime": "波动率区间",
+    "volatility_z_score": "波动率Z分数",
+    "atr_ratio": "ATR比率",
+    "hurst_exponent": "赫斯特指数",
+    "skewness": "偏度",
+    "kurtosis": "峰度",
+
+    # 基本面分析字段
+    "profitability_signal": "盈利能力信号",
+    "growth_signal": "增长信号",
+    "financial_health_signal": "财务健康信号",
+    "price_ratios_signal": "价格比率信号",
+    "fallback": "回退",
+    "details": "详情",
+
+    # 估值分析字段
+    "dcf_analysis": "DCF分析",
+    "owner_earnings_analysis": "所有者收益分析",
+
+    # 辩论室字段
+    "confidence_diff": "置信度差异",
+    "llm_score": "LLM评分",
+    "llm_analysis": "LLM分析",
+    "llm_reasoning": "LLM推理",
+    "mixed_confidence_diff": "混合置信度差异",
+    "debate_summary": "辩论摘要",
+
+    # 投资组合管理字段
+    "agent_signals": "各分析师信号",
+    "agent_name": "分析师名称",
+
+    # 宏观分析字段
+    "macro_environment": "宏观环境",
+    "impact_on_stock": "对股票影响",
+    "key_factors": "关键因素",
+    "positive": "积极",
+    "negative": "消极",
+}
+
 # Agent显示顺序
 AGENT_ORDER = [
     "market_data_agent",
@@ -119,11 +209,14 @@ class StructuredTerminalOutput:
             prefix = SYMBOLS["tree_last"] if is_last else SYMBOLS["tree_branch"]
             indent_str = "  " * indent
 
+            # 将英文key转换为中文显示
+            display_key = FIELD_NAME_MAP.get(key, key)
+
             if isinstance(value, dict) and value:
-                result.append(f"{indent_str}{prefix} {key}:")
+                result.append(f"{indent_str}{prefix} {display_key}:")
                 result.extend(self._format_dict_as_tree(value, indent + 1))
             elif isinstance(value, list) and value:
-                result.append(f"{indent_str}{prefix} {key}:")
+                result.append(f"{indent_str}{prefix} {display_key}:")
                 for j, item in enumerate(value):
                     sub_is_last = j == len(value) - 1
                     sub_prefix = SYMBOLS["tree_last"] if sub_is_last else SYMBOLS["tree_branch"]
@@ -136,7 +229,7 @@ class StructuredTerminalOutput:
                         result.append(f"{indent_str}  {sub_prefix} {item}")
             else:
                 formatted_value = self._format_value(value)
-                result.append(f"{indent_str}{prefix} {key}: {formatted_value}")
+                result.append(f"{indent_str}{prefix} {display_key}: {formatted_value}")
 
         return result
 
@@ -185,7 +278,7 @@ class StructuredTerminalOutput:
                         f"{SYMBOLS['vertical']} {SYMBOLS['section_prefix']}各分析师意见:")
 
                     for signal_info in data["agent_signals"]:
-                        agent = signal_info.get("agent", "")
+                        agent = signal_info.get("agent_name", signal_info.get("agent", ""))
                         signal = signal_info.get("signal", "")
                         conf = signal_info.get("confidence", 1.0)
 

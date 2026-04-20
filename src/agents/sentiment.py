@@ -13,7 +13,7 @@ logger = setup_logger('sentiment_agent')
 @agent_endpoint("sentiment", "情感分析师，分析市场新闻和社交媒体情绪")
 def sentiment_agent(state: AgentState):
     """Responsible for sentiment analysis"""
-    show_workflow_status("Sentiment Analyst")
+    show_workflow_status("情绪分析师")
     show_reasoning = state["metadata"]["show_reasoning"]
     data = state["data"]
     symbol = data["ticker"]
@@ -25,7 +25,11 @@ def sentiment_agent(state: AgentState):
     end_date = data.get("end_date")  # 从 run_hedge_fund 传递来的 end_date
 
     # 获取新闻数据并分析情感，添加 date 参数
-    news_list = get_stock_news(symbol, max_news=num_of_news, date=end_date)
+    try:
+        news_list = get_stock_news(symbol, max_news=num_of_news, date=end_date)
+    except Exception as exc:
+        logger.exception("获取新闻失败，情感分析将回退为空新闻集: %s", exc)
+        news_list = []
 
     # 过滤7天内的新闻（只对有publish_time字段的新闻进行过滤）
     cutoff_date = datetime.now() - timedelta(days=7)
@@ -44,10 +48,17 @@ def sentiment_agent(state: AgentState):
             # 如果没有publish_time字段，默认包含这条新闻
             recent_news.append(news)
 
-    sentiment_score = get_news_sentiment(recent_news, num_of_news=num_of_news)
+    try:
+        sentiment_score = get_news_sentiment(recent_news, num_of_news=num_of_news)
+    except Exception as exc:
+        logger.exception("新闻情感分析失败，回退为中性: %s", exc)
+        sentiment_score = 0.0
 
     # 根据情感分数生成交易信号和置信度
-    if sentiment_score >= 0.5:
+    if not recent_news:
+        signal = "neutral"
+        confidence = "0%"
+    elif sentiment_score >= 0.5:
         signal = "bullish"
         confidence = str(round(abs(sentiment_score) * 100)) + "%"
     elif sentiment_score <= -0.5:
@@ -55,7 +66,7 @@ def sentiment_agent(state: AgentState):
         confidence = str(round(abs(sentiment_score) * 100)) + "%"
     else:
         signal = "neutral"
-        confidence = str(round((1 - abs(sentiment_score)) * 100)) + "%"
+        confidence = str(round(abs(sentiment_score) * 100)) + "%"
 
     # 生成分析结果
     message_content = {
@@ -76,7 +87,7 @@ def sentiment_agent(state: AgentState):
         name="sentiment_agent",
     )
 
-    show_workflow_status("Sentiment Analyst", "completed")
+    show_workflow_status("情绪分析师", "completed")
     # logger.info(
     # f"--- DEBUG: sentiment_agent RETURN messages: {[msg.name for msg in [message]]} ---")
     return {

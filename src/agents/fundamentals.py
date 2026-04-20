@@ -9,16 +9,54 @@ import json
 # 初始化 logger
 logger = setup_logger('fundamentals_agent')
 
+
+def _is_missing_metric(value) -> bool:
+    return value is None or value == 0
+
 ##### Fundamental Agent #####
 
 
 @agent_endpoint("fundamentals", "基本面分析师，分析公司财务指标、盈利能力和增长潜力")
 def fundamentals_agent(state: AgentState):
     """Responsible for fundamental analysis"""
-    show_workflow_status("Fundamentals Analyst")
+    show_workflow_status("基本面分析师")
     show_reasoning = state["metadata"]["show_reasoning"]
     data = state["data"]
     metrics = data["financial_metrics"][0]
+    populated_metrics = [
+        key for key, value in metrics.items()
+        if not _is_missing_metric(value)
+    ] if isinstance(metrics, dict) else []
+
+    if not populated_metrics:
+        reason = "Financial metrics unavailable, defaulting fundamentals analysis to neutral."
+        logger.warning(reason)
+        message_content = {
+            "signal": "neutral",
+            "confidence": "0%",
+            "reasoning": {
+                "fallback": {
+                    "signal": "neutral",
+                    "details": reason
+                }
+            }
+        }
+        message = HumanMessage(
+            content=json.dumps(message_content),
+            name="fundamentals_agent",
+        )
+        if show_reasoning:
+            show_agent_reasoning(message_content, "Fundamental Analysis Agent")
+            state["metadata"]["agent_reasoning"] = message_content
+        show_workflow_status("基本面分析师", "completed")
+        return {
+            "messages": [message],
+            "data": {
+                **data,
+                "fundamental_analysis": message_content
+            },
+            "metadata": state["metadata"],
+        }
 
     # Initialize signals list for different fundamental aspects
     signals = []
@@ -172,7 +210,7 @@ def fundamentals_agent(state: AgentState):
         # 保存推理信息到metadata供API使用
         state["metadata"]["agent_reasoning"] = message_content
 
-    show_workflow_status("Fundamentals Analyst", "completed")
+    show_workflow_status("基本面分析师", "completed")
     # logger.info(f"--- DEBUG: fundamentals_agent RETURN messages: {[msg.name for msg in [message]]} ---")
     return {
         "messages": [message],

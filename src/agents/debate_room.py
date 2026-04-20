@@ -13,7 +13,7 @@ logger = logging.getLogger('debate_room')
 @agent_endpoint("debate_room", "辩论室，分析多空双方观点，得出平衡的投资结论")
 def debate_room_agent(state: AgentState):
     """Facilitates debate between bull and bear researchers to reach a balanced conclusion."""
-    show_workflow_status("Debate Room")
+    show_workflow_status("辩论室")
     show_reasoning = state["metadata"]["show_reasoning"]
     logger.info("开始分析研究员观点并进行辩论...")
 
@@ -73,11 +73,11 @@ def debate_room_agent(state: AgentState):
 
     # 分析辩论观点
     debate_summary = []
-    debate_summary.append("Bullish Arguments:")
+    debate_summary.append("看多观点:")
     for point in bull_thesis.get("thesis_points", []):
         debate_summary.append(f"+ {point}")
 
-    debate_summary.append("\nBearish Arguments:")
+    debate_summary.append("\n看空观点:")
     for point in bear_thesis.get("thesis_points", []):
         debate_summary.append(f"- {point}")
 
@@ -111,7 +111,7 @@ def debate_room_agent(state: AgentState):
     "reasoning": "你给出这个评分的简要理由"
 }
 
-务必确保你的回复是有效的 JSON 格式，且包含上述所有字段。回复必须使用英文，不要使用中文或其他语言。
+务必确保你的回复是有效的 JSON 格式，且包含上述所有字段。请使用中文回复。
 """
 
     # 调用 LLM 获取第三方观点
@@ -121,13 +121,17 @@ def debate_room_agent(state: AgentState):
     try:
         logger.info("开始调用 LLM 获取第三方分析...")
         messages = [
-            {"role": "system", "content": "You are a professional financial analyst. Please provide your analysis in English only, not in Chinese or any other language."},
+            {"role": "system", "content": "你是一位专业的金融分析师。请用中文提供你的分析。"},
             {"role": "user", "content": llm_prompt}
         ]
 
         # 使用log_llm_interaction装饰器记录LLM交互
         llm_response = log_llm_interaction(state)(
-            lambda: get_chat_completion(messages)
+            lambda: get_chat_completion(
+                messages,
+                max_retries=1,
+                initial_retry_delay=0.5,
+            )
         )()
 
         logger.info("LLM 返回响应完成")
@@ -174,15 +178,15 @@ def debate_room_agent(state: AgentState):
     # 基于混合置信度差异确定最终建议
     if abs(mixed_confidence_diff) < 0.1:  # 接近争论
         final_signal = "neutral"
-        reasoning = "Balanced debate with strong arguments on both sides"
+        reasoning = "多空双方论点均衡，难分胜负"
         confidence = max(bull_confidence, bear_confidence)
     elif mixed_confidence_diff > 0:  # 看多胜出
         final_signal = "bullish"
-        reasoning = "Bullish arguments more convincing"
+        reasoning = "看多观点更具说服力"
         confidence = bull_confidence
     else:  # 看空胜出
         final_signal = "bearish"
-        reasoning = "Bearish arguments more convincing"
+        reasoning = "看空观点更具说服力"
         confidence = bear_confidence
 
     logger.info(f"最终投资信号: {final_signal}, 置信度: {confidence}")
@@ -212,7 +216,7 @@ def debate_room_agent(state: AgentState):
         # 保存推理信息到metadata供API使用
         state["metadata"]["agent_reasoning"] = message_content
 
-    show_workflow_status("Debate Room", "completed")
+    show_workflow_status("辩论室", "completed")
     logger.info("辩论室分析完成")
     return {
         "messages": state["messages"] + [message],

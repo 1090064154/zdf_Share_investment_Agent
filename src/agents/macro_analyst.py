@@ -11,10 +11,19 @@ from src.tools.openrouter_config import get_chat_completion
 logger = setup_logger('macro_analyst_agent')
 
 
+def _normalize_news_item(news: dict) -> dict:
+    return {
+        "title": str(news.get("title", "")).strip() or "未命名新闻",
+        "source": str(news.get("source", "未知来源")).strip() or "未知来源",
+        "publish_time": str(news.get("publish_time", "未知时间")).strip() or "未知时间",
+        "content": str(news.get("content", "")).strip() or str(news.get("title", "")).strip() or "无正文内容",
+    }
+
+
 @agent_endpoint("macro_analyst", "宏观分析师，分析宏观经济环境对目标股票的影响")
 def macro_analyst_agent(state: AgentState):
     """Responsible for macro analysis"""
-    show_workflow_status("Macro Analyst")
+    show_workflow_status("宏观分析师")
     show_reasoning = state["metadata"]["show_reasoning"]
     data = state["data"]
     symbol = data["ticker"]
@@ -24,7 +33,11 @@ def macro_analyst_agent(state: AgentState):
     end_date = data.get("end_date")  # 从 run_hedge_fund 传递来的 end_date
 
     # 获取大量新闻数据（最多100条），传递正确的日期参数
-    news_list = get_stock_news(symbol, max_news=100, date=end_date)
+    try:
+        news_list = get_stock_news(symbol, max_news=100, date=end_date)
+    except Exception as exc:
+        logger.exception("获取宏观分析新闻失败，将回退为空新闻集: %s", exc)
+        news_list = []
 
     # 过滤七天前的新闻（只对有publish_time字段的新闻进行过滤）
     cutoff_date = datetime.now() - timedelta(days=7)
@@ -71,7 +84,7 @@ def macro_analyst_agent(state: AgentState):
         name="macro_analyst_agent",
     )
 
-    show_workflow_status("Macro Analyst", "completed")
+    show_workflow_status("宏观分析师", "completed")
     # logger.info(f"--- DEBUG: macro_analyst_agent COMPLETED ---")
     # logger.info(
     # f"--- DEBUG: macro_analyst_agent RETURN messages: {[msg.name for msg in (state['messages'] + [message])]} ---")
@@ -108,9 +121,10 @@ def get_macro_news_analysis(news_list: list) -> dict:
     os.makedirs(os.path.dirname(cache_file), exist_ok=True)
 
     # 生成新闻内容的唯一标识
+    normalized_news_list = [_normalize_news_item(news) for news in news_list]
     news_key = "|".join([
         f"{news['title']}|{news['publish_time']}"
-        for news in news_list[:20]  # 使用前20条新闻作为标识
+        for news in normalized_news_list[:20]  # 使用前20条新闻作为标识
     ])
 
     # 检查缓存
@@ -154,14 +168,14 @@ def get_macro_news_analysis(news_list: list) -> dict:
         4. 提供具体、可操作的见解"""
     }
 
-    # 准备新闻内容
+    # 准备新闻内容（减少到10条以避免超时）
     news_content = "\n\n".join([
         f"标题：{news['title']}\n"
         f"来源：{news['source']}\n"
         f"时间：{news['publish_time']}\n"
         f"内容：{news['content']}"
-        # 使用前50条新闻进行分析，注意这里不是100，因为可能超过上下文限制，可根据自己的LLM来自行设置
-        for news in news_list[:50]
+        # 减少到10条新闻进行分析，避免LLM超时
+        for news in normalized_news_list[:10]
     ])
 
     user_message = {
@@ -172,15 +186,25 @@ def get_macro_news_analysis(news_list: list) -> dict:
     try:
         # 获取LLM分析结果
         logger.info("正在调用LLM进行宏观分析...")
-        result = get_chat_completion([system_message, user_message])
+        logger.info(f"新闻内容长度: {len(news_content)} 字符")
+        logger.info(f"准备发送消息到LLM...")
+
+        result = get_chat_completion(
+            [system_message, user_message],
+            max_retries=1,
+            initial_retry_delay=0.5,
+        )
+
+        logger.info(f"LLM调用完成，结果类型: {type(result)}")
         if result is None:
-            logger.error("LLM分析失败，无法获取宏观分析结果")
+            logger.warning("LLM分析暂不可用，宏观分析回退为中性结果")
             return {
                 "macro_environment": "neutral",
                 "impact_on_stock": "neutral",
                 "key_factors": [],
                 "reasoning": "LLM分析失败，无法获取宏观分析结果"
             }
+        logger.info(f"LLM返回结果长度: {len(result) if result else 0} 字符")
 
         # 解析JSON结果
         try:

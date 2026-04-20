@@ -8,7 +8,7 @@ import ast
 @agent_endpoint("researcher_bear", "空方研究员，从看空角度分析市场数据并提出风险警示")
 def researcher_bear_agent(state: AgentState):
     """Analyzes signals from a bearish perspective and generates cautionary investment thesis."""
-    show_workflow_status("Bearish Researcher")
+    show_workflow_status("看空研究员")
     show_reasoning = state["metadata"]["show_reasoning"]
 
     # Fetch messages from analysts
@@ -31,6 +31,33 @@ def researcher_bear_agent(state: AgentState):
         technical_signals = ast.literal_eval(technical_message.content)
         sentiment_signals = ast.literal_eval(sentiment_message.content)
         valuation_signals = ast.literal_eval(valuation_message.content)
+
+    analyst_signals = [
+        technical_signals.get("signal"),
+        fundamental_signals.get("signal"),
+        sentiment_signals.get("signal"),
+        valuation_signals.get("signal"),
+    ]
+    if all(signal == "neutral" for signal in analyst_signals):
+        message_content = {
+            "perspective": "bearish",
+            "confidence": 0.0,
+            "thesis_points": ["Insufficient non-neutral evidence to build a bearish thesis."],
+            "reasoning": "All upstream analyst signals are neutral or unavailable."
+        }
+        message = HumanMessage(
+            content=json.dumps(message_content),
+            name="researcher_bear_agent",
+        )
+        if show_reasoning:
+            show_agent_reasoning(message_content, "Bearish Researcher")
+            state["metadata"]["agent_reasoning"] = message_content
+        show_workflow_status("看空研究员", "completed")
+        return {
+            "messages": state["messages"] + [message],
+            "data": state["data"],
+            "metadata": state["metadata"],
+        }
 
     # Analyze from bearish perspective
     bearish_points = []
@@ -100,7 +127,7 @@ def researcher_bear_agent(state: AgentState):
         # 保存推理信息到metadata供API使用
         state["metadata"]["agent_reasoning"] = message_content
 
-    show_workflow_status("Bearish Researcher", "completed")
+    show_workflow_status("看空研究员", "completed")
     return {
         "messages": state["messages"] + [message],
         "data": state["data"],

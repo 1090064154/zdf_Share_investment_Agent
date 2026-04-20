@@ -17,6 +17,26 @@ from src.tools.api import prices_to_df
 logger = setup_logger('technical_analyst_agent')
 
 
+def _build_fallback_analysis(reason: str) -> dict:
+    return {
+        "signal": "neutral",
+        "confidence": "0%",
+        "strategy_signals": {
+            "trend_following": {"signal": "neutral", "confidence": "0%", "metrics": {}},
+            "mean_reversion": {"signal": "neutral", "confidence": "0%", "metrics": {}},
+            "momentum": {"signal": "neutral", "confidence": "0%", "metrics": {}},
+            "volatility": {"signal": "neutral", "confidence": "0%", "metrics": {}},
+            "statistical_arbitrage": {"signal": "neutral", "confidence": "0%", "metrics": {}}
+        },
+        "reasoning": {
+            "fallback": {
+                "signal": "neutral",
+                "details": reason
+            }
+        }
+    }
+
+
 ##### Technical Analyst #####
 @agent_endpoint("technical_analyst", "技术分析师，提供基于价格走势、指标和技术模式的交易信号")
 def technical_analyst_agent(state: AgentState):
@@ -29,11 +49,37 @@ def technical_analyst_agent(state: AgentState):
     5. Statistical Arbitrage Signals
     """
     logger.info("\n--- DEBUG: technical_analyst_agent START ---")
-    show_workflow_status("Technical Analyst")
+    show_workflow_status("技术分析师")
     show_reasoning = state["metadata"]["show_reasoning"]
     data = state["data"]
     prices = data["prices"]
     prices_df = prices_to_df(prices)
+    logger.info(
+        "Technical analyst received price frame: rows=%s columns=%s",
+        len(prices_df),
+        list(prices_df.columns),
+    )
+
+    if prices_df.empty or len(prices_df) < 60:
+        reason = (
+            f"Insufficient price history for technical analysis: "
+            f"received {len(prices_df)} rows, need at least 60."
+        )
+        logger.warning(reason)
+        analysis_report = _build_fallback_analysis(reason)
+        message = HumanMessage(
+            content=json.dumps(analysis_report),
+            name="technical_analyst_agent",
+        )
+        if show_reasoning:
+            show_agent_reasoning(analysis_report, "Technical Analyst")
+            state["metadata"]["agent_reasoning"] = analysis_report
+        show_workflow_status("技术分析师", "completed")
+        return {
+            "messages": [message],
+            "data": data,
+            "metadata": state["metadata"],
+        }
 
     # Initialize confidence variable
     confidence = 0.0
@@ -223,7 +269,7 @@ def technical_analyst_agent(state: AgentState):
         # 保存推理信息到state的metadata供API使用
         state["metadata"]["agent_reasoning"] = analysis_report
 
-    show_workflow_status("Technical Analyst", "completed")
+    show_workflow_status("技术分析师", "completed")
 
     # 添加调试信息，打印将要返回的消息名称
     # logger.info(

@@ -36,12 +36,32 @@ class GeminiClient(LLMClient):
         self.client = genai.Client(api_key=self.api_key)
         logger.info(f"{SUCCESS_ICON} Gemini 客户端初始化成功")
 
+    @staticmethod
+    def _should_fail_fast(error: Exception) -> bool:
+        error_msg = str(error).lower()
+        fast_fail_markers = [
+            "connection error",
+            "nameresolutionerror",
+            "proxyerror",
+            "failed to resolve",
+            "nodename nor servname provided",
+            "temporary failure in name resolution",
+        ]
+        return any(marker in error_msg for marker in fast_fail_markers)
+
+    @staticmethod
+    def _log_api_failure(error: Exception) -> None:
+        if GeminiClient._should_fail_fast(error):
+            logger.warning(f"{ERROR_ICON} API 不可达，使用降级路径: {error}")
+        else:
+            logger.error(f"{ERROR_ICON} API 调用失败: {error}")
+
     @backoff.on_exception(
         backoff.expo,
         (Exception),
-        max_tries=5,
-        max_time=300,
-        giveup=lambda e: "AFC is enabled" not in str(e)
+        max_tries=2,
+        max_time=15,
+        giveup=lambda e: GeminiClient._should_fail_fast(e) or "AFC is enabled" not in str(e)
     )
     def generate_content_with_retry(self, contents, config=None):
         """带重试机制的内容生成函数"""
@@ -70,7 +90,7 @@ class GeminiClient(LLMClient):
                     f"{ERROR_ICON} 触发 API 限制，等待重试... 错误: {error_msg}")
                 time.sleep(5)
             else:
-                logger.error(f"{ERROR_ICON} API 调用失败: {error_msg}")
+                self._log_api_failure(e)
             raise e
 
     def get_completion(self, messages, max_retries=3, initial_retry_delay=1, **kwargs):
@@ -124,14 +144,21 @@ class GeminiClient(LLMClient):
                     return response.text
 
                 except Exception as e:
-                    logger.error(
-                        f"{ERROR_ICON} 尝试 {attempt + 1}/{max_retries} 失败: {str(e)}")
+                    if self._should_fail_fast(e):
+                        logger.warning(
+                            f"{ERROR_ICON} 尝试 {attempt + 1}/{max_retries} 失败，进入降级路径: {str(e)}")
+                    else:
+                        logger.error(
+                            f"{ERROR_ICON} 尝试 {attempt + 1}/{max_retries} 失败: {str(e)}")
                     if attempt < max_retries - 1:
                         retry_delay = initial_retry_delay * (2 ** attempt)
                         logger.info(f"{WAIT_ICON} 等待 {retry_delay} 秒后重试...")
                         time.sleep(retry_delay)
                     else:
-                        logger.error(f"{ERROR_ICON} 最终错误: {str(e)}")
+                        if self._should_fail_fast(e):
+                            logger.warning(f"{ERROR_ICON} 最终降级: {str(e)}")
+                        else:
+                            logger.error(f"{ERROR_ICON} 最终错误: {str(e)}")
                         return None
 
         except Exception as e:
@@ -169,11 +196,32 @@ class OpenAICompatibleClient(LLMClient):
         )
         logger.info(f"{SUCCESS_ICON} OpenAI Compatible 客户端初始化成功")
 
+    @staticmethod
+    def _should_fail_fast(error: Exception) -> bool:
+        error_msg = str(error).lower()
+        fast_fail_markers = [
+            "connection error",
+            "nameresolutionerror",
+            "proxyerror",
+            "failed to resolve",
+            "nodename nor servname provided",
+            "temporary failure in name resolution",
+        ]
+        return any(marker in error_msg for marker in fast_fail_markers)
+
+    @staticmethod
+    def _log_api_failure(error: Exception) -> None:
+        if OpenAICompatibleClient._should_fail_fast(error):
+            logger.warning(f"{ERROR_ICON} API 不可达，使用降级路径: {error}")
+        else:
+            logger.error(f"{ERROR_ICON} API 调用失败: {error}")
+
     @backoff.on_exception(
         backoff.expo,
         (Exception),
-        max_tries=5,
-        max_time=300
+        max_tries=2,
+        max_time=15,
+        giveup=lambda e: OpenAICompatibleClient._should_fail_fast(e)
     )
     def call_api_with_retry(self, messages, stream=False):
         """带重试机制的 API 调用函数"""
@@ -191,8 +239,7 @@ class OpenAICompatibleClient(LLMClient):
             logger.info(f"{SUCCESS_ICON} API 调用成功")
             return response
         except Exception as e:
-            error_msg = str(e)
-            logger.error(f"{ERROR_ICON} API 调用失败: {error_msg}")
+            self._log_api_failure(e)
             raise e
 
     def get_completion(self, messages, max_retries=3, initial_retry_delay=1, **kwargs):
@@ -226,14 +273,21 @@ class OpenAICompatibleClient(LLMClient):
                     return content
 
                 except Exception as e:
-                    logger.error(
-                        f"{ERROR_ICON} 尝试 {attempt + 1}/{max_retries} 失败: {str(e)}")
+                    if self._should_fail_fast(e):
+                        logger.warning(
+                            f"{ERROR_ICON} 尝试 {attempt + 1}/{max_retries} 失败，进入降级路径: {str(e)}")
+                    else:
+                        logger.error(
+                            f"{ERROR_ICON} 尝试 {attempt + 1}/{max_retries} 失败: {str(e)}")
                     if attempt < max_retries - 1:
                         retry_delay = initial_retry_delay * (2 ** attempt)
                         logger.info(f"{WAIT_ICON} 等待 {retry_delay} 秒后重试...")
                         time.sleep(retry_delay)
                     else:
-                        logger.error(f"{ERROR_ICON} 最终错误: {str(e)}")
+                        if self._should_fail_fast(e):
+                            logger.warning(f"{ERROR_ICON} 最终降级: {str(e)}")
+                        else:
+                            logger.error(f"{ERROR_ICON} 最终错误: {str(e)}")
                         return None
 
         except Exception as e:

@@ -9,6 +9,7 @@ from src.agents.state import AgentState, show_agent_reasoning, show_workflow_sta
 from typing import Dict, Any, List
 from src.utils.api_utils import agent_endpoint  # Added for alignment
 from src.tools.openrouter_config import get_chat_completion
+from src.tools.news_crawler import get_stock_news
 from langchain_core.messages import HumanMessage  # Added import
 
 # LLM Prompt for analyzing full news data
@@ -31,6 +32,19 @@ LLM_PROMPT_MACRO_ANALYSIS = """你是一名资深的A股市场宏观分析师。
 logger = setup_logger('macro_news_agent')
 
 
+def _is_usable_cached_summary(summary: str) -> bool:
+    if not summary:
+        return False
+    invalid_markers = [
+        "发生错误",
+        "expecting value",
+        "llm分析未能返回有效结果",
+        "执行出错",
+    ]
+    lowered = summary.lower()
+    return not any(marker.lower() in lowered for marker in invalid_markers)
+
+
 @agent_endpoint("macro_news_agent", "获取沪深300全量新闻并进行宏观分析，为投资决策提供市场层面的宏观环境评估")
 def macro_news_agent(state: AgentState) -> Dict[str, Any]:
     """
@@ -38,10 +52,10 @@ def macro_news_agent(state: AgentState) -> Dict[str, Any]:
     该Agent独立运行，不依赖特定上游数据，结果注入AgentState。
     """
     agent_name = "macro_news_agent"
-    show_workflow_status(f"{agent_name}: --- Executing Macro News Agent ---")
+    show_workflow_status(f"{agent_name}: --- 正在执行宏观新闻 Agent ---")
     symbol = "000300"  # 沪深300指数
     news_list_for_llm: List[Dict[str, str]] = []
-    summary = f"宏观新闻分析过程中发生错误: 未知错误"  # Default error summary
+    summary = "今日宏观新闻摘要暂不可用。"  # Default fallback summary
     retrieved_news_count = 0
     from_cache = False  # Flag to indicate if summary was loaded from cache
 
@@ -53,7 +67,7 @@ def macro_news_agent(state: AgentState) -> Dict[str, Any]:
         try:
             with open(output_file_path, 'r', encoding='utf-8') as f:
                 all_summaries = json.load(f)
-            if today_str in all_summaries and all_summaries[today_str].get("summary_content"):
+            if today_str in all_summaries and _is_usable_cached_summary(all_summaries[today_str].get("summary_content", "")):
                 cached_data = all_summaries[today_str]
                 summary = cached_data["summary_content"]
                 retrieved_news_count = cached_data.get(
@@ -63,6 +77,8 @@ def macro_news_agent(state: AgentState) -> Dict[str, Any]:
                     f"{agent_name}: 从缓存加载 {today_str} 的宏观新闻总结。")
                 show_agent_reasoning(
                     f"Loaded macro summary for {today_str} from cache. News count: {retrieved_news_count}", agent_name)
+            elif today_str in all_summaries:
+                logger.warning("Skipping unusable cached macro summary for %s", today_str)
         except json.JSONDecodeError:
             show_agent_reasoning(
                 f"JSONDecodeError for {output_file_path} when trying to load cache. Will fetch fresh data.", agent_name)
@@ -76,27 +92,20 @@ def macro_news_agent(state: AgentState) -> Dict[str, Any]:
         show_workflow_status(f"{agent_name}: 缓存中未找到今日总结或缓存无效，开始获取实时新闻。")
         try:
             show_workflow_status(
-                f"{agent_name}: Fetching news for symbol {symbol}")
-            news_df = ak.stock_news_em(symbol=symbol)
-            if news_df is None or news_df.empty:
+                f"{agent_name}: 正在获取 {symbol} 的新闻")
+            news_list_for_llm = get_stock_news(symbol, max_news=100, date=today_str)
+            if not news_list_for_llm:
                 message = f"未获取到 {symbol} 的新闻数据。"
                 show_workflow_status(f"{agent_name}: {message}")
                 show_agent_reasoning(
-                    f"No news found for {symbol}. Proceeding with no data summary.", agent_name)
+                    f"未获取到 {symbol} 的新闻。将使用无数据摘要继续。", agent_name)
                 summary = "今日未获取到相关宏观新闻数据。"
             else:
-                retrieved_news_count = len(news_df)
+                retrieved_news_count = len(news_list_for_llm)
                 message = f"成功获取到 {symbol} 的 {retrieved_news_count} 条新闻数据。"
                 show_workflow_status(f"{agent_name}: {message}")
                 show_agent_reasoning(
-                    f"Successfully fetched {retrieved_news_count} news items for {symbol}. Preparing for LLM analysis.", agent_name)
-                for _, row in news_df.iterrows():
-                    news_item = {
-                        "title": str(row.get("新闻标题", "")).strip(),
-                        "content": str(row.get("新闻内容", "")).strip(),  # 全量内容
-                        "publish_time": str(row.get("发布时间", "")).strip()
-                    }
-                    news_list_for_llm.append(news_item)
+                    f"成功获取 {retrieved_news_count} 条 {symbol} 的新闻。正在准备LLM分析。", agent_name)
 
                 news_data_json_string = json.dumps(
                     news_list_for_llm, ensure_ascii=False, indent=2)
@@ -104,26 +113,31 @@ def macro_news_agent(state: AgentState) -> Dict[str, Any]:
                     news_data_json_string=news_data_json_string)
 
                 show_workflow_status(
-                    f"{agent_name}: Calling LLM for analysis.")
+                    f"{agent_name}: 正在调用LLM进行分析。")
                 llm_response = get_chat_completion(
-                    messages=[{"role": "user", "content": prompt_filled}]
+                    messages=[{"role": "user", "content": prompt_filled}],
+                    max_retries=1,
+                    initial_retry_delay=0.5,
                 )
                 summary = llm_response.strip() if llm_response else "LLM分析未能返回有效结果。"
-                show_workflow_status(f"{agent_name}: LLM宏观分析结果获取成功.")
-                show_agent_reasoning(
-                    f"LLM analysis complete. Summary (first 100 chars): {summary[:100]}...", agent_name)
+                if _is_usable_cached_summary(summary):
+                    show_workflow_status(f"{agent_name}: LLM宏观分析结果获取成功.")
+                    show_agent_reasoning(
+                        f"LLM分析完成。摘要(前100字符): {summary[:100]}...", agent_name)
+                else:
+                    show_workflow_status(f"{agent_name}: LLM未返回可用总结，使用中性摘要。")
+                    summary = "今日宏观新闻数据已获取，但自动总结服务暂不可用，建议结合原始新闻人工复核。"
 
         except Exception as e:
-            error_message = f"{agent_name}: 执行出错: {e}"
-            show_workflow_status(error_message)
+            show_workflow_status(f"{agent_name}: 新闻源不可用，使用中性摘要。")
             show_agent_reasoning(
-                f"Exception during execution: {str(e)}", agent_name)
-            summary = f"宏观新闻分析过程中发生错误: {str(e)}"
+                f"启用宏观新闻获取备用方案: {str(e)}", agent_name)
+            summary = "今日宏观新闻数据暂不可用，已跳过该模块并使用中性摘要。"
 
     # 保存总结到JSON文件 (only if not from cache and successful, or if updating existing)
     if not from_cache:  # Also save if summary was updated, even if initially from cache but e.g. re-analyzed
         show_workflow_status(
-            f"{agent_name}: Preparing to save summary to {output_file_path}")
+            f"{agent_name}: 正在保存摘要到 {output_file_path}")
 
         # Ensure all_summaries is initialized if cache loading failed or file didn't exist
         if not os.path.exists(output_file_path) or 'all_summaries' not in locals():
@@ -139,12 +153,13 @@ def macro_news_agent(state: AgentState) -> Dict[str, Any]:
         os.makedirs(os.path.dirname(output_file_path),
                     exist_ok=True)  # Ensure directory exists
 
-        current_summary_details = {
-            "summary_content": summary,
-            "retrieved_news_count": retrieved_news_count,
-            "last_updated": datetime.now().isoformat()
-        }
-        all_summaries[today_str] = current_summary_details
+        if _is_usable_cached_summary(summary):
+            current_summary_details = {
+                "summary_content": summary,
+                "retrieved_news_count": retrieved_news_count,
+                "last_updated": datetime.now().isoformat()
+            }
+            all_summaries[today_str] = current_summary_details
 
         try:
             with open(output_file_path, 'w', encoding='utf-8') as f:
@@ -156,9 +171,9 @@ def macro_news_agent(state: AgentState) -> Dict[str, Any]:
             show_agent_reasoning(
                 f"Failed to save summary to {output_file_path}: {str(e)}", agent_name)
 
-    show_workflow_status(f"{agent_name}: Execution finished.")
+    show_workflow_status(f"{agent_name}: 执行完成。")
 
-    new_message_content = f"Macro News Agent Analysis for {today_str} (from_cache={from_cache}):\\n{summary}"
+    new_message_content = f"宏观新闻Agent分析 {today_str} (是否从缓存加载={from_cache}):\\n{summary}"
     new_message = HumanMessage(content=new_message_content, name=agent_name)
 
     agent_details_for_metadata = {

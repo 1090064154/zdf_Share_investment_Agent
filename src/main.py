@@ -3,6 +3,7 @@ import argparse
 import uuid  # Import uuid for run IDs
 import threading  # Import threading for background task
 import uvicorn  # Import uvicorn to run FastAPI
+import traceback
 
 from datetime import datetime, timedelta
 # Removed START as it's implicit with set_entry_point
@@ -62,11 +63,22 @@ logger = setup_logger('main_workflow')
 
 
 def run_hedge_fund(run_id: str, ticker: str, start_date: str, end_date: str, portfolio: dict, show_reasoning: bool = False, num_of_news: int = 5, show_summary: bool = False):
-    print(f"--- Starting Workflow Run ID: {run_id} ---")
+    print(f"--- 开始执行工作流 Run ID: {run_id} ---")
+    logger.info(
+        "Workflow bootstrap: run_id=%s ticker=%s start=%s end=%s show_reasoning=%s num_of_news=%s show_summary=%s portfolio=%s",
+        run_id,
+        ticker,
+        start_date,
+        end_date,
+        show_reasoning,
+        num_of_news,
+        show_summary,
+        portfolio,
+    )
     try:
         from backend.state import api_state
         api_state.current_run_id = run_id
-        print(f"--- API State updated with Run ID: {run_id} ---")
+        print(f"--- API状态已更新 Run ID: {run_id} ---")
     except Exception as e:
         print(f"Note: Could not update API state: {str(e)}")
 
@@ -89,8 +101,14 @@ def run_hedge_fund(run_id: str, ticker: str, start_date: str, end_date: str, por
     try:
         from backend.utils.context_managers import workflow_run
         with workflow_run(run_id):
+            logger.info("Invoking compiled workflow graph for run_id=%s", run_id)
             final_state = app.invoke(initial_state)
-            print(f"--- Finished Workflow Run ID: {run_id} ---")
+            logger.info(
+                "Workflow graph completed for run_id=%s with %s messages",
+                run_id,
+                len(final_state.get("messages", [])),
+            )
+            print(f"--- 工作流执行完成 Run ID: {run_id} ---")
 
             if HAS_SUMMARY_REPORT and show_summary:
                 store_final_state(final_state)
@@ -100,7 +118,16 @@ def run_hedge_fund(run_id: str, ticker: str, start_date: str, end_date: str, por
             if HAS_STRUCTURED_OUTPUT and show_reasoning:
                 print_structured_output(final_state)
     except ImportError:
+        logger.info(
+            "workflow_run context manager unavailable; invoking workflow directly for run_id=%s",
+            run_id,
+        )
         final_state = app.invoke(initial_state)
+        logger.info(
+            "Workflow graph completed for run_id=%s with %s messages",
+            run_id,
+            len(final_state.get("messages", [])),
+        )
         print(f"--- Finished Workflow Run ID: {run_id} ---")
 
         if HAS_SUMMARY_REPORT and show_summary:
@@ -114,6 +141,11 @@ def run_hedge_fund(run_id: str, ticker: str, start_date: str, end_date: str, por
             api_state.complete_run(run_id, "completed")
         except Exception:
             pass
+    except Exception as exc:
+        logger.exception("Workflow execution failed for run_id=%s: %s", run_id, exc)
+        print(f"--- 工作流执行失败 Run ID: {run_id} ---")
+        print(traceback.format_exc())
+        raise
     return final_state["messages"][-1].content
 
 
@@ -146,18 +178,17 @@ workflow.add_edge("market_data_agent", "valuation_agent")
 workflow.add_edge("market_data_agent", "macro_news_agent")
 
 # Main analysis path (technical, fundamentals, sentiment, valuation -> researchers -> ... -> macro_analyst)
-workflow.add_edge("technical_analyst_agent", "researcher_bull_agent")
-workflow.add_edge("fundamentals_agent", "researcher_bull_agent")
-workflow.add_edge("sentiment_agent", "researcher_bull_agent")
-workflow.add_edge("valuation_agent", "researcher_bull_agent")
+# Use explicit join edges so downstream nodes wait for all required parents.
+workflow.add_edge(
+    ["technical_analyst_agent", "fundamentals_agent", "sentiment_agent", "valuation_agent"],
+    "researcher_bull_agent",
+)
+workflow.add_edge(
+    ["technical_analyst_agent", "fundamentals_agent", "sentiment_agent", "valuation_agent"],
+    "researcher_bear_agent",
+)
 
-workflow.add_edge("technical_analyst_agent", "researcher_bear_agent")
-workflow.add_edge("fundamentals_agent", "researcher_bear_agent")
-workflow.add_edge("sentiment_agent", "researcher_bear_agent")
-workflow.add_edge("valuation_agent", "researcher_bear_agent")
-
-workflow.add_edge("researcher_bull_agent", "debate_room_agent")
-workflow.add_edge("researcher_bear_agent", "debate_room_agent")
+workflow.add_edge(["researcher_bull_agent", "researcher_bear_agent"], "debate_room_agent")
 
 workflow.add_edge("debate_room_agent", "risk_management_agent")
 workflow.add_edge("risk_management_agent", "macro_analyst_agent")
@@ -166,8 +197,7 @@ workflow.add_edge("risk_management_agent", "macro_analyst_agent")
 # macro_analyst_agent (end of main analysis path) and macro_news_agent (parallel news path)
 # both feed into portfolio_management_agent.
 # LangGraph will wait for both parent nodes to complete before running portfolio_management_agent.
-workflow.add_edge("macro_analyst_agent", "portfolio_management_agent")
-workflow.add_edge("macro_news_agent", "portfolio_management_agent")
+workflow.add_edge(["macro_analyst_agent", "macro_news_agent"], "portfolio_management_agent")
 
 # Final node
 workflow.add_edge("portfolio_management_agent", END)
@@ -178,8 +208,11 @@ app = workflow.compile()
 
 
 def run_fastapi():
-    print("--- Starting FastAPI server in background (port 8000) ---")
-    uvicorn.run(fastapi_app, host="0.0.0.0", port=8000, log_config=None)
+    print("--- 正在后台启动 FastAPI 服务器 (端口 8000) ---")
+    try:
+        uvicorn.run(fastapi_app, host="0.0.0.0", port=8000, log_config=None)
+    except Exception as exc:
+        logger.exception("Background FastAPI server failed to start: %s", exc)
 
 
 # --- Main Execution Block ---
@@ -205,6 +238,17 @@ if __name__ == "__main__":
     parser.add_argument('--summary', action='store_true',
                         help='Show beautiful summary report at the end')
     args = parser.parse_args()
+    logger.info(
+        "CLI arguments parsed: ticker=%s start_date=%s end_date=%s show_reasoning=%s num_of_news=%s initial_capital=%s initial_position=%s show_summary=%s",
+        args.ticker,
+        args.start_date,
+        args.end_date,
+        args.show_reasoning,
+        args.num_of_news,
+        args.initial_capital,
+        args.initial_position,
+        args.summary,
+    )
     current_date = datetime.now()
     yesterday = current_date - timedelta(days=1)
     end_date = yesterday if not args.end_date else min(
@@ -231,5 +275,5 @@ if __name__ == "__main__":
         num_of_news=args.num_of_news,
         show_summary=args.summary
     )
-    print("\nFinal Result:")
+    print("\n最终投资决策:")
     print(result)

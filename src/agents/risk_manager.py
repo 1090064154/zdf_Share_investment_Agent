@@ -8,23 +8,74 @@ from src.utils.api_utils import agent_endpoint, log_llm_interaction
 
 import json
 import ast
+from src.utils.logging_config import setup_logger
 
 ##### Risk Management Agent #####
+
+logger = setup_logger('risk_management_agent')
 
 
 @agent_endpoint("risk_management", "风险管理专家，评估投资风险并给出风险调整后的交易建议")
 def risk_management_agent(state: AgentState):
     """Responsible for risk management"""
-    show_workflow_status("Risk Manager")
+    show_workflow_status("风险管理师")
     show_reasoning = state["metadata"]["show_reasoning"]
     portfolio = state["data"]["portfolio"]
     data = state["data"]
 
     prices_df = prices_to_df(data["prices"])
+    logger.info(
+        "Risk manager received price frame: rows=%s columns=%s",
+        len(prices_df),
+        list(prices_df.columns),
+    )
 
-    # Fetch debate room message instead of individual analyst messages
     debate_message = next(
-        msg for msg in state["messages"] if msg.name == "debate_room_agent")
+        (msg for msg in state["messages"] if msg.name == "debate_room_agent"),
+        None,
+    )
+
+    if prices_df.empty or len(prices_df) < 2 or debate_message is None:
+        reason = (
+            f"Insufficient inputs for risk analysis: prices_rows={len(prices_df)}, "
+            f"debate_message_present={debate_message is not None}"
+        )
+        logger.warning(reason)
+        message_content = {
+            "最大持仓规模": 0.0,
+            "风险评分": 10,
+            "交易行动": "hold",
+            "风险指标": {
+                "波动率": 0.0,
+                "95%风险价值": 0.0,
+                "最大回撤": 0.0,
+                "市场风险评分": 10,
+                "压力测试结果": {}
+            },
+            "辩论分析": {
+                "多方置信度": 0.0,
+                "空方置信度": 0.0,
+                "辩论置信度": 0.0,
+                "辩论信号": "neutral"
+            },
+            "推理": reason
+        }
+        message = HumanMessage(
+            content=json.dumps(message_content),
+            name="risk_management_agent",
+        )
+        if show_reasoning:
+            show_agent_reasoning(message_content, "Risk Management Agent")
+            state["metadata"]["agent_reasoning"] = message_content
+        show_workflow_status("风险管理师", "completed")
+        return {
+            "messages": state["messages"] + [message],
+            "data": {
+                **data,
+                "risk_analysis": message_content
+            },
+            "metadata": state["metadata"],
+        }
 
     try:
         debate_results = json.loads(debate_message.content)
@@ -41,7 +92,9 @@ def risk_management_agent(state: AgentState):
     rolling_std = returns.rolling(window=120).std() * (252 ** 0.5)
     volatility_mean = rolling_std.mean()
     volatility_std = rolling_std.std()
-    volatility_percentile = (volatility - volatility_mean) / volatility_std
+    volatility_percentile = 0 if volatility_std == 0 or math.isnan(volatility_std) else (
+        (volatility - volatility_mean) / volatility_std
+    )
 
     # Simple historical VaR at 95% confidence
     var_95 = returns.quantile(0.05)
@@ -104,8 +157,8 @@ def risk_management_agent(state: AgentState):
         portfolio_impact = potential_loss / (portfolio['cash'] + current_position_value) if (
             portfolio['cash'] + current_position_value) != 0 else math.nan
         stress_test_results[scenario] = {
-            "potential_loss": potential_loss,
-            "portfolio_impact": portfolio_impact
+            "潜在损失": potential_loss,
+            "组合影响": portfolio_impact
         }
 
     # 5. Risk-Adjusted Signal Analysis
@@ -141,25 +194,29 @@ def risk_management_agent(state: AgentState):
             trading_action = "hold"
 
     message_content = {
-        "max_position_size": float(max_position_size),
-        "risk_score": risk_score,
-        "trading_action": trading_action,
-        "risk_metrics": {
-            "volatility": float(volatility),
-            "value_at_risk_95": float(var_95),
-            "max_drawdown": float(max_drawdown),
-            "market_risk_score": market_risk_score,
-            "stress_test_results": stress_test_results
+        "最大持仓规模": float(max_position_size),
+        "风险评分": risk_score,
+        "交易行动": trading_action,
+        "风险指标": {
+            "波动率": float(volatility),
+            "95%风险价值": float(var_95),
+            "最大回撤": float(max_drawdown),
+            "市场风险评分": market_risk_score,
+            "压力测试结果": {
+                "市场崩盘": stress_test_results.get("market_crash", {}),
+                "中度下跌": stress_test_results.get("moderate_decline", {}),
+                "轻度下跌": stress_test_results.get("slight_decline", {})
+            }
         },
-        "debate_analysis": {
-            "bull_confidence": bull_confidence,
-            "bear_confidence": bear_confidence,
-            "debate_confidence": debate_confidence,
-            "debate_signal": debate_signal
+        "辩论分析": {
+            "多方置信度": bull_confidence,
+            "空方置信度": bear_confidence,
+            "辩论置信度": debate_confidence,
+            "辩论信号": debate_signal
         },
-        "reasoning": f"Risk Score {risk_score}/10: Market Risk={market_risk_score}, "
-                     f"Volatility={volatility:.2%}, VaR={var_95:.2%}, "
-                     f"Max Drawdown={max_drawdown:.2%}, Debate Signal={debate_signal}"
+        "推理": f"风险评分 {risk_score}/10: 市场风险={market_risk_score}, "
+                f"波动率={volatility:.2%}, 风险价值={var_95:.2%}, "
+                f"最大回撤={max_drawdown:.2%}, 辩论信号={debate_signal}"
     }
 
     # Create the risk management message
@@ -173,7 +230,7 @@ def risk_management_agent(state: AgentState):
         # 保存推理信息到metadata供API使用
         state["metadata"]["agent_reasoning"] = message_content
 
-    show_workflow_status("Risk Manager", "completed")
+    show_workflow_status("风险管理师", "completed")
     return {
         "messages": state["messages"] + [message],
         "data": {

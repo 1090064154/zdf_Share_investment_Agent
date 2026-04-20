@@ -10,142 +10,193 @@ from src.utils.logging_config import setup_logger
 logger = setup_logger('api')
 
 
+def _is_expected_network_error(error: Exception) -> bool:
+    error_msg = str(error).lower()
+    markers = [
+        "nameresolutionerror",
+        "failed to resolve",
+        "nodename nor servname provided",
+        "proxyerror",
+        "remote end closed connection",
+        "connection aborted",
+        "connectionpool",
+        "ssl:",
+        "ssleoferror",
+        "no value to decode",
+    ]
+    return any(marker in error_msg for marker in markers)
+
+
+def _log_data_source_failure(action: str, error: Exception) -> None:
+    if _is_expected_network_error(error):
+        logger.warning("%s unavailable, using fallback data: %s", action, error)
+    else:
+        logger.error("%s failed: %s", action, error)
+
+
+def _estimate_market_cap_from_financials(symbol: str, price: float) -> float:
+    """使用新浪财报中的股本信息粗略估算市值，避免依赖东方财富接口。"""
+    if price <= 0:
+        return 0
+    try:
+        stock_prefix = "sz" if symbol.startswith(("0", "3")) else "sh"
+        balance = ak.stock_financial_report_sina(stock=f"{stock_prefix}{symbol}", symbol="资产负债表")
+        if balance is None or balance.empty:
+            return 0
+        total_shares = 0
+        for col in balance.columns:
+            if "股本" in str(col) or "资本" in str(col):
+                raw_value = balance[col].iloc[0]
+                total_shares = float(raw_value) if not pd.isna(raw_value) else 0
+                if total_shares > 0:
+                    break
+        return price * total_shares if total_shares > 0 else 0
+    except Exception as e:
+        _log_data_source_failure("Market cap fallback calculation", e)
+        return 0
+
+
 def get_financial_metrics(symbol: str) -> Dict[str, Any]:
     """获取财务指标数据"""
     logger.info(f"Getting financial indicators for {symbol}...")
+
+    stock_data = pd.Series()
+    latest_financial = pd.Series()
+    latest_income = pd.Series()
+
+    # 获取实时行情数据（用于市值和估值比率）- 独立 try-except
     try:
-        # 获取实时行情数据（用于市值和估值比率）
         logger.info("Fetching real-time quotes...")
-        realtime_data = ak.stock_zh_a_spot_em()
-        if realtime_data is None or realtime_data.empty:
-            logger.warning("No real-time quotes data available")
-            return [{}]
+        realtime_data = ak.stock_zh_a_spot()
+        if realtime_data is not None and not realtime_data.empty:
+            stock_code = f"sz{symbol}" if symbol.startswith("3") or symbol.startswith("0") else f"sh{symbol}"
+            stock_data_match = realtime_data[realtime_data['代码'] == stock_code]
+            if not stock_data_match.empty:
+                stock_data = stock_data_match.iloc[0]
+                logger.info("✓ Real-time quotes fetched")
+    except Exception as e:
+        logger.warning(f"Failed to get real-time quotes: {e}")
 
-        stock_data = realtime_data[realtime_data['代码'] == symbol]
-        if stock_data.empty:
-            logger.warning(f"No real-time quotes found for {symbol}")
-            return [{}]
-
-        stock_data = stock_data.iloc[0]
-        logger.info("✓ Real-time quotes fetched")
-
-        # 获取新浪财务指标
+    # 获取财务分析指标 - 独立 try-except
+    try:
         logger.info("Fetching Sina financial indicators...")
         current_year = datetime.now().year
         financial_data = ak.stock_financial_analysis_indicator(
             symbol=symbol, start_year=str(current_year-1))
-        if financial_data is None or financial_data.empty:
-            logger.warning("No financial indicator data available")
-            return [{}]
+        if financial_data is not None and not financial_data.empty:
+            financial_data['日期'] = pd.to_datetime(financial_data['日期'])
+            financial_data = financial_data.sort_values('日期', ascending=False)
+            latest_financial = financial_data.iloc[0]
+            logger.info(f"✓ Financial indicators fetched ({len(financial_data)} records)")
+            logger.info(f"Latest data date: {latest_financial.get('日期')}")
+    except Exception as e:
+        logger.warning(f"Failed to get financial indicators: {e}")
 
-        # 按日期排序并获取最新的数据
-        financial_data['日期'] = pd.to_datetime(financial_data['日期'])
-        financial_data = financial_data.sort_values('日期', ascending=False)
-        latest_financial = financial_data.iloc[0] if not financial_data.empty else pd.Series(
-        )
-        logger.info(
-            f"✓ Financial indicators fetched ({len(financial_data)} records)")
-        logger.info(f"Latest data date: {latest_financial.get('日期')}")
+    # 如果没有获取到任何数据
+    if latest_financial.empty:
+        logger.warning("No financial indicator data available, trying to build from available data")
 
-        # 获取利润表数据（用于计算 price_to_sales）
+    # 获取利润表数据（用于计算 price_to_sales）- 独立 try-except
+    try:
         logger.info("Fetching income statement...")
-        try:
-            income_statement = ak.stock_financial_report_sina(
-                stock=f"sh{symbol}", symbol="利润表")
-            if not income_statement.empty:
-                latest_income = income_statement.iloc[0]
-                logger.info("✓ Income statement fetched")
-            else:
-                logger.warning("Failed to get income statement")
-                logger.error("No income statement data found")
-                latest_income = pd.Series()
-        except Exception as e:
-            logger.warning("Failed to get income statement")
-            logger.error(f"Error getting income statement: {e}")
-            latest_income = pd.Series()
+        income_statement = ak.stock_financial_report_sina(
+            stock=f"sh{symbol}", symbol="利润表")
+        if income_statement is not None and not income_statement.empty:
+            latest_income = income_statement.iloc[0]
+            logger.info("✓ Income statement fetched")
+    except Exception as e:
+        logger.warning(f"Failed to get income statement: {e}")
 
-        # 构建完整指标数据
-        logger.info("Building indicators...")
-        try:
-            def convert_percentage(value: float) -> float:
-                """将百分比值转换为小数"""
-                try:
-                    return float(value) / 100.0 if value is not None else 0.0
-                except:
-                    return 0.0
+    # 构建完整指标数据
+    logger.info("Building indicators...")
+    try:
+        def convert_percentage(value: float) -> float:
+            """将百分比值转换为小数"""
+            try:
+                return float(value) / 100.0 if value is not None else 0.0
+            except:
+                return 0.0
 
-            all_metrics = {
-                # 市场数据
-                "market_cap": float(stock_data.get("总市值", 0)),
-                "float_market_cap": float(stock_data.get("流通市值", 0)),
+        all_metrics = {
+            # 市场数据 - 从个股信息获取市值
+            "market_cap": 0,  # 将在后面从个股信息获取
+            "float_market_cap": 0,
 
-                # 盈利数据
-                "revenue": float(latest_income.get("营业总收入", 0)),
-                "net_income": float(latest_income.get("净利润", 0)),
-                "return_on_equity": convert_percentage(latest_financial.get("净资产收益率(%)", 0)),
-                "net_margin": convert_percentage(latest_financial.get("销售净利率(%)", 0)),
-                "operating_margin": convert_percentage(latest_financial.get("营业利润率(%)", 0)),
+            # 盈利数据
+            "revenue": float(latest_income.get("营业总收入", 0)) if not latest_income.empty else 0,
+            "net_income": float(latest_income.get("净利润", 0)) if not latest_income.empty else 0,
+            "return_on_equity": convert_percentage(latest_financial.get("净资产收益率(%)", 0)) if not latest_financial.empty else 0,
+            "net_margin": convert_percentage(latest_financial.get("销售净利率(%)", 0)) if not latest_financial.empty else 0,
+            "operating_margin": convert_percentage(latest_financial.get("营业利润率(%)", 0)) if not latest_financial.empty else 0,
 
-                # 增长指标
-                "revenue_growth": convert_percentage(latest_financial.get("主营业务收入增长率(%)", 0)),
-                "earnings_growth": convert_percentage(latest_financial.get("净利润增长率(%)", 0)),
-                "book_value_growth": convert_percentage(latest_financial.get("净资产增长率(%)", 0)),
+            # 增长指标
+            "revenue_growth": convert_percentage(latest_financial.get("主营业务收入增长率(%)", 0)) if not latest_financial.empty else 0,
+            "earnings_growth": convert_percentage(latest_financial.get("净利润增长率(%)", 0)) if not latest_financial.empty else 0,
+            "book_value_growth": convert_percentage(latest_financial.get("净资产增长率(%)", 0)) if not latest_financial.empty else 0,
 
-                # 财务健康指标
-                "current_ratio": float(latest_financial.get("流动比率", 0)),
-                "debt_to_equity": convert_percentage(latest_financial.get("资产负债率(%)", 0)),
-                "free_cash_flow_per_share": float(latest_financial.get("每股经营性现金流(元)", 0)),
-                "earnings_per_share": float(latest_financial.get("加权每股收益(元)", 0)),
+            # 财务健康指标
+            "current_ratio": float(latest_financial.get("流动比率", 0)) if not latest_financial.empty else 0,
+            "debt_to_equity": convert_percentage(latest_financial.get("资产负债率(%)", 0)) if not latest_financial.empty else 0,
+            "free_cash_flow_per_share": float(latest_financial.get("每股经营性现金流(元)", 0)) if not latest_financial.empty else 0,
+            "earnings_per_share": float(latest_financial.get("加权每股收益(元)", 0)) if not latest_financial.empty else 0,
 
-                # 估值比率
-                "pe_ratio": float(stock_data.get("市盈率-动态", 0)),
-                "price_to_book": float(stock_data.get("市净率", 0)),
-                "price_to_sales": float(stock_data.get("总市值", 0)) / float(latest_income.get("营业总收入", 1)) if float(latest_income.get("营业总收入", 0)) > 0 else 0,
-            }
+            # 估值比率 - 从个股信息获取
+            "pe_ratio": 0,  # 后续可从其他接口获取
+            "price_to_book": 0,
+            "price_to_sales": 0,
+        }
 
-            # 只返回 agent 需要的指标
-            agent_metrics = {
-                # 盈利能力指标
-                "return_on_equity": all_metrics["return_on_equity"],
-                "net_margin": all_metrics["net_margin"],
-                "operating_margin": all_metrics["operating_margin"],
+        all_metrics["market_cap"] = _estimate_market_cap_from_financials(
+            symbol,
+            float(stock_data.get("最新价", 0)) if not stock_data.empty else 0,
+        )
+        if all_metrics["market_cap"] > 0:
+            logger.info(f"✓ 通过新浪财报估算市值: {all_metrics['market_cap']}")
 
-                # 增长指标
-                "revenue_growth": all_metrics["revenue_growth"],
-                "earnings_growth": all_metrics["earnings_growth"],
-                "book_value_growth": all_metrics["book_value_growth"],
+        # 只返回 agent 需要的指标
+        agent_metrics = {
+            # 盈利能力指标
+            "return_on_equity": all_metrics["return_on_equity"],
+            "net_margin": all_metrics["net_margin"],
+            "operating_margin": all_metrics["operating_margin"],
 
-                # 财务健康指标
-                "current_ratio": all_metrics["current_ratio"],
-                "debt_to_equity": all_metrics["debt_to_equity"],
-                "free_cash_flow_per_share": all_metrics["free_cash_flow_per_share"],
-                "earnings_per_share": all_metrics["earnings_per_share"],
+            # 增长指标
+            "revenue_growth": all_metrics["revenue_growth"],
+            "earnings_growth": all_metrics["earnings_growth"],
+            "book_value_growth": all_metrics["book_value_growth"],
 
-                # 估值比率
-                "pe_ratio": all_metrics["pe_ratio"],
-                "price_to_book": all_metrics["price_to_book"],
-                "price_to_sales": all_metrics["price_to_sales"],
-            }
+            # 财务健康指标
+            "current_ratio": all_metrics["current_ratio"],
+            "debt_to_equity": all_metrics["debt_to_equity"],
+            "free_cash_flow_per_share": all_metrics["free_cash_flow_per_share"],
+            "earnings_per_share": all_metrics["earnings_per_share"],
 
-            logger.info("✓ Indicators built successfully")
+            # 估值比率
+            "pe_ratio": all_metrics["pe_ratio"],
+            "price_to_book": all_metrics["price_to_book"],
+            "price_to_sales": all_metrics["price_to_sales"],
+        }
 
-            # 打印所有获取到的指标数据（用于调试）
-            logger.debug("\n获取到的完整指标数据：")
-            for key, value in all_metrics.items():
-                logger.debug(f"{key}: {value}")
+        logger.info("✓ Indicators built successfully")
 
-            logger.debug("\n传递给 agent 的指标数据：")
-            for key, value in agent_metrics.items():
-                logger.debug(f"{key}: {value}")
+        # 打印所有获取到的指标数据（用于调试）
+        logger.debug("\n获取到的完整指标数据：")
+        for key, value in all_metrics.items():
+            logger.debug(f"{key}: {value}")
 
-            return [agent_metrics]
+        logger.debug("\n传递给 agent 的指标数据：")
+        for key, value in agent_metrics.items():
+            logger.debug(f"{key}: {value}")
 
-        except Exception as e:
-            logger.error(f"Error building indicators: {e}")
+        # 如果指标全为0，说明没有获取到有效数据
+        if all(v == 0 for v in agent_metrics.values()):
+            logger.warning("All metrics are zero, returning empty")
             return [{}]
+
+        return [agent_metrics]
 
     except Exception as e:
-        logger.error(f"Error getting financial indicators: {e}")
+        logger.error(f"Error building indicators: {e}")
         return [{}]
 
 
@@ -170,7 +221,7 @@ def get_financial_statements(symbol: str) -> Dict[str, Any]:
                 previous_balance = pd.Series()
         except Exception as e:
             logger.warning("Failed to get balance sheet")
-            logger.error(f"Error getting balance sheet: {e}")
+            _log_data_source_failure("Balance sheet source", e)
             latest_balance = pd.Series()
             previous_balance = pd.Series()
 
@@ -191,7 +242,7 @@ def get_financial_statements(symbol: str) -> Dict[str, Any]:
                 previous_income = pd.Series()
         except Exception as e:
             logger.warning("Failed to get income statement")
-            logger.error(f"Error getting income statement: {e}")
+            _log_data_source_failure("Income statement source", e)
             latest_income = pd.Series()
             previous_income = pd.Series()
 
@@ -212,7 +263,7 @@ def get_financial_statements(symbol: str) -> Dict[str, Any]:
                 previous_cash_flow = pd.Series()
         except Exception as e:
             logger.warning("Failed to get cash flow statement")
-            logger.error(f"Error getting cash flow statement: {e}")
+            _log_data_source_failure("Cash flow statement source", e)
             latest_cash_flow = pd.Series()
             previous_cash_flow = pd.Series()
 
@@ -266,7 +317,7 @@ def get_financial_statements(symbol: str) -> Dict[str, Any]:
         return line_items
 
     except Exception as e:
-        logger.error(f"Error getting financial statements: {e}")
+        _log_data_source_failure("Financial statement source", e)
         default_item = {
             "net_income": 0,
             "operating_revenue": 0,
@@ -280,24 +331,47 @@ def get_financial_statements(symbol: str) -> Dict[str, Any]:
 
 
 def get_market_data(symbol: str) -> Dict[str, Any]:
-    """获取市场数据"""
+    """获取市场数据 - 使用新浪/腾讯数据源"""
     try:
-        # 获取实时行情
-        realtime_data = ak.stock_zh_a_spot_em()
-        stock_data = realtime_data[realtime_data['代码'] == symbol].iloc[0]
+        # 获取实时行情 - 新浪数据源
+        realtime_data = ak.stock_zh_a_spot()
+        # 新浪数据源股票代码格式
+        stock_code = f"sz{symbol}" if symbol.startswith("3") or symbol.startswith("0") else f"sh{symbol}"
+        stock_data = realtime_data[realtime_data['代码'] == stock_code]
+
+        if not stock_data.empty:
+            stock_data = stock_data.iloc[0]
+            price = float(stock_data.get("最新价", 0))
+            volume = float(stock_data.get("成交量", 0))
+            high_52w = float(stock_data.get("最高", 0))
+            low_52w = float(stock_data.get("最低", 0))
+        else:
+            price = 0
+            volume = 0
+            high_52w = 0
+            low_52w = 0
+
+        market_cap = _estimate_market_cap_from_financials(symbol, price)
+        if market_cap > 0:
+            logger.info(f"✓ 通过新浪财报估算市值: {market_cap}")
 
         return {
-            "market_cap": float(stock_data.get("总市值", 0)),
-            "volume": float(stock_data.get("成交量", 0)),
-            # A股没有平均成交量，暂用当日成交量
-            "average_volume": float(stock_data.get("成交量", 0)),
-            "fifty_two_week_high": float(stock_data.get("52周最高", 0)),
-            "fifty_two_week_low": float(stock_data.get("52周最低", 0))
+            "market_cap": market_cap,
+            "volume": volume,
+            "average_volume": volume,
+            "fifty_two_week_high": high_52w,
+            "fifty_two_week_low": low_52w
         }
 
     except Exception as e:
-        logger.error(f"Error getting market data: {e}")
-        return {}
+        _log_data_source_failure("Market data source", e)
+        return {
+            "market_cap": 0,
+            "volume": 0,
+            "average_volume": 0,
+            "fifty_two_week_high": 0,
+            "fifty_two_week_low": 0
+        }
 
 
 def get_price_history(symbol: str, start_date: str = None, end_date: str = None, adjust: str = "qfq") -> pd.DataFrame:
@@ -363,35 +437,49 @@ def get_price_history(symbol: str, start_date: str = None, end_date: str = None,
         logger.info(f"End date: {end_date.strftime('%Y-%m-%d')}")
 
         def get_and_process_data(start_date, end_date):
-            """获取并处理数据，包括重命名列等操作"""
-            df = ak.stock_zh_a_hist(
-                symbol=symbol,
-                period="daily",
-                start_date=start_date.strftime("%Y%m%d"),
-                end_date=end_date.strftime("%Y%m%d"),
-                adjust=adjust
-            )
+            """获取并处理数据，包括重命名列等操作 - 使用腾讯数据源"""
+            # 腾讯数据源股票代码格式
+            stock_code = f"sz{symbol}" if symbol.startswith("3") or symbol.startswith("0") else f"sh{symbol}"
+
+            # 使用腾讯历史行情接口
+            df = ak.stock_zh_a_hist_tx(symbol=stock_code)
 
             if df is None or df.empty:
                 return pd.DataFrame()
 
+            # 腾讯数据列: date, open, close, high, low, amount (成交量单位: 手)
             # 重命名列以匹配技术分析代理的需求
             df = df.rename(columns={
-                "日期": "date",
-                "开盘": "open",
-                "最高": "high",
-                "最低": "low",
-                "收盘": "close",
-                "成交量": "volume",
-                "成交额": "amount",
-                "振幅": "amplitude",
-                "涨跌幅": "pct_change",
-                "涨跌额": "change_amount",
-                "换手率": "turnover"
+                "date": "date",
+                "open": "open",
+                "close": "close",
+                "high": "high",
+                "low": "low",
+                "amount": "volume"  # 腾讯的 amount 是成交量(手)
             })
+
+            # 添加缺失的列
+            if "volume" not in df.columns and "amount" in df.columns:
+                df["volume"] = df["amount"]
+
+            # 添加其他需要的列（腾讯不提供，设为默认值）
+            if "amount" not in df.columns:
+                df["amount"] = df["volume"] * df["close"]  # 估算成交额
+            if "amplitude" not in df.columns:
+                df["amplitude"] = (df["high"] - df["low"]) / df["close"].shift(1) * 100
+            if "pct_change" not in df.columns:
+                df["pct_change"] = df["close"].pct_change() * 100
+            if "change_amount" not in df.columns:
+                df["change_amount"] = df["close"] - df["close"].shift(1)
+            if "turnover" not in df.columns:
+                df["turnover"] = 0  # 腾讯不直接提供换手率
 
             # 确保日期列为datetime类型
             df["date"] = pd.to_datetime(df["date"])
+
+            # 过滤日期范围
+            df = df[(df["date"] >= start_date) & (df["date"] <= end_date)]
+
             return df
 
         # 获取历史行情数据
@@ -547,7 +635,7 @@ def get_price_history(symbol: str, start_date: str = None, end_date: str = None,
         return df
 
     except Exception as e:
-        logger.error(f"Error getting price history: {e}")
+        _log_data_source_failure("Price history source", e)
         return pd.DataFrame()
 
 

@@ -8,18 +8,65 @@ import json
 logger = setup_logger('valuation_agent')
 
 
+def _safe_first(items):
+    return items[0] if isinstance(items, list) and items else {}
+
+
+def _safe_second(items):
+    if isinstance(items, list) and len(items) > 1:
+        return items[1]
+    return _safe_first(items)
+
+
 @agent_endpoint("valuation", "估值分析师，使用DCF和所有者收益法评估公司内在价值")
 def valuation_agent(state: AgentState):
     """Responsible for valuation analysis"""
-    show_workflow_status("Valuation Agent")
+    show_workflow_status("估值Agent")
     show_reasoning = state["metadata"]["show_reasoning"]
     data = state["data"]
-    metrics = data["financial_metrics"][0]
-    current_financial_line_item = data["financial_line_items"][0]
-    previous_financial_line_item = data["financial_line_items"][1]
-    market_cap = data["market_cap"]
+    metrics = _safe_first(data.get("financial_metrics", []))
+    current_financial_line_item = _safe_first(data.get("financial_line_items", []))
+    previous_financial_line_item = _safe_second(data.get("financial_line_items", []))
+    market_cap = data.get("market_cap") or 0
+    logger.info(
+        "Valuation inputs prepared: market_cap=%s metrics_keys=%s current_line_item_keys=%s previous_line_item_keys=%s",
+        market_cap,
+        list(metrics.keys()) if isinstance(metrics, dict) else type(metrics).__name__,
+        list(current_financial_line_item.keys()) if isinstance(current_financial_line_item, dict) else type(current_financial_line_item).__name__,
+        list(previous_financial_line_item.keys()) if isinstance(previous_financial_line_item, dict) else type(previous_financial_line_item).__name__,
+    )
 
     reasoning = {}
+
+    if market_cap <= 0 or not current_financial_line_item:
+        reason = "Insufficient valuation inputs: market_cap missing or financial statements unavailable."
+        logger.warning(reason)
+        message_content = {
+            "signal": "neutral",
+            "confidence": "0%",
+            "reasoning": {
+                "fallback": {
+                    "signal": "neutral",
+                    "details": reason
+                }
+            }
+        }
+        message = HumanMessage(
+            content=json.dumps(message_content),
+            name="valuation_agent",
+        )
+        if show_reasoning:
+            show_agent_reasoning(message_content, "Valuation Analysis Agent")
+            state["metadata"]["agent_reasoning"] = message_content
+        show_workflow_status("估值Agent", "completed")
+        return {
+            "messages": [message],
+            "data": {
+                **data,
+                "valuation_analysis": message_content
+            },
+            "metadata": state["metadata"],
+        }
 
     # Calculate working capital change
     working_capital_change = (current_financial_line_item.get(
@@ -32,7 +79,7 @@ def valuation_agent(state: AgentState):
             'depreciation_and_amortization'),
         capex=current_financial_line_item.get('capital_expenditure'),
         working_capital_change=working_capital_change,
-        growth_rate=metrics["earnings_growth"],
+        growth_rate=metrics.get("earnings_growth", 0),
         required_return=0.15,
         margin_of_safety=0.25
     )
@@ -40,15 +87,15 @@ def valuation_agent(state: AgentState):
     # DCF Valuation
     dcf_value = calculate_intrinsic_value(
         free_cash_flow=current_financial_line_item.get('free_cash_flow'),
-        growth_rate=metrics["earnings_growth"],
+        growth_rate=metrics.get("earnings_growth", 0),
         discount_rate=0.10,
         terminal_growth_rate=0.03,
         num_years=5,
     )
 
     # Calculate combined valuation gap (average of both methods)
-    dcf_gap = (dcf_value - market_cap) / market_cap
-    owner_earnings_gap = (owner_earnings_value - market_cap) / market_cap
+    dcf_gap = (dcf_value - market_cap) / market_cap if market_cap else 0
+    owner_earnings_gap = (owner_earnings_value - market_cap) / market_cap if market_cap else 0
     valuation_gap = (dcf_gap + owner_earnings_gap) / 2
 
     if valuation_gap > 0.10:  # Changed from 0.15 to 0.10 (10% undervalued)
@@ -84,7 +131,7 @@ def valuation_agent(state: AgentState):
         # 保存推理信息到metadata供API使用
         state["metadata"]["agent_reasoning"] = message_content
 
-    show_workflow_status("Valuation Agent", "completed")
+    show_workflow_status("估值Agent", "completed")
     # logger.info(
     # f"--- DEBUG: valuation_agent RETURN messages: {[msg.name for msg in [message]]} ---")
     return {

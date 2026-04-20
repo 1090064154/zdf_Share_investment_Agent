@@ -50,7 +50,7 @@ def portfolio_management_agent(state: AgentState):
     # logger.info(
     # f"--- DEBUG: {agent_name} CLEANED messages for processing: {[msg.name for msg in cleaned_messages_for_processing]} ---")
 
-    show_workflow_status(f"{agent_name}: --- Executing Portfolio Manager ---")
+    show_workflow_status(f"{agent_name}: --- 正在执行投资组合管理 ---")
     show_reasoning_flag = state["metadata"]["show_reasoning"]
     portfolio = state["data"]["portfolio"]
 
@@ -89,54 +89,53 @@ def portfolio_management_agent(state: AgentState):
     macro_news_agent_message_obj = get_latest_message_by_name(
         cleaned_messages_for_processing, "macro_news_agent")
 
-    system_message_content = """You are a portfolio manager making final trading decisions.
-            Your job is to make a trading decision based on the team's analysis while strictly adhering
-            to risk management constraints.
+    system_message_content = """你是一位专业的投资组合经理，负责做出最终的交易决策。
+            你的任务是在严格遵守风险管理约束的前提下，根据团队的分析做出交易决策。
 
-            RISK MANAGEMENT CONSTRAINTS:
-            - You MUST NOT exceed the max_position_size specified by the risk manager
-            - You MUST follow the trading_action (buy/sell/hold) recommended by risk management
-            - These are hard constraints that cannot be overridden by other signals
+            风险管理约束（硬性要求，必须遵守）：
+            - 禁止超过风险管理师规定的最大持仓量
+            - 必须遵循风险管理师推荐的交易操作（买入/卖出/持有）
+            - 这些是硬性约束，不能被其他信号Override
 
-            When weighing the different signals for direction and timing:
-            1. Valuation Analysis (30% weight)
-            2. Fundamental Analysis (25% weight)
-            3. Technical Analysis (20% weight)
-            4. Macro Analysis (15% weight) - This encompasses TWO inputs:
-               a) General Macro Environment (from Macro Analyst Agent, tool-based)
-               b) Daily Market-Wide News Summary (from Macro News Agent)
-               Both provide context for external risks and opportunities.
-            5. Sentiment Analysis (10% weight)
+            各分析维度权重：
+            1. 估值分析 (30%权重)
+            2. 基本面分析 (25%权重)
+            3. 技术分析 (20%权重)
+            4. 宏观分析 (15%权重) - 包含两部分：
+               a) 常规宏观环境（来自宏观分析师 Agent，基于工具分析）
+               b) 每日大盘新闻摘要（来自宏观新闻 Agent）
+               两者都为外部风险和机会提供背景参考。
+            5. 情绪分析 (10%权重)
 
-            The decision process should be:
-            1. First check risk management constraints
-            2. Then evaluate valuation signal
-            3. Then evaluate fundamentals signal
-            4. Consider BOTH the General Macro Environment AND the Daily Market-Wide News Summary.
-            5. Use technical analysis for timing
-            6. Consider sentiment for final adjustment
+            决策流程：
+            1. 首先检查风险管理约束
+            2. 然后评估估值信号
+            3. 接着评估基本面信号
+            4. 综合考虑常规宏观环境和每日大盘新闻摘要
+            5. 使用技术分析把握时机
+            6. 参考情绪分析进行最终调整
 
-            Provide the following in your output JSON:
-            - "action": "buy" | "sell" | "hold",
-            - "quantity": <positive integer>
-            - "confidence": <float between 0 and 1>
-            - "agent_signals": <list of agent signals including agent name, signal (bullish | bearish | neutral), and their confidence>.
-              IMPORTANT: Your 'agent_signals' list MUST include entries for:
-                - "technical_analysis"
-                - "fundamental_analysis"
-                - "sentiment_analysis"
-                - "valuation_analysis"
-                - "risk_management"
-                - "selected_stock_macro_analysis" (representing the tool-based macro input from macro_analyst_agent)
-                - "market_wide_news_summary(沪深300指数)" (representing the daily news summary input from macro_news_agent - provide a brief signal like bullish/bearish/neutral for the news summary itself, or state if it was primarily factored into overall reasoning with confidence reflecting its impact)
-            - "reasoning": <concise explanation of the decision including how you weighted ALL signals, including both macro inputs>
+            请按以下JSON格式输出：
+            - "action": "buy" | "sell" | "hold"（买入/卖出/持有）
+            - "quantity": <正整数，交易数量>
+            - "confidence": <0到1之间的浮点数，置信度>
+            - "agent_signals": <包含各Agent信号的列表，每个信号包括Agent名称、信号（看多/看空/中性）和置信度>
+              注意：你的 'agent_signals' 列表必须包含以下Agent的条目：
+                - "technical_analysis"（技术分析）
+                - "fundamental_analysis"（基本面分析）
+                - "sentiment_analysis"（情绪分析）
+                - "valuation_analysis"（估值分析）
+                - "risk_management"（风险管理）
+                - "selected_stock_macro_analysis"（来自macro_analyst_agent的针对所选股票的宏观分析）
+                - "market_wide_news_summary(沪深300指数)"（来自macro_news_agent的每日大盘新闻摘要）
+            - "reasoning": <简洁解释你的决策过程，包括如何权衡所有信号>
 
-            Trading Rules:
-            - Never exceed risk management position limits
-            - Only buy if you have available cash
-            - Only sell if you have shares to sell
-            - Quantity must be ≤ current position for sells
-            - Quantity must be ≤ max_position_size from risk management"""
+            交易规则：
+            - 禁止超过风险管理的位置限制
+            - 只有在可用现金充足时才能买入
+            - 只有在持有股票时才能卖出
+            - 卖出数量必须≤当前持仓量
+            - 买入数量必须≤风险管理允许的最大持仓量"""
     system_message = {
         "role": "system",
         "content": system_message_content
@@ -167,7 +166,11 @@ def portfolio_management_agent(state: AgentState):
         agent_name, f"Preparing LLM. User msg includes: TA, FA, Sent, Val, Risk, GeneralMacro, MarketNews.")
 
     llm_interaction_messages = [system_message, user_message]
-    llm_response_content = get_chat_completion(llm_interaction_messages)
+    llm_response_content = get_chat_completion(
+        llm_interaction_messages,
+        max_retries=1,
+        initial_retry_delay=0.5,
+    )
 
     current_metadata = state["metadata"]
     current_metadata["current_agent_name"] = agent_name
@@ -183,7 +186,7 @@ def portfolio_management_agent(state: AgentState):
         llm_response_content = json.dumps({
             "action": "hold",
             "quantity": 0,
-            "confidence": 0.7,
+            "confidence": 0.3,
             "agent_signals": [
                 {"agent_name": "technical_analysis",
                     "signal": "neutral", "confidence": 0.0},
@@ -200,7 +203,7 @@ def portfolio_management_agent(state: AgentState):
                 {"agent_name": "macro_news_agent",
                     "signal": "unavailable_or_llm_error", "confidence": 0.0}
             ],
-            "reasoning": "LLM API error. Defaulting to conservative hold based on risk management."
+            "reasoning": "LLM API unavailable. Defaulting to a low-confidence conservative hold based on risk management."
         })
 
     final_decision_message = HumanMessage(
@@ -227,7 +230,7 @@ def portfolio_management_agent(state: AgentState):
             "raw_response_snippet": llm_response_content[:200] + "..."
         }
 
-    show_workflow_status(f"{agent_name}: --- Portfolio Manager Completed ---")
+    show_workflow_status(f"{agent_name}: --- 投资组合管理完成 ---")
 
     # The portfolio_management_agent is a terminal or near-terminal node in terms of new message generation for the main state.
     # It should return its own decision, and an updated state["messages"] that includes its decision.
