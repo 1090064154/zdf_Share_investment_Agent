@@ -39,7 +39,7 @@ def valuation_agent(state: AgentState):
     reasoning = {}
 
     if market_cap <= 0 or not current_financial_line_item:
-        reason = "Insufficient valuation inputs: market_cap missing or financial statements unavailable."
+        reason = "估值输入不足：市值缺失或财务报表不可用。"
         logger.warning(reason)
         message_content = {
             "signal": "neutral",
@@ -56,7 +56,7 @@ def valuation_agent(state: AgentState):
             name="valuation_agent",
         )
         if show_reasoning:
-            show_agent_reasoning(message_content, "Valuation Analysis Agent")
+            show_agent_reasoning(message_content, "估值分析Agent")
             state["metadata"]["agent_reasoning"] = message_content
         show_workflow_status("估值Agent", "completed")
         return {

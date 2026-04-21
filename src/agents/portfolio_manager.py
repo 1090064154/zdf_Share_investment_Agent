@@ -118,17 +118,26 @@ def portfolio_management_agent(state: AgentState):
             请按以下JSON格式输出：
             - "action": "buy" | "sell" | "hold"（买入/卖出/持有）
             - "quantity": <正整数，交易数量>
-            - "confidence": <0到1之间的浮点数，置信度>
-            - "agent_signals": <包含各Agent信号的列表，每个信号包括Agent名称、信号（看多/看空/中性）和置信度>
-              注意：你的 'agent_signals' 列表必须包含以下Agent的条目：
+            - "confidence": <0到1之间的浮点数，表示你对最终决策的置信度>
+            - "agent_signals": <包含各Agent信号的列表，每个信号是一个对象，包含：
+                * "agent_name": Agent名称（见下方列表）
+                * "signal": 信号值（"bullish"/"bearish"/"neutral" 或 "看多"/"看空"/"中性"）
+                * "confidence": 0到1之间的浮点数（从各Agent输出中提取，如果是百分比字符串如"50%"则转换为0.5）
+              你的 'agent_signals' 列表必须包含以下Agent的条目：
                 - "technical_analysis"（技术分析）
                 - "fundamental_analysis"（基本面分析）
                 - "sentiment_analysis"（情绪分析）
                 - "valuation_analysis"（估值分析）
                 - "risk_management"（风险管理）
-                - "selected_stock_macro_analysis"（来自macro_analyst_agent的针对所选股票的宏观分析）
-                - "market_wide_news_summary(沪深300指数)"（来自macro_news_agent的每日大盘新闻摘要）
+                - "macro_analysis"（宏观分析）
             - "reasoning": <简洁解释你的决策过程，包括如何权衡所有信号>
+
+            重要提示：
+            1. 从各Agent的JSON输出中正确提取confidence值：
+               - 如果是百分比字符串（如"50%"），转换为浮点数（0.5）
+               - 如果已经是浮点数，直接使用
+               - 不要返回0，除非该Agent确实返回了0或无法确定
+            2. 从各Agent的JSON输出中正确提取signal值（查找"signal"字段）
 
             交易规则：
             - 禁止超过风险管理的位置限制

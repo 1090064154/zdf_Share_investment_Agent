@@ -143,6 +143,14 @@ FIELD_NAME_MAP = {
     # 投资组合管理字段
     "agent_signals": "各分析师信号",
     "agent_name": "分析师名称",
+    # Agent名称中英映射
+    "technical_analysis": "技术分析",
+    "fundamental_analysis": "基本面分析",
+    "sentiment_analysis": "情绪分析",
+    "valuation_analysis": "估值分析",
+    "risk_management": "风险管理",
+    "selected_stock_macro_analysis": "所选股宏观分析",
+    "market_wide_news_summary(沪深300指数)": "大盘新闻摘要(沪深300)",
 
     # 宏观分析字段
     "macro_environment": "宏观环境",
@@ -150,6 +158,42 @@ FIELD_NAME_MAP = {
     "key_factors": "关键因素",
     "positive": "积极",
     "negative": "消极",
+    "neutral": "中性",
+    "cautious_weak": "谨慎偏弱",
+
+    # 财务指标缩写映射
+    "ROE": "净资产收益率",
+    "Net Margin": "净利率",
+    "Op Margin": "营业利润率",
+    "Revenue Growth": "营收增长率",
+    "Earnings Growth": "盈利增长率",
+    "D/E": "负债权益比",
+    "P/E": "市盈率",
+    "P/B": "市净率",
+    "P/S": "市销率",
+    "Current Ratio": "流动比率",
+    "Free Cash Flow": "自由现金流",
+    "EPS": "每股收益",
+    "Intrinsic Value": "内在价值",
+    "Market Cap": "市值",
+    "Owner Earnings Value": "所有者收益价值",
+    "Gap": "差距",
+    "DCF": "现金流折现",
+    "ADX": "平均趋向指数",
+    "RSI": "相对强弱指数",
+    "Z-score": "Z分数",
+    "ATR": "平均真实波幅",
+
+    # 研究员字段
+    "perspective": "观点",
+    "thesis_points": "论点",
+
+    # 信号值映射
+    "bullish": "看多",
+    "bearish": "看空",
+    "hold": "持有",
+    "buy": "买入",
+    "sell": "卖出",
 }
 
 # Agent显示顺序
@@ -185,17 +229,41 @@ class StructuredTerminalOutput:
         """添加agent数据"""
         self.data[agent_name] = data
 
-    def _format_value(self, value: Any) -> str:
+    def _format_value(self, value: Any, key: str = "") -> str:
         """格式化单个值"""
         if isinstance(value, bool):
             return "✅" if value else "❌"
         elif isinstance(value, (int, float)):
+            # 对置信度字段进行特殊处理
+            if key.lower() == "confidence":
+                # 智能判断：大于1认为是百分比，否则是小数
+                conf_value = value if value > 1 else value * 100
+                return f"{conf_value:.0f}%"
             # 对百分比值进行特殊处理
             if -1 <= value <= 1 and isinstance(value, float):
                 return f"{value:.2%}"
             return str(value)
         elif value is None:
             return "N/A"
+        elif isinstance(value, str):
+            # 对置信度字段进行特殊处理
+            if key.lower() == "confidence":
+                try:
+                    conf_str = value.strip().replace("%", "")
+                    conf_num = float(conf_str)
+                    # 如果字符串值大于1，认为是百分比；否则是小数
+                    conf_value = conf_num if conf_num > 1 else conf_num * 100
+                    return f"{conf_value:.0f}%"
+                except (ValueError, TypeError):
+                    return value
+            # 尝试将字符串值转换为中文（如 neutral -> 中性）
+            # 先尝试精确匹配，再尝试小写匹配
+            if value in FIELD_NAME_MAP:
+                return FIELD_NAME_MAP[value]
+            lower_value = value.lower()
+            if lower_value in FIELD_NAME_MAP:
+                return FIELD_NAME_MAP[lower_value]
+            return value
         else:
             return str(value)
 
@@ -228,7 +296,7 @@ class StructuredTerminalOutput:
                     else:
                         result.append(f"{indent_str}  {sub_prefix} {item}")
             else:
-                formatted_value = self._format_value(value)
+                formatted_value = self._format_value(value, key)
                 result.append(f"{indent_str}{prefix} {display_key}: {formatted_value}")
 
         return result
@@ -266,10 +334,22 @@ class StructuredTerminalOutput:
 
                 if "confidence" in data:
                     conf = data.get("confidence", 0)
-                    if isinstance(conf, (int, float)) and conf <= 1:
-                        conf_str = f"{conf*100:.0f}%"
-                    else:
-                        conf_str = str(conf)
+                    # 格式化置信度（处理多种格式）
+                    try:
+                        if isinstance(conf, (int, float)):
+                            # 如果是数字，判断范围：大于1则认为是百分比，否则是小数
+                            conf_value = conf if conf > 1 else conf * 100
+                        elif isinstance(conf, str):
+                            conf_str = conf.strip().replace("%", "")
+                            conf_num = float(conf_str)
+                            # 如果字符串值大于1，认为是百分比；否则是小数
+                            conf_value = conf_num if conf_num > 1 else conf_num * 100
+                        else:
+                            conf_value = 0
+                        conf_value = max(0, min(100, conf_value))  # 限制在0-100之间
+                    except (ValueError, TypeError):
+                        conf_value = 0
+                    conf_str = f"{conf_value:.0f}%"
                     result.append(f"{SYMBOLS['vertical']} 决策信心: {conf_str}")
 
                 # 显示各个Agent的信号
@@ -289,14 +369,29 @@ class StructuredTerminalOutput:
                         # 获取信号图标
                         signal_icon = STATUS_ICONS.get(signal.lower(), "")
 
-                        # 格式化置信度
-                        if isinstance(conf, (int, float)) and conf <= 1:
-                            conf_str = f"{conf*100:.0f}%"
-                        else:
-                            conf_str = str(conf)
+                        # 格式化置信度（处理多种格式）
+                        try:
+                            if isinstance(conf, (int, float)):
+                                # 如果是数字，判断范围：大于1则认为是百分比，否则是小数
+                                conf_value = conf if conf > 1 else conf * 100
+                            elif isinstance(conf, str):
+                                conf_str = str(conf).strip().replace("%", "")
+                                conf_num = float(conf_str)
+                                # 如果字符串值大于1，认为是百分比；否则是小数
+                                conf_value = conf_num if conf_num > 1 else conf_num * 100
+                            else:
+                                conf_value = 0
+                            conf_value = max(0, min(100, conf_value))  # 限制在0-100之间
+                        except (ValueError, TypeError):
+                            conf_value = 0
+                        conf_str = f"{conf_value:.0f}%"
+
+                        # 转换agent名称和信号值为中文
+                        agent_cn = FIELD_NAME_MAP.get(agent, agent)
+                        signal_cn = FIELD_NAME_MAP.get(signal.lower(), signal)
 
                         result.append(
-                            f"{SYMBOLS['vertical']}   • {agent}: {signal_icon} {signal} (置信度: {conf_str})")
+                            f"{SYMBOLS['vertical']}   • {agent_cn}: {signal_icon} {signal_cn} (置信度: {conf_str})")
 
                 # 决策理由
                 if "reasoning" in data:
@@ -313,16 +408,30 @@ class StructuredTerminalOutput:
                 # 提取信号和置信度（如果有）
                 if "signal" in data:
                     signal = data.get("signal", "")
+                    # 转换信号值为中文
+                    signal_cn = FIELD_NAME_MAP.get(signal.lower(), signal)
                     signal_icon = STATUS_ICONS.get(signal.lower(), "")
                     result.append(
-                        f"{SYMBOLS['vertical']} 信号: {signal_icon} {signal}")
+                        f"{SYMBOLS['vertical']} 信号: {signal_icon} {signal_cn}")
 
                 if "confidence" in data:
                     conf = data.get("confidence", "")
-                    if isinstance(conf, (int, float)) and conf <= 1:
-                        conf_str = f"{conf*100:.0f}%"
-                    else:
-                        conf_str = str(conf)
+                    # 格式化置信度（处理多种格式）
+                    try:
+                        if isinstance(conf, (int, float)):
+                            # 如果是数字，判断范围：大于1则认为是百分比，否则是小数
+                            conf_value = conf if conf > 1 else conf * 100
+                        elif isinstance(conf, str):
+                            conf_str = conf.strip().replace("%", "")
+                            conf_num = float(conf_str)
+                            # 如果字符串值大于1，认为是百分比；否则是小数
+                            conf_value = conf_num if conf_num > 1 else conf_num * 100
+                        else:
+                            conf_value = 0
+                        conf_value = max(0, min(100, conf_value))  # 限制在0-100之间
+                    except (ValueError, TypeError):
+                        conf_value = 0
+                    conf_str = f"{conf_value:.0f}%"
                     result.append(f"{SYMBOLS['vertical']} 置信度: {conf_str}")
 
             # 添加其他数据

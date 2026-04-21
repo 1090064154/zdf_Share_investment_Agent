@@ -82,14 +82,14 @@ def fundamentals_agent(state: AgentState):
     reasoning["profitability_signal"] = {
         "signal": signals[0],
         "details": (
-            f"ROE: {metrics.get('return_on_equity', 0):.2%}" if metrics.get(
-                "return_on_equity") is not None else "ROE: N/A"
+            f"净资产收益率(ROE): {metrics.get('return_on_equity', 0):.2%}" if metrics.get(
+                "return_on_equity") is not None else "净资产收益率(ROE): N/A"
         ) + ", " + (
-            f"Net Margin: {metrics.get('net_margin', 0):.2%}" if metrics.get(
-                "net_margin") is not None else "Net Margin: N/A"
+            f"净利率(Net Margin): {metrics.get('net_margin', 0):.2%}" if metrics.get(
+                "net_margin") is not None else "净利率(Net Margin): N/A"
         ) + ", " + (
-            f"Op Margin: {metrics.get('operating_margin', 0):.2%}" if metrics.get(
-                "operating_margin") is not None else "Op Margin: N/A"
+            f"营业利润率(Op Margin): {metrics.get('operating_margin', 0):.2%}" if metrics.get(
+                "operating_margin") is not None else "营业利润率(Op Margin): N/A"
         )
     }
 
@@ -113,11 +113,11 @@ def fundamentals_agent(state: AgentState):
     reasoning["growth_signal"] = {
         "signal": signals[1],
         "details": (
-            f"Revenue Growth: {metrics.get('revenue_growth', 0):.2%}" if metrics.get(
-                "revenue_growth") is not None else "Revenue Growth: N/A"
+            f"营收增长率(Revenue Growth): {metrics.get('revenue_growth', 0):.2%}" if metrics.get(
+                "revenue_growth") is not None else "营收增长率(Revenue Growth): N/A"
         ) + ", " + (
-            f"Earnings Growth: {metrics.get('earnings_growth', 0):.2%}" if metrics.get(
-                "earnings_growth") is not None else "Earnings Growth: N/A"
+            f"盈利增长率(Earnings Growth): {metrics.get('earnings_growth', 0):.2%}" if metrics.get(
+                "earnings_growth") is not None else "盈利增长率(Earnings Growth): N/A"
         )
     }
 
@@ -141,11 +141,11 @@ def fundamentals_agent(state: AgentState):
     reasoning["financial_health_signal"] = {
         "signal": signals[2],
         "details": (
-            f"Current Ratio: {metrics.get('current_ratio', 0):.2f}" if metrics.get(
-                "current_ratio") is not None else "Current Ratio: N/A"
+            f"流动比率(Current Ratio): {metrics.get('current_ratio', 0):.2f}" if metrics.get(
+                "current_ratio") is not None else "流动比率(Current Ratio): N/A"
         ) + ", " + (
-            f"D/E: {metrics.get('debt_to_equity', 0):.2f}" if metrics.get(
-                "debt_to_equity") is not None else "D/E: N/A"
+            f"负债权益比(D/E): {metrics.get('debt_to_equity', 0):.2f}" if metrics.get(
+                "debt_to_equity") is not None else "负债权益比(D/E): N/A"
         )
     }
 
@@ -169,11 +169,11 @@ def fundamentals_agent(state: AgentState):
     reasoning["price_ratios_signal"] = {
         "signal": signals[3],
         "details": (
-            f"P/E: {pe_ratio:.2f}" if pe_ratio else "P/E: N/A"
+            f"市盈率(P/E): {pe_ratio:.2f}" if pe_ratio else "市盈率(P/E): N/A"
         ) + ", " + (
-            f"P/B: {price_to_book:.2f}" if price_to_book else "P/B: N/A"
+            f"市净率(P/B): {price_to_book:.2f}" if price_to_book else "市净率(P/B): N/A"
         ) + ", " + (
-            f"P/S: {price_to_sales:.2f}" if price_to_sales else "P/S: N/A"
+            f"市销率(P/S): {price_to_sales:.2f}" if price_to_sales else "市销率(P/S): N/A"
         )
     }
 

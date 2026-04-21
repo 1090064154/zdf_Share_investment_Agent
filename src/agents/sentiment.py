@@ -60,24 +60,33 @@ def sentiment_agent(state: AgentState):
         confidence = "0%"
     elif sentiment_score >= 0.5:
         signal = "bullish"
-        confidence = str(round(abs(sentiment_score) * 100)) + "%"
+        # 置信度基于情感强度，范围 50%-100%
+        conf_value = 50 + (sentiment_score - 0.5) * 100  # 0.5->50%, 1.0->100%
+        confidence = f"{round(conf_value)}%"
     elif sentiment_score <= -0.5:
         signal = "bearish"
-        confidence = str(round(abs(sentiment_score) * 100)) + "%"
+        # 置信度基于情感强度，范围 50%-100%
+        conf_value = 50 + (abs(sentiment_score) - 0.5) * 100  # -0.5->50%, -1.0->100%
+        confidence = f"{round(conf_value)}%"
     else:
         signal = "neutral"
-        confidence = str(round(abs(sentiment_score) * 100)) + "%"
+        # 中性信号时，置信度基于新闻数量和情感分数偏离中性的程度
+        # 新闻越多，置信度越高；情感越接近0，对"中性"判断越确定
+        news_factor = min(len(recent_news) / 10, 1.0) * 30  # 最多30%
+        deviation_factor = (0.5 - abs(sentiment_score)) * 100  # 越接近0越高，最多50%
+        conf_value = min(20 + news_factor + deviation_factor, 80)  # 基础20%，最高80%
+        confidence = f"{round(conf_value)}%"
 
     # 生成分析结果
     message_content = {
         "signal": signal,
         "confidence": confidence,
-        "reasoning": f"Based on {len(recent_news)} recent news articles, sentiment score: {sentiment_score:.2f}"
+        "reasoning": f"基于{len(recent_news)}篇近期新闻，情绪分数: {sentiment_score:.2f}"
     }
 
     # 如果需要显示推理过程
     if show_reasoning:
-        show_agent_reasoning(message_content, "Sentiment Analysis Agent")
+        show_agent_reasoning(message_content, "情绪分析Agent")
         # 保存推理信息到metadata供API使用
         state["metadata"]["agent_reasoning"] = message_content
 

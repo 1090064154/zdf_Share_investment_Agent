@@ -1,4 +1,5 @@
 from typing import Dict, Any, List
+import os
 import pandas as pd
 import akshare as ak
 from datetime import datetime, timedelta
@@ -34,10 +35,28 @@ def _log_data_source_failure(action: str, error: Exception) -> None:
         logger.error("%s failed: %s", action, error)
 
 
+def _get_latest_price_from_tx(symbol: str) -> float:
+    """从腾讯历史行情获取最新收盘价作为备选方案"""
+    try:
+        stock_code = f"sz{symbol}" if symbol.startswith(("0", "3")) else f"sh{symbol}"
+        df = ak.stock_zh_a_hist_tx(symbol=stock_code)
+        if df is not None and not df.empty:
+            latest_close = float(df['close'].iloc[-1])
+            logger.info(f"✓ 从腾讯历史行情获取最新价格: {latest_close}")
+            return latest_close
+    except Exception as e:
+        _log_data_source_failure("Tencent price history", e)
+    return 0
+
+
 def _estimate_market_cap_from_financials(symbol: str, price: float) -> float:
     """使用新浪财报中的股本信息粗略估算市值，避免依赖东方财富接口。"""
+    # 如果价格为0，尝试从腾讯历史行情获取
     if price <= 0:
-        return 0
+        price = _get_latest_price_from_tx(symbol)
+        if price <= 0:
+            return 0
+
     try:
         stock_prefix = "sz" if symbol.startswith(("0", "3")) else "sh"
         balance = ak.stock_financial_report_sina(stock=f"{stock_prefix}{symbol}", symbol="资产负债表")
@@ -77,26 +96,41 @@ def get_financial_metrics(symbol: str) -> Dict[str, Any]:
     except Exception as e:
         logger.warning(f"Failed to get real-time quotes: {e}")
 
-    # 获取财务分析指标 - 独立 try-except
+    # 获取财务分析指标 - 先尝试sina，失败则用东方财富备用
     try:
         logger.info("Fetching Sina financial indicators...")
         current_year = datetime.now().year
         financial_data = ak.stock_financial_analysis_indicator(
-            symbol=symbol, start_year=str(current_year-1))
+            symbol=symbol, start_year=str(current_year-2))
         if financial_data is not None and not financial_data.empty:
             financial_data['日期'] = pd.to_datetime(financial_data['日期'])
             financial_data = financial_data.sort_values('日期', ascending=False)
             latest_financial = financial_data.iloc[0]
             logger.info(f"✓ Financial indicators fetched ({len(financial_data)} records)")
-            logger.info(f"Latest data date: {latest_financial.get('日期')}")
     except Exception as e:
-        logger.warning(f"Failed to get financial indicators: {e}")
+        logger.warning(f"Failed to get Sina financial indicators: {e}")
+        try:
+            logger.info("Trying Eastmoney financial abstract as fallback...")
+            fin_abstract = ak.stock_financial_abstract(symbol=symbol)
+            if fin_abstract is not None and not fin_abstract.empty:
+                col_2025 = str(current_year) + "1231"
+                col_2024 = str(current_year-1) + "1231"
+                latest_cols = [col for col in fin_abstract.columns if col in [col_2025, col_2024, "20251231", "20241231", "20231231"]]
+                latest_col = latest_cols[0] if latest_cols else fin_abstract.columns[2] if len(fin_abstract.columns) > 2 else None
+                if latest_col:
+                    latest_financial = pd.Series(dict(zip(fin_abstract['指标'], fin_abstract[latest_col])))
+                    latest_financial['净资产收益率(%)'] = latest_financial.get('归母净资产收益率') * 100 if pd.notna(latest_financial.get('归母净资产收益率')) else 0
+                    latest_financial['销售净利率(%)'] = latest_financial.get('销售净利率') * 100 if pd.notna(latest_financial.get('销售净利率')) else 0
+                    latest_financial['每股净资产_调整前(元)'] = latest_financial.get('归母每股净资产')
+                    latest_financial['加权每股收益(元)'] = latest_financial.get('扣非每股收益')
+                    logger.info(f"✓ Financial data from Eastmoney, date: {latest_col}")
+        except Exception as e2:
+            logger.warning(f"Eastmoney fallback also failed: {e2}")
 
-    # 如果没有获取到任何数据
     if latest_financial.empty:
-        logger.warning("No financial indicator data available, trying to build from available data")
+        logger.warning("No financial indicator data available")
 
-    # 获取利润表数据（用于计算 price_to_sales）- 独立 try-except
+    # 获取利润表数据 - 备用尝试东方财富
     try:
         logger.info("Fetching income statement...")
         income_statement = ak.stock_financial_report_sina(
@@ -106,6 +140,18 @@ def get_financial_metrics(symbol: str) -> Dict[str, Any]:
             logger.info("✓ Income statement fetched")
     except Exception as e:
         logger.warning(f"Failed to get income statement: {e}")
+        try:
+            fin_abstract = ak.stock_financial_abstract(symbol=symbol)
+            if fin_abstract is not None and not fin_abstract.empty:
+                col_2025 = str(datetime.now().year) + "1231"
+                col_2024 = str(datetime.now().year-1) + "1231"
+                latest_cols = [col for col in fin_abstract.columns if col in [col_2025, col_2024, "20251231", "20241231", "20231231"]]
+                latest_col = latest_cols[0] if latest_cols else fin_abstract.columns[2] if len(fin_abstract.columns) > 2 else None
+                if latest_col:
+                    latest_income = pd.Series(dict(zip(fin_abstract['指标'], fin_abstract[latest_col])))
+                    logger.info("✓ Income data from Eastmoney fallback")
+        except Exception as e2:
+            logger.warning(f"Eastmoney income fallback also failed: {e2}")
 
     # 构建完整指标数据
     logger.info("Building indicators...")
@@ -140,16 +186,30 @@ def get_financial_metrics(symbol: str) -> Dict[str, Any]:
             "free_cash_flow_per_share": float(latest_financial.get("每股经营性现金流(元)", 0)) if not latest_financial.empty else 0,
             "earnings_per_share": float(latest_financial.get("加权每股收益(元)", 0)) if not latest_financial.empty else 0,
 
-            # 估值比率 - 从个股信息获取
-            "pe_ratio": 0,  # 后续可从其他接口获取
+            # 估值比率 - 从财务数据计算
+            "pe_ratio": 0,
             "price_to_book": 0,
             "price_to_sales": 0,
         }
 
-        all_metrics["market_cap"] = _estimate_market_cap_from_financials(
-            symbol,
-            float(stock_data.get("最新价", 0)) if not stock_data.empty else 0,
-        )
+        price = float(stock_data.get("最新价", 0)) if not stock_data.empty else 0
+        if price <= 0:
+            price = _get_latest_price_from_tx(symbol)
+
+        market_cap = _estimate_market_cap_from_financials(symbol, price)
+        all_metrics["market_cap"] = market_cap
+
+        book_value_per_share = float(latest_financial.get("每股净资产_调整前(元)", 0)) if not latest_financial.empty else 0
+        eps = float(latest_financial.get("加权每股收益(元)", 0)) if not latest_financial.empty else 0
+        total_revenue = float(latest_income.get("营业总收入", 0)) if not latest_income.empty else 0
+
+        if price > 0:
+            if book_value_per_share > 0:
+                all_metrics["price_to_book"] = round(price / book_value_per_share, 2)
+            if eps > 0:
+                all_metrics["pe_ratio"] = round(price / eps, 2)
+            if total_revenue > 0 and market_cap > 0:
+                all_metrics["price_to_sales"] = round(market_cap / total_revenue, 2)
         if all_metrics["market_cap"] > 0:
             logger.info(f"✓ 通过新浪财报估算市值: {all_metrics['market_cap']}")
 
@@ -332,6 +392,23 @@ def get_financial_statements(symbol: str) -> Dict[str, Any]:
 
 def get_market_data(symbol: str) -> Dict[str, Any]:
     """获取市场数据 - 使用新浪/腾讯数据源"""
+    # 尝试从缓存获取市值
+    cache_file = "src/data/market_cap_cache.json"
+    cached_market_cap = 0
+    cached_price = 0
+
+    try:
+        if os.path.exists(cache_file):
+            with open(cache_file, 'r', encoding='utf-8') as f:
+                cache = json.load(f)
+                if symbol in cache:
+                    cached_data = cache[symbol]
+                    cached_market_cap = cached_data.get("market_cap", 0)
+                    cached_price = cached_data.get("price", 0)
+                    logger.info(f"使用缓存的市值: {cached_market_cap}, 价格: {cached_price}")
+    except Exception as e:
+        logger.warning(f"读取市值缓存失败: {e}")
+
     try:
         # 获取实时行情 - 新浪数据源
         realtime_data = ak.stock_zh_a_spot()
@@ -345,33 +422,75 @@ def get_market_data(symbol: str) -> Dict[str, Any]:
             volume = float(stock_data.get("成交量", 0))
             high_52w = float(stock_data.get("最高", 0))
             low_52w = float(stock_data.get("最低", 0))
+
+            # 尝试获取市值
+            market_cap = _estimate_market_cap_from_financials(symbol, price)
+            if market_cap > 0:
+                logger.info(f"✓ 通过新浪财报估算市值: {market_cap}")
+
+                # 缓存市值
+                try:
+                    os.makedirs(os.path.dirname(cache_file), exist_ok=True)
+                    cache = {}
+                    if os.path.exists(cache_file):
+                        with open(cache_file, 'r', encoding='utf-8') as f:
+                            cache = json.load(f)
+                    cache[symbol] = {"market_cap": market_cap, "price": price, "updated": datetime.now().isoformat()}
+                    with open(cache_file, 'w', encoding='utf-8') as f:
+                        json.dump(cache, f, ensure_ascii=False, indent=2)
+                    logger.info(f"✓ 市值已缓存")
+                except Exception as e:
+                    logger.warning(f"缓存市值失败: {e}")
         else:
             price = 0
             volume = 0
             high_52w = 0
             low_52w = 0
-
-        market_cap = _estimate_market_cap_from_financials(symbol, price)
-        if market_cap > 0:
-            logger.info(f"✓ 通过新浪财报估算市值: {market_cap}")
-
-        return {
-            "market_cap": market_cap,
-            "volume": volume,
-            "average_volume": volume,
-            "fifty_two_week_high": high_52w,
-            "fifty_two_week_low": low_52w
-        }
+            market_cap = 0
 
     except Exception as e:
         _log_data_source_failure("Market data source", e)
-        return {
-            "market_cap": 0,
-            "volume": 0,
-            "average_volume": 0,
-            "fifty_two_week_high": 0,
-            "fifty_two_week_low": 0
-        }
+        price = 0
+        volume = 0
+        high_52w = 0
+        low_52w = 0
+        market_cap = 0
+
+    # 如果市值获取失败，尝试从腾讯历史行情获取价格并估算市值
+    if market_cap <= 0:
+        # 先尝试使用缓存的市值
+        if cached_market_cap > 0:
+            market_cap = cached_market_cap
+            price = cached_price
+            logger.info(f"使用缓存的市值: {market_cap}")
+        else:
+            # 从腾讯历史行情获取最新价格
+            price = _get_latest_price_from_tx(symbol)
+            if price > 0:
+                market_cap = _estimate_market_cap_from_financials(symbol, price)
+                if market_cap > 0:
+                    logger.info(f"✓ 通过腾讯历史行情估算市值: {market_cap}")
+                    # 缓存市值
+                    try:
+                        os.makedirs(os.path.dirname(cache_file), exist_ok=True)
+                        cache = {}
+                        if os.path.exists(cache_file):
+                            with open(cache_file, 'r', encoding='utf-8') as f:
+                                cache = json.load(f)
+                        cache[symbol] = {"market_cap": market_cap, "price": price, "updated": datetime.now().isoformat()}
+                        with open(cache_file, 'w', encoding='utf-8') as f:
+                            json.dump(cache, f, ensure_ascii=False, indent=2)
+                        logger.info(f"✓ 市值已缓存")
+                    except Exception as e:
+                        logger.warning(f"缓存市值失败: {e}")
+
+    return {
+        "market_cap": market_cap,
+        "volume": volume,
+        "average_volume": volume,
+        "fifty_two_week_high": high_52w,
+        "fifty_two_week_low": low_52w
+    }
 
 
 def get_price_history(symbol: str, start_date: str = None, end_date: str = None, adjust: str = "qfq") -> pd.DataFrame:
