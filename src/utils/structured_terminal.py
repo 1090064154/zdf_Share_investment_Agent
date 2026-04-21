@@ -233,14 +233,24 @@ class StructuredTerminalOutput:
 
     def _format_value(self, value: Any, key: str = "") -> str:
         """格式化单个值"""
+        key_lower = key.lower()
         if isinstance(value, bool):
             return "✅" if value else "❌"
         elif isinstance(value, (int, float)):
             # 对置信度字段进行特殊处理
-            if key.lower() == "confidence":
+            if key_lower == "confidence":
                 # 智能判断：大于1认为是百分比，否则是小数
                 conf_value = value if value > 1 else value * 100
                 return f"{conf_value:.0f}%"
+            # 对特定字段的特殊处理
+            if key_lower in ["max_position_size", "最大持仓"]:
+                return f"{value:.2f}"
+            if key_lower in ["hurst_exponent", "skewness"]:
+                if abs(value) < 0.01:
+                    return "N/A"
+                return f"{value:.2f}"
+            if key_lower in ["z_score", "volatility_z_score"]:
+                return f"{value:.2f}"
             # 对百分比值进行特殊处理
             if -1 <= value <= 1 and isinstance(value, float):
                 return f"{value:.2%}"

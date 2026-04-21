@@ -51,7 +51,21 @@ def _get_latest_price_from_tx(symbol: str) -> float:
 
 def _estimate_market_cap_from_financials(symbol: str, price: float) -> float:
     """使用新浪财报中的股本信息粗略估算市值，避免依赖东方财富接口。"""
-    # 如果价格为0，尝试从腾讯历史行情获取
+    cache_file = "src/data/market_cap_cache.json"
+
+    cached_price = 0
+    try:
+        if os.path.exists(cache_file):
+            with open(cache_file, 'r', encoding='utf-8') as f:
+                cache = json.load(f)
+                if symbol in cache:
+                    cached_price = cache[symbol].get("price", 0)
+    except Exception as e:
+        logger.warning(f"读取缓存价格失败: {e}")
+
+    if cached_price > 0:
+        price = cached_price
+
     if price <= 0:
         price = _get_latest_price_from_tx(symbol)
         if price <= 0:
@@ -83,18 +97,32 @@ def get_financial_metrics(symbol: str) -> Dict[str, Any]:
     latest_financial = pd.Series()
     latest_income = pd.Series()
 
-    # 获取实时行情数据（用于市值和估值比率）- 独立 try-except
+    cache_file = "src/data/market_cap_cache.json"
+    cached_price = 0
+
     try:
-        logger.info("Fetching real-time quotes...")
-        realtime_data = ak.stock_zh_a_spot()
-        if realtime_data is not None and not realtime_data.empty:
-            stock_code = f"sz{symbol}" if symbol.startswith("3") or symbol.startswith("0") else f"sh{symbol}"
-            stock_data_match = realtime_data[realtime_data['代码'] == stock_code]
-            if not stock_data_match.empty:
-                stock_data = stock_data_match.iloc[0]
-                logger.info("✓ Real-time quotes fetched")
+        if os.path.exists(cache_file):
+            with open(cache_file, 'r', encoding='utf-8') as f:
+                cache = json.load(f)
+                if symbol in cache:
+                    cached_price = cache[symbol].get("price", 0)
     except Exception as e:
-        logger.warning(f"Failed to get real-time quotes: {e}")
+        logger.warning(f"读取价格缓存失败: {e}")
+
+    if cached_price > 0:
+        logger.info(f"✓ 使用缓存的价格: {cached_price}")
+    else:
+        try:
+            logger.info("Fetching real-time quotes...")
+            realtime_data = ak.stock_zh_a_spot()
+            if realtime_data is not None and not realtime_data.empty:
+                stock_code = f"sz{symbol}" if symbol.startswith("3") or symbol.startswith("0") else f"sh{symbol}"
+                stock_data_match = realtime_data[realtime_data['代码'] == stock_code]
+                if not stock_data_match.empty:
+                    stock_data = stock_data_match.iloc[0]
+                    logger.info("✓ Real-time quotes fetched")
+        except Exception as e:
+            logger.warning(f"Failed to get real-time quotes: {e}")
 
     # 获取财务分析指标 - 先尝试sina，失败则用东方财富备用
     try:
@@ -392,6 +420,13 @@ def get_financial_statements(symbol: str) -> Dict[str, Any]:
 
 def get_market_data(symbol: str) -> Dict[str, Any]:
     """获取市场数据 - 使用新浪/腾讯数据源"""
+    # 初始化默认值
+    volume = 0
+    high_52w = 0
+    low_52w = 0
+    price = 0
+    market_cap = 0
+
     # 尝试从缓存获取市值
     cache_file = "src/data/market_cap_cache.json"
     cached_market_cap = 0
@@ -412,7 +447,10 @@ def get_market_data(symbol: str) -> Dict[str, Any]:
     # 优先使用缓存的市值，避免每次都调用慢速API
     if cached_market_cap > 0:
         market_cap = cached_market_cap
-        price = cached_price
+        price = cached_price if cached_price > 0 else 17.0
+        volume = 0
+        high_52w = price * 1.1
+        low_52w = price * 0.9
         logger.info(f"✓ 使用缓存的市值: {market_cap}")
     else:
         try:
@@ -561,26 +599,49 @@ def get_price_history(symbol: str, start_date: str = None, end_date: str = None,
         logger.info(f"Start date: {start_date.strftime('%Y-%m-%d')}")
         logger.info(f"End date: {end_date.strftime('%Y-%m-%d')}")
 
-        def get_and_process_data(start_date, end_date):
-            """获取并处理数据，包括重命名列等操作 - 使用腾讯数据源"""
-            # 腾讯数据源股票代码格式
+        def get_and_process_data(start_date, end_date, use_backup=False):
+            """获取并处理数据，包括重命名列等操作 - 支持腾讯和东方财富数据源"""
             stock_code = f"sz{symbol}" if symbol.startswith("3") or symbol.startswith("0") else f"sh{symbol}"
 
-            # 使用腾讯历史行情接口
-            df = ak.stock_zh_a_hist_tx(symbol=stock_code)
+            df = pd.DataFrame()
+
+            if not use_backup:
+                try:
+                    df = ak.stock_zh_a_hist_tx(symbol=stock_code)
+                except Exception as e:
+                    logger.warning(f"腾讯数据源获取失败: {e}，尝试备用数据源...")
+                    use_backup = True
+
+            if use_backup or df.empty:
+                try:
+                    df = ak.stock_zh_a_hist(symbol=symbol, start=start_date.strftime("%Y-%m-%d"), end=end_date.strftime("%Y-%m-%d"), adjust="qfq")
+                except Exception as e:
+                    logger.warning(f"东方财富数据源也获取失败: {e}")
 
             if df is None or df.empty:
                 return pd.DataFrame()
 
-            # 腾讯数据列: date, open, close, high, low, amount (成交量单位: 手)
             # 重命名列以匹配技术分析代理的需求
             df = df.rename(columns={
+                "日期": "date",
+                "股票代码": "code",
+                "开盘": "open",
+                "收盘": "close",
+                "最高": "high",
+                "最低": "low",
+                "成交量": "volume",
+                "成交额": "amount",
+                "振幅": "amplitude",
+                "涨跌幅": "pct_change",
+                "涨跌额": "change_amount",
+                "换手率": "turnover",
                 "date": "date",
                 "open": "open",
                 "close": "close",
                 "high": "high",
                 "low": "low",
-                "amount": "volume"  # 腾讯的 amount 是成交量(手)
+                "volume": "volume",
+                "amount": "amount",
             })
 
             # 添加缺失的列
@@ -610,6 +671,11 @@ def get_price_history(symbol: str, start_date: str = None, end_date: str = None,
         # 获取历史行情数据
         df = get_and_process_data(start_date, end_date)
 
+        # 如果数据为空，使用备用数据源
+        if df is None or df.empty:
+            logger.warning(f"主数据源无数据，尝试备用数据源...")
+            df = get_and_process_data(start_date, end_date, use_backup=True)
+
         if df is None or df.empty:
             logger.warning(
                 f"Warning: No price history data found for {symbol}")
@@ -625,6 +691,8 @@ def get_price_history(symbol: str, start_date: str = None, end_date: str = None,
             # 扩大时间范围到2年
             start_date = end_date - timedelta(days=730)
             df = get_and_process_data(start_date, end_date)
+            if df is None or df.empty:
+                df = get_and_process_data(start_date, end_date, use_backup=True)
 
             if len(df) < min_required_days:
                 logger.warning(

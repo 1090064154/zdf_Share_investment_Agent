@@ -185,14 +185,17 @@ def valuation_agent(state: AgentState):
     else:
         signal = 'neutral'
 
+    capped_dcf_gap = min(abs(dcf_gap), 1.0) * (1 if dcf_gap >= 0 else -1)
+    capped_owner_gap = min(abs(owner_earnings_gap), 1.0) * (1 if owner_earnings_gap >= 0 else -1)
+
     reasoning["dcf_analysis"] = {
         "signal": "bullish" if dcf_gap > 0.10 else "bearish" if dcf_gap < -0.20 else "neutral",
-        "details": f"Intrinsic Value: ${dcf_value:,.2f}, Market Cap: ${market_cap:,.2f}, Gap: {dcf_gap:.1%}"
+        "details": f"Intrinsic Value: ${dcf_value:,.2f}, Market Cap: ${market_cap:,.2f}, Gap: {capped_dcf_gap:.1%}"
     }
 
     reasoning["owner_earnings_analysis"] = {
         "signal": "bullish" if owner_earnings_gap > 0.10 else "bearish" if owner_earnings_gap < -0.20 else "neutral",
-        "details": f"Owner Earnings Value: ${owner_earnings_value:,.2f}, Market Cap: ${market_cap:,.2f}, Gap: {owner_earnings_gap:.1%}"
+        "details": f"Owner Earnings Value: ${owner_earnings_value:,.2f}, Market Cap: ${market_cap:,.2f}, Gap: {capped_owner_gap:.1%}"
     }
 
     capped_valuation_gap = min(abs(valuation_gap), 1.0)
