@@ -149,6 +149,8 @@ FIELD_NAME_MAP = {
     "sentiment_analysis": "情绪分析",
     "valuation_analysis": "估值分析",
     "risk_management": "风险管理",
+    "macro_analysis": "宏观分析",
+    "macro_news_analysis": "宏观新闻分析",
     "selected_stock_macro_analysis": "所选股宏观分析",
     "market_wide_news_summary(沪深300指数)": "大盘新闻摘要(沪深300)",
 

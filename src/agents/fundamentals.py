@@ -62,119 +62,116 @@ def fundamentals_agent(state: AgentState):
     signals = []
     reasoning = {}
 
+    def _valid_num(v) -> bool:
+        """Check if value is a valid non-zero, non-NaN number"""
+        import math
+        if v is None:
+            return False
+        try:
+            fv = float(v)
+            return not (math.isnan(fv) or math.isinf(fv) or fv == 0)
+        except (TypeError, ValueError):
+            return False
+
     # 1. Profitability Analysis
-    return_on_equity = metrics.get("return_on_equity", 0)
-    net_margin = metrics.get("net_margin", 0)
-    operating_margin = metrics.get("operating_margin", 0)
+    return_on_equity = metrics.get("return_on_equity", 0) or 0
+    net_margin = metrics.get("net_margin", 0) or 0
+    operating_margin = metrics.get("operating_margin", 0) or 0
 
     thresholds = [
-        (return_on_equity, 0.15),  # Strong ROE above 15%
-        (net_margin, 0.20),  # Healthy profit margins
-        (operating_margin, 0.15)  # Strong operating efficiency
+        (return_on_equity, 0.15),
+        (net_margin, 0.20),
+        (operating_margin, 0.15)
     ]
     profitability_score = sum(
-        metric is not None and metric > threshold
+        _valid_num(metric) and metric > threshold
         for metric, threshold in thresholds
     )
 
-    signals.append('bullish' if profitability_score >=
-                   2 else 'bearish' if profitability_score == 0 else 'neutral')
+    signals.append('bullish' if profitability_score >= 2 else 'bearish' if profitability_score == 0 else 'neutral')
+
+    roe_str = f"净资产收益率(ROE): {return_on_equity:.2%}" if _valid_num(return_on_equity) else "净资产收益率(ROE): N/A"
+    netm_str = f"净利率(Net Margin): {net_margin:.2%}" if _valid_num(net_margin) else "净利率(Net Margin): N/A"
+    opm_str = f"营业利润率(Op Margin): {operating_margin:.2%}" if _valid_num(operating_margin) else "营业利润率(Op Margin): N/A"
+
     reasoning["profitability_signal"] = {
         "signal": signals[0],
-        "details": (
-            f"净资产收益率(ROE): {metrics.get('return_on_equity', 0):.2%}" if metrics.get(
-                "return_on_equity") is not None else "净资产收益率(ROE): N/A"
-        ) + ", " + (
-            f"净利率(Net Margin): {metrics.get('net_margin', 0):.2%}" if metrics.get(
-                "net_margin") is not None else "净利率(Net Margin): N/A"
-        ) + ", " + (
-            f"营业利润率(Op Margin): {metrics.get('operating_margin', 0):.2%}" if metrics.get(
-                "operating_margin") is not None else "营业利润率(Op Margin): N/A"
-        )
+        "details": f"{roe_str}, {netm_str}, {opm_str}"
     }
 
     # 2. Growth Analysis
-    revenue_growth = metrics.get("revenue_growth", 0)
-    earnings_growth = metrics.get("earnings_growth", 0)
-    book_value_growth = metrics.get("book_value_growth", 0)
+    revenue_growth = metrics.get("revenue_growth", 0) or 0
+    earnings_growth = metrics.get("earnings_growth", 0) or 0
+    book_value_growth = metrics.get("book_value_growth", 0) or 0
 
     thresholds = [
-        (revenue_growth, 0.10),  # 10% revenue growth
-        (earnings_growth, 0.10),  # 10% earnings growth
-        (book_value_growth, 0.10)  # 10% book value growth
+        (revenue_growth, 0.10),
+        (earnings_growth, 0.10),
+        (book_value_growth, 0.10)
     ]
     growth_score = sum(
-        metric is not None and metric > threshold
+        _valid_num(metric) and metric > threshold
         for metric, threshold in thresholds
     )
 
-    signals.append('bullish' if growth_score >=
-                   2 else 'bearish' if growth_score == 0 else 'neutral')
+    signals.append('bullish' if growth_score >= 2 else 'bearish' if growth_score == 0 else 'neutral')
+
+    revg_str = f"营收增长率(Revenue Growth): {revenue_growth:.2%}" if _valid_num(revenue_growth) else "营收增长率(Revenue Growth): N/A"
+    erng_str = f"盈利增长率(Earnings Growth): {earnings_growth:.2%}" if _valid_num(earnings_growth) else "盈利增长率(Earnings Growth): N/A"
+
     reasoning["growth_signal"] = {
         "signal": signals[1],
-        "details": (
-            f"营收增长率(Revenue Growth): {metrics.get('revenue_growth', 0):.2%}" if metrics.get(
-                "revenue_growth") is not None else "营收增长率(Revenue Growth): N/A"
-        ) + ", " + (
-            f"盈利增长率(Earnings Growth): {metrics.get('earnings_growth', 0):.2%}" if metrics.get(
-                "earnings_growth") is not None else "盈利增长率(Earnings Growth): N/A"
-        )
+        "details": f"{revg_str}, {erng_str}"
     }
 
     # 3. Financial Health
-    current_ratio = metrics.get("current_ratio", 0)
-    debt_to_equity = metrics.get("debt_to_equity", 0)
-    free_cash_flow_per_share = metrics.get("free_cash_flow_per_share", 0)
-    earnings_per_share = metrics.get("earnings_per_share", 0)
+    current_ratio = metrics.get("current_ratio", 0) or 0
+    debt_to_equity = metrics.get("debt_to_equity", 0) or 0
+    free_cash_flow_per_share = metrics.get("free_cash_flow_per_share", 0) or 0
+    earnings_per_share = metrics.get("earnings_per_share", 0) or 0
 
     health_score = 0
-    if current_ratio and current_ratio > 1.5:  # Strong liquidity
+    if _valid_num(current_ratio) and current_ratio > 1.5:
         health_score += 1
-    if debt_to_equity and debt_to_equity < 0.5:  # Conservative debt levels
+    if _valid_num(debt_to_equity) and debt_to_equity < 0.5:
         health_score += 1
-    if (free_cash_flow_per_share and earnings_per_share and
-            free_cash_flow_per_share > earnings_per_share * 0.8):  # Strong FCF conversion
+    if _valid_num(free_cash_flow_per_share) and _valid_num(earnings_per_share) and free_cash_flow_per_share > earnings_per_share * 0.8:
         health_score += 1
 
-    signals.append('bullish' if health_score >=
-                   2 else 'bearish' if health_score == 0 else 'neutral')
+    signals.append('bullish' if health_score >= 2 else 'bearish' if health_score == 0 else 'neutral')
+
+    cr_str = f"流动比率(Current Ratio): {current_ratio:.2f}" if _valid_num(current_ratio) else "流动比率(Current Ratio): N/A"
+    de_str = f"负债权益比(D/E): {debt_to_equity:.2f}" if _valid_num(debt_to_equity) else "负债权益比(D/E): N/A"
+
     reasoning["financial_health_signal"] = {
         "signal": signals[2],
-        "details": (
-            f"流动比率(Current Ratio): {metrics.get('current_ratio', 0):.2f}" if metrics.get(
-                "current_ratio") is not None else "流动比率(Current Ratio): N/A"
-        ) + ", " + (
-            f"负债权益比(D/E): {metrics.get('debt_to_equity', 0):.2f}" if metrics.get(
-                "debt_to_equity") is not None else "负债权益比(D/E): N/A"
-        )
+        "details": f"{cr_str}, {de_str}"
     }
 
     # 4. Price to X ratios
-    pe_ratio = metrics.get("pe_ratio", 0)
-    price_to_book = metrics.get("price_to_book", 0)
-    price_to_sales = metrics.get("price_to_sales", 0)
+    pe_ratio = metrics.get("pe_ratio", 0) or 0
+    price_to_book = metrics.get("price_to_book", 0) or 0
+    price_to_sales = metrics.get("price_to_sales", 0) or 0
 
     thresholds = [
-        (pe_ratio, 25),  # Reasonable P/E ratio
-        (price_to_book, 3),  # Reasonable P/B ratio
-        (price_to_sales, 5)  # Reasonable P/S ratio
+        (pe_ratio, 25),
+        (price_to_book, 3),
+        (price_to_sales, 5)
     ]
     price_ratio_score = sum(
-        metric is not None and metric < threshold
+        _valid_num(metric) and metric < threshold
         for metric, threshold in thresholds
     )
 
-    signals.append('bullish' if price_ratio_score >=
-                   2 else 'bearish' if price_ratio_score == 0 else 'neutral')
+    signals.append('bullish' if price_ratio_score >= 2 else 'bearish' if price_ratio_score == 0 else 'neutral')
+
+    pe_str = f"市盈率(P/E): {pe_ratio:.2f}" if _valid_num(pe_ratio) else "市盈率(P/E): N/A"
+    pb_str = f"市净率(P/B): {price_to_book:.2f}" if _valid_num(price_to_book) else "市净率(P/B): N/A"
+    ps_str = f"市销率(P/S): {price_to_sales:.2f}" if _valid_num(price_to_sales) else "市销率(P/S): N/A"
+
     reasoning["price_ratios_signal"] = {
         "signal": signals[3],
-        "details": (
-            f"市盈率(P/E): {pe_ratio:.2f}" if pe_ratio else "市盈率(P/E): N/A"
-        ) + ", " + (
-            f"市净率(P/B): {price_to_book:.2f}" if price_to_book else "市净率(P/B): N/A"
-        ) + ", " + (
-            f"市销率(P/S): {price_to_sales:.2f}" if price_to_sales else "市销率(P/S): N/A"
-        )
+        "details": f"{pe_str}, {pb_str}, {ps_str}"
     }
 
     # Determine overall signal

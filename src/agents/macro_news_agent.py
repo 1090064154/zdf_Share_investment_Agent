@@ -45,6 +45,13 @@ def _is_usable_cached_summary(summary: str) -> bool:
     return not any(marker.lower() in lowered for marker in invalid_markers)
 
 
+def _resolve_analysis_date(state: AgentState) -> str:
+    end_date = state.get("data", {}).get("end_date")
+    if end_date:
+        return end_date
+    return datetime.now().strftime("%Y-%m-%d")
+
+
 @agent_endpoint("macro_news_agent", "获取沪深300全量新闻并进行宏观分析，为投资决策提供市场层面的宏观环境评估")
 def macro_news_agent(state: AgentState) -> Dict[str, Any]:
     """
@@ -59,7 +66,7 @@ def macro_news_agent(state: AgentState) -> Dict[str, Any]:
     retrieved_news_count = 0
     from_cache = False  # Flag to indicate if summary was loaded from cache
 
-    today_str = datetime.now().strftime("%Y-%m-%d")
+    analysis_date = _resolve_analysis_date(state)
     output_file_path = os.path.join("src", "data", "macro_summary.json")
 
     # Attempt to load from cache first
@@ -67,18 +74,18 @@ def macro_news_agent(state: AgentState) -> Dict[str, Any]:
         try:
             with open(output_file_path, 'r', encoding='utf-8') as f:
                 all_summaries = json.load(f)
-            if today_str in all_summaries and _is_usable_cached_summary(all_summaries[today_str].get("summary_content", "")):
-                cached_data = all_summaries[today_str]
+            if analysis_date in all_summaries and _is_usable_cached_summary(all_summaries[analysis_date].get("summary_content", "")):
+                cached_data = all_summaries[analysis_date]
                 summary = cached_data["summary_content"]
                 retrieved_news_count = cached_data.get(
                     "retrieved_news_count", 0)  # Get cached news count
                 from_cache = True
                 show_workflow_status(
-                    f"{agent_name}: 从缓存加载 {today_str} 的宏观新闻总结。")
+                    f"{agent_name}: 从缓存加载 {analysis_date} 的宏观新闻总结。")
                 show_agent_reasoning(
-                    f"Loaded macro summary for {today_str} from cache. News count: {retrieved_news_count}", agent_name)
-            elif today_str in all_summaries:
-                logger.warning("Skipping unusable cached macro summary for %s", today_str)
+                    f"Loaded macro summary for {analysis_date} from cache. News count: {retrieved_news_count}", agent_name)
+            elif analysis_date in all_summaries:
+                logger.warning("Skipping unusable cached macro summary for %s", analysis_date)
         except json.JSONDecodeError:
             show_agent_reasoning(
                 f"JSONDecodeError for {output_file_path} when trying to load cache. Will fetch fresh data.", agent_name)
@@ -93,7 +100,7 @@ def macro_news_agent(state: AgentState) -> Dict[str, Any]:
         try:
             show_workflow_status(
                 f"{agent_name}: 正在获取 {symbol} 的新闻")
-            news_list_for_llm = get_stock_news(symbol, max_news=100, date=today_str)
+            news_list_for_llm = get_stock_news(symbol, max_news=100, date=analysis_date)
             if not news_list_for_llm:
                 message = f"未获取到 {symbol} 的新闻数据。"
                 show_workflow_status(f"{agent_name}: {message}")
@@ -159,7 +166,7 @@ def macro_news_agent(state: AgentState) -> Dict[str, Any]:
                 "retrieved_news_count": retrieved_news_count,
                 "last_updated": datetime.now().isoformat()
             }
-            all_summaries[today_str] = current_summary_details
+            all_summaries[analysis_date] = current_summary_details
 
         try:
             with open(output_file_path, 'w', encoding='utf-8') as f:
@@ -173,11 +180,11 @@ def macro_news_agent(state: AgentState) -> Dict[str, Any]:
 
     show_workflow_status(f"{agent_name}: 执行完成。")
 
-    new_message_content = f"宏观新闻Agent分析 {today_str} (是否从缓存加载={from_cache}):\\n{summary}"
+    new_message_content = f"宏观新闻Agent分析 {analysis_date} (是否从缓存加载={from_cache}):\\n{summary}"
     new_message = HumanMessage(content=new_message_content, name=agent_name)
 
     agent_details_for_metadata = {
-        "summary_generated_on": today_str,
+        "summary_generated_on": analysis_date,
         "news_count_for_summary": retrieved_news_count,
         "llm_summary_preview": summary[:150] + "..." if len(summary) > 150 else summary,
         "loaded_from_cache": from_cache

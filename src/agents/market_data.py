@@ -12,6 +12,16 @@ import pandas as pd
 logger = setup_logger('market_data_agent')
 
 
+def _has_meaningful_records(value) -> bool:
+    if isinstance(value, pd.DataFrame):
+        return not value.empty
+    if isinstance(value, dict):
+        return any(v not in (None, 0, "", [], {}) for v in value.values())
+    if isinstance(value, list):
+        return any(_has_meaningful_records(item) for item in value)
+    return bool(value)
+
+
 @agent_endpoint("market_data", "市场数据收集，负责获取股价历史、财务指标和市场信息")
 def market_data_agent(state: AgentState):
     """Responsible for gathering and preprocessing market data"""
@@ -85,9 +95,9 @@ def market_data_agent(state: AgentState):
         "end_date": end_date,
         "data_collected": {
             "price_history": len(prices_dict) > 0,
-            "financial_metrics": len(financial_metrics) > 0,
-            "financial_statements": len(financial_line_items) > 0,
-            "market_data": len(market_data) > 0
+            "financial_metrics": _has_meaningful_records(financial_metrics),
+            "financial_statements": _has_meaningful_records(financial_line_items),
+            "market_data": _has_meaningful_records(market_data)
         },
         "summary": f"为{ticker}收集了从{start_date}到{end_date}的市场数据，包括价格历史、财务指标和市场信息"
     }

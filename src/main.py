@@ -217,8 +217,6 @@ def run_fastapi():
 
 # --- Main Execution Block ---
 if __name__ == "__main__":
-    fastapi_thread = threading.Thread(target=run_fastapi, daemon=True)
-    fastapi_thread.start()
     parser = argparse.ArgumentParser(
         description='Run the hedge fund trading system')
     parser.add_argument('--ticker', type=str, required=True,
@@ -237,9 +235,11 @@ if __name__ == "__main__":
                         default=0, help='Initial stock position (default: 0)')
     parser.add_argument('--summary', action='store_true',
                         help='Show beautiful summary report at the end')
+    parser.add_argument('--start-backend', action='store_true',
+                        help='Start the FastAPI backend server in the background')
     args = parser.parse_args()
     logger.info(
-        "CLI arguments parsed: ticker=%s start_date=%s end_date=%s show_reasoning=%s num_of_news=%s initial_capital=%s initial_position=%s show_summary=%s",
+        "CLI arguments parsed: ticker=%s start_date=%s end_date=%s show_reasoning=%s num_of_news=%s initial_capital=%s initial_position=%s show_summary=%s start_backend=%s",
         args.ticker,
         args.start_date,
         args.end_date,
@@ -248,7 +248,11 @@ if __name__ == "__main__":
         args.initial_capital,
         args.initial_position,
         args.summary,
+        args.start_backend,
     )
+    if args.start_backend:
+        fastapi_thread = threading.Thread(target=run_fastapi, daemon=True)
+        fastapi_thread.start()
     current_date = datetime.now()
     yesterday = current_date - timedelta(days=1)
     end_date = yesterday if not args.end_date else min(

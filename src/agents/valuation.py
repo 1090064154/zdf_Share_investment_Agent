@@ -3,6 +3,7 @@ from src.utils.logging_config import setup_logger
 from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status
 from src.utils.api_utils import agent_endpoint, log_llm_interaction
 import json
+import math
 
 # 初始化 logger
 logger = setup_logger('valuation_agent')
@@ -16,6 +17,25 @@ def _safe_second(items):
     if isinstance(items, list) and len(items) > 1:
         return items[1]
     return _safe_first(items)
+
+
+def _is_meaningful_number(value) -> bool:
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return False
+    return math.isfinite(numeric) and numeric != 0
+
+
+def _has_meaningful_valuation_inputs(current_financial_line_item: dict) -> bool:
+    required_keys = [
+        "net_income",
+        "depreciation_and_amortization",
+        "capital_expenditure",
+        "working_capital",
+        "free_cash_flow",
+    ]
+    return any(_is_meaningful_number(current_financial_line_item.get(key)) for key in required_keys)
 
 
 @agent_endpoint("valuation", "估值分析师，使用DCF和所有者收益法评估公司内在价值")
@@ -40,6 +60,36 @@ def valuation_agent(state: AgentState):
 
     if market_cap <= 0 or not current_financial_line_item:
         reason = "估值输入不足：市值缺失或财务报表不可用。"
+        logger.warning(reason)
+        message_content = {
+            "signal": "neutral",
+            "confidence": "0%",
+            "reasoning": {
+                "fallback": {
+                    "signal": "neutral",
+                    "details": reason
+                }
+            }
+        }
+        message = HumanMessage(
+            content=json.dumps(message_content),
+            name="valuation_agent",
+        )
+        if show_reasoning:
+            show_agent_reasoning(message_content, "估值分析Agent")
+            state["metadata"]["agent_reasoning"] = message_content
+        show_workflow_status("估值Agent", "completed")
+        return {
+            "messages": [message],
+            "data": {
+                **data,
+                "valuation_analysis": message_content
+            },
+            "metadata": state["metadata"],
+        }
+
+    if not _has_meaningful_valuation_inputs(current_financial_line_item):
+        reason = "估值输入不足：关键现金流和利润字段缺失或均为0，回退为中性。"
         logger.warning(reason)
         message_content = {
             "signal": "neutral",
@@ -97,6 +147,36 @@ def valuation_agent(state: AgentState):
     dcf_gap = (dcf_value - market_cap) / market_cap if market_cap else 0
     owner_earnings_gap = (owner_earnings_value - market_cap) / market_cap if market_cap else 0
     valuation_gap = (dcf_gap + owner_earnings_gap) / 2
+
+    if dcf_value == 0 and owner_earnings_value == 0:
+        reason = "DCF和所有者收益法都未得到有效估值结果，避免输出误导性的极端看空结论。"
+        logger.warning(reason)
+        message_content = {
+            "signal": "neutral",
+            "confidence": "0%",
+            "reasoning": {
+                "fallback": {
+                    "signal": "neutral",
+                    "details": reason
+                }
+            }
+        }
+        message = HumanMessage(
+            content=json.dumps(message_content),
+            name="valuation_agent",
+        )
+        if show_reasoning:
+            show_agent_reasoning(message_content, "估值分析Agent")
+            state["metadata"]["agent_reasoning"] = message_content
+        show_workflow_status("估值Agent", "completed")
+        return {
+            "messages": [message],
+            "data": {
+                **data,
+                "valuation_analysis": message_content
+            },
+            "metadata": state["metadata"],
+        }
 
     if valuation_gap > 0.10:  # Changed from 0.15 to 0.10 (10% undervalued)
         signal = 'bullish'

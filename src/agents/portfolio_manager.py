@@ -26,6 +26,101 @@ def get_latest_message_by_name(messages: list, name: str):
     return HumanMessage(content=json.dumps({"signal": "error", "details": f"Message from {name} not found"}), name=name)
 
 
+def _parse_message_json(message_content: str):
+    try:
+        return json.loads(message_content)
+    except (TypeError, json.JSONDecodeError):
+        return None
+
+
+def _normalize_confidence(value) -> float:
+    try:
+        if isinstance(value, str):
+            value = value.strip().replace("%", "")
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    if numeric > 1:
+        numeric /= 100.0
+    return max(0.0, min(1.0, numeric))
+
+
+def _extract_signal_entry(agent_name: str, payload: dict, signal_key: str = "signal", confidence_key: str = "confidence") -> dict:
+    signal = "neutral"
+    confidence = 0.0
+
+    if isinstance(payload, dict):
+        signal = payload.get(signal_key, signal)
+        confidence = _normalize_confidence(payload.get(confidence_key, confidence))
+
+    return {
+        "agent_name": agent_name,
+        "signal": signal,
+        "confidence": confidence,
+    }
+
+
+def _build_fallback_portfolio_decision(
+    technical_payload: dict,
+    fundamentals_payload: dict,
+    sentiment_payload: dict,
+    valuation_payload: dict,
+    risk_payload: dict,
+    macro_payload: dict,
+    has_macro_news_summary: bool,
+) -> str:
+    risk_entry = {
+        "agent_name": "risk_management",
+        "signal": (risk_payload or {}).get("交易行动", "hold"),
+        "confidence": 1.0 if risk_payload else 0.0,
+    }
+
+    agent_signals = [
+        _extract_signal_entry("technical_analysis", technical_payload),
+        _extract_signal_entry("fundamental_analysis", fundamentals_payload),
+        _extract_signal_entry("sentiment_analysis", sentiment_payload),
+        _extract_signal_entry("valuation_analysis", valuation_payload),
+        risk_entry,
+        _extract_signal_entry("macro_analysis", macro_payload, signal_key="impact_on_stock", confidence_key="confidence"),
+        {
+            "agent_name": "macro_news_analysis",
+            "signal": "neutral" if has_macro_news_summary else "unavailable",
+            "confidence": 0.1 if has_macro_news_summary else 0.0,
+        },
+    ]
+
+    risk_signal = risk_entry["signal"]
+    risk_score = 0.0
+    if isinstance(risk_payload, dict):
+        try:
+            risk_score = float(risk_payload.get("风险评分", 0))
+        except (TypeError, ValueError):
+            risk_score = 0.0
+
+    reasoning = "LLM不可用，已改用确定性保守决策，并保留上游Agent的真实信号。"
+    if risk_signal in {"sell", "reduce"}:
+        reasoning += f" 当前风险管理建议为{risk_signal}，因此不执行买入。"
+    elif risk_score >= 7:
+        reasoning += f" 当前风险评分为{risk_score:.0f}/10，优先保持观望。"
+    else:
+        reasoning += " 在缺少最终LLM综合裁决时，默认持有并等待更可靠输入。"
+
+    return json.dumps({
+        "action": "hold",
+        "quantity": 0,
+        "confidence": 0.35,
+        "agent_signals": agent_signals,
+        "reasoning": reasoning,
+    })
+
+
+def _has_usable_macro_news_summary(summary: str) -> bool:
+    if not summary:
+        return False
+    invalid_markers = ["暂不可用", "未提供", "未获取到", "跳过该模块"]
+    return not any(marker in summary for marker in invalid_markers)
+
+
 @agent_endpoint("portfolio_management", "负责投资组合管理和最终交易决策")
 def portfolio_management_agent(state: AgentState):
     """Responsible for portfolio management"""
@@ -88,6 +183,13 @@ def portfolio_management_agent(state: AgentState):
     # Optional: also try to get the message object for consistency in agent_signals, though data field is primary source
     macro_news_agent_message_obj = get_latest_message_by_name(
         cleaned_messages_for_processing, "macro_news_agent")
+
+    technical_payload = _parse_message_json(technical_content) or {}
+    fundamentals_payload = _parse_message_json(fundamentals_content) or {}
+    sentiment_payload = _parse_message_json(sentiment_content) or {}
+    valuation_payload = _parse_message_json(valuation_content) or {}
+    risk_payload = _parse_message_json(risk_content) or {}
+    macro_payload = _parse_message_json(tool_based_macro_content) or {}
 
     system_message_content = """你是一位专业的投资组合经理，负责做出最终的交易决策。
             你的任务是在严格遵守风险管理约束的前提下，根据团队的分析做出交易决策。
@@ -191,29 +293,15 @@ def portfolio_management_agent(state: AgentState):
     if llm_response_content is None:
         show_agent_reasoning(
             agent_name, "LLM call failed. Using default conservative decision.")
-        # Ensure the dummy response matches the expected structure for agent_signals
-        llm_response_content = json.dumps({
-            "action": "hold",
-            "quantity": 0,
-            "confidence": 0.3,
-            "agent_signals": [
-                {"agent_name": "technical_analysis",
-                    "signal": "neutral", "confidence": 0.0},
-                {"agent_name": "fundamental_analysis",
-                    "signal": "neutral", "confidence": 0.0},
-                {"agent_name": "sentiment_analysis",
-                    "signal": "neutral", "confidence": 0.0},
-                {"agent_name": "valuation_analysis",
-                    "signal": "neutral", "confidence": 0.0},
-                {"agent_name": "risk_management",
-                    "signal": "hold", "confidence": 1.0},
-                {"agent_name": "macro_analyst_agent",
-                    "signal": "neutral", "confidence": 0.0},
-                {"agent_name": "macro_news_agent",
-                    "signal": "unavailable_or_llm_error", "confidence": 0.0}
-            ],
-            "reasoning": "LLM API unavailable. Defaulting to a low-confidence conservative hold based on risk management."
-        })
+        llm_response_content = _build_fallback_portfolio_decision(
+            technical_payload=technical_payload,
+            fundamentals_payload=fundamentals_payload,
+            sentiment_payload=sentiment_payload,
+            valuation_payload=valuation_payload,
+            risk_payload=risk_payload,
+            macro_payload=macro_payload,
+            has_macro_news_summary=_has_usable_macro_news_summary(market_wide_news_summary_content),
+        )
 
     final_decision_message = HumanMessage(
         content=llm_response_content,

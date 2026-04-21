@@ -11,6 +11,12 @@ from src.tools.openrouter_config import get_chat_completion
 logger = setup_logger('macro_analyst_agent')
 
 
+def _resolve_news_window_end(end_date: str | None) -> datetime:
+    if not end_date:
+        return datetime.now()
+    return datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1) - timedelta(seconds=1)
+
+
 def _normalize_news_item(news: dict) -> dict:
     return {
         "title": str(news.get("title", "")).strip() or "未命名新闻",
@@ -40,14 +46,15 @@ def macro_analyst_agent(state: AgentState):
         news_list = []
 
     # 过滤七天前的新闻（只对有publish_time字段的新闻进行过滤）
-    cutoff_date = datetime.now() - timedelta(days=7)
+    reference_time = _resolve_news_window_end(end_date)
+    cutoff_date = reference_time - timedelta(days=7)
     recent_news = []
     for news in news_list:
         if 'publish_time' in news:
             try:
                 news_date = datetime.strptime(
                     news['publish_time'], '%Y-%m-%d %H:%M:%S')
-                if news_date > cutoff_date:
+                if cutoff_date < news_date <= reference_time:
                     recent_news.append(news)
             except ValueError:
                 # 如果时间格式无法解析，默认包含这条新闻
