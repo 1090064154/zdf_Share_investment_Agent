@@ -195,9 +195,11 @@ def valuation_agent(state: AgentState):
         "details": f"Owner Earnings Value: ${owner_earnings_value:,.2f}, Market Cap: ${market_cap:,.2f}, Gap: {owner_earnings_gap:.1%}"
     }
 
+    capped_valuation_gap = min(abs(valuation_gap), 1.0)
+
     message_content = {
         "signal": signal,
-        "confidence": f"{abs(valuation_gap):.0%}",
+        "confidence": f"{capped_valuation_gap:.0%}",
         "reasoning": reasoning
     }
 

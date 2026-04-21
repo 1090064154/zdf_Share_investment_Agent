@@ -59,6 +59,10 @@ def researcher_bear_agent(state: AgentState):
             "metadata": state["metadata"],
         }
 
+    def parse_confidence(confidence_str):
+        raw_val = float(str(confidence_str).replace("%", "")) / 100
+        return min(max(raw_val, 0.0), 1.0)
+
     # Analyze from bearish perspective
     bearish_points = []
     confidence_scores = []
@@ -68,7 +72,7 @@ def researcher_bear_agent(state: AgentState):
         bearish_points.append(
             f"技术指标显示看空动能，置信度为{technical_signals['confidence']}")
         confidence_scores.append(
-            float(str(technical_signals["confidence"]).replace("%", "")) / 100)
+            parse_confidence(technical_signals["confidence"]))
     else:
         bearish_points.append(
             "技术反弹可能是暂时的，暗示潜在反转")
@@ -79,7 +83,7 @@ def researcher_bear_agent(state: AgentState):
         bearish_points.append(
             f"基本面令人担忧，置信度为{fundamental_signals['confidence']}")
         confidence_scores.append(
-            float(str(fundamental_signals["confidence"]).replace("%", "")) / 100)
+            parse_confidence(fundamental_signals["confidence"]))
     else:
         bearish_points.append(
             "当前基本面的强劲可能不可持续")
@@ -90,7 +94,7 @@ def researcher_bear_agent(state: AgentState):
         bearish_points.append(
             f"负面市场情绪，置信度为{sentiment_signals['confidence']}")
         confidence_scores.append(
-            float(str(sentiment_signals["confidence"]).replace("%", "")) / 100)
+            parse_confidence(sentiment_signals["confidence"]))
     else:
         bearish_points.append(
             "市场情绪可能过于乐观，表明存在潜在风险")
@@ -101,7 +105,7 @@ def researcher_bear_agent(state: AgentState):
         bearish_points.append(
             f"股票被高估，置信度为{valuation_signals['confidence']}")
         confidence_scores.append(
-            float(str(valuation_signals["confidence"]).replace("%", "")) / 100)
+            parse_confidence(valuation_signals["confidence"]))
     else:
         bearish_points.append(
             "当前估值可能未完全反映下行风险")

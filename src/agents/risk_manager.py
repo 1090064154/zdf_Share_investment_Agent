@@ -152,14 +152,23 @@ def risk_management_agent(state: AgentState):
     stress_test_results = {}
     current_position_value = current_stock_value
 
+    if current_position_value == 0 and max_position_size > 0:
+        current_position_value = max_position_size
+
     for scenario, decline in stress_test_scenarios.items():
-        potential_loss = current_position_value * decline
-        portfolio_impact = potential_loss / (portfolio['cash'] + current_position_value) if (
-            portfolio['cash'] + current_position_value) != 0 else math.nan
-        stress_test_results[scenario] = {
-            "潜在损失": potential_loss,
-            "组合影响": portfolio_impact
-        }
+        if current_position_value == 0:
+            stress_test_results[scenario] = {
+                "潜在损失": None,
+                "组合影响": None
+            }
+        else:
+            potential_loss = current_position_value * decline
+            portfolio_impact = potential_loss / (portfolio['cash'] + current_position_value) if (
+                portfolio['cash'] + current_position_value) != 0 else math.nan
+            stress_test_results[scenario] = {
+                "潜在损失": potential_loss,
+                "组合影响": portfolio_impact
+            }
 
     # 5. Risk-Adjusted Signal Analysis
     # Consider debate room confidence levels

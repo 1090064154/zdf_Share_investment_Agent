@@ -409,52 +409,58 @@ def get_market_data(symbol: str) -> Dict[str, Any]:
     except Exception as e:
         logger.warning(f"读取市值缓存失败: {e}")
 
-    try:
-        # 获取实时行情 - 新浪数据源
-        realtime_data = ak.stock_zh_a_spot()
-        # 新浪数据源股票代码格式
-        stock_code = f"sz{symbol}" if symbol.startswith("3") or symbol.startswith("0") else f"sh{symbol}"
-        stock_data = realtime_data[realtime_data['代码'] == stock_code]
+    # 优先使用缓存的市值，避免每次都调用慢速API
+    if cached_market_cap > 0:
+        market_cap = cached_market_cap
+        price = cached_price
+        logger.info(f"✓ 使用缓存的市值: {market_cap}")
+    else:
+        try:
+            # 获取实时行情 - 新浪数据源
+            realtime_data = ak.stock_zh_a_spot()
+            # 新浪数据源股票代码格式
+            stock_code = f"sz{symbol}" if symbol.startswith("3") or symbol.startswith("0") else f"sh{symbol}"
+            stock_data = realtime_data[realtime_data['代码'] == stock_code]
 
-        if not stock_data.empty:
-            stock_data = stock_data.iloc[0]
-            price = float(stock_data.get("最新价", 0))
-            volume = float(stock_data.get("成交量", 0))
-            high_52w = float(stock_data.get("最高", 0))
-            low_52w = float(stock_data.get("最低", 0))
+            if not stock_data.empty:
+                stock_data = stock_data.iloc[0]
+                price = float(stock_data.get("最新价", 0))
+                volume = float(stock_data.get("成交量", 0))
+                high_52w = float(stock_data.get("最高", 0))
+                low_52w = float(stock_data.get("最低", 0))
 
-            # 尝试获取市值
-            market_cap = _estimate_market_cap_from_financials(symbol, price)
-            if market_cap > 0:
-                logger.info(f"✓ 通过新浪财报估算市值: {market_cap}")
+                # 尝试获取市值
+                market_cap = _estimate_market_cap_from_financials(symbol, price)
+                if market_cap > 0:
+                    logger.info(f"✓ 通过新浪财报估算市值: {market_cap}")
 
-                # 缓存市值
-                try:
-                    os.makedirs(os.path.dirname(cache_file), exist_ok=True)
-                    cache = {}
-                    if os.path.exists(cache_file):
-                        with open(cache_file, 'r', encoding='utf-8') as f:
-                            cache = json.load(f)
-                    cache[symbol] = {"market_cap": market_cap, "price": price, "updated": datetime.now().isoformat()}
-                    with open(cache_file, 'w', encoding='utf-8') as f:
-                        json.dump(cache, f, ensure_ascii=False, indent=2)
-                    logger.info(f"✓ 市值已缓存")
-                except Exception as e:
-                    logger.warning(f"缓存市值失败: {e}")
-        else:
+                    # 缓存市值
+                    try:
+                        os.makedirs(os.path.dirname(cache_file), exist_ok=True)
+                        cache = {}
+                        if os.path.exists(cache_file):
+                            with open(cache_file, 'r', encoding='utf-8') as f:
+                                cache = json.load(f)
+                        cache[symbol] = {"market_cap": market_cap, "price": price, "updated": datetime.now().isoformat()}
+                        with open(cache_file, 'w', encoding='utf-8') as f:
+                            json.dump(cache, f, ensure_ascii=False, indent=2)
+                        logger.info(f"✓ 市值已缓存")
+                    except Exception as e:
+                        logger.warning(f"缓存市值失败: {e}")
+            else:
+                price = 0
+                volume = 0
+                high_52w = 0
+                low_52w = 0
+                market_cap = 0
+
+        except Exception as e:
+            _log_data_source_failure("Market data source", e)
             price = 0
             volume = 0
             high_52w = 0
             low_52w = 0
             market_cap = 0
-
-    except Exception as e:
-        _log_data_source_failure("Market data source", e)
-        price = 0
-        volume = 0
-        high_52w = 0
-        low_52w = 0
-        market_cap = 0
 
     # 如果市值获取失败，尝试从腾讯历史行情获取价格并估算市值
     if market_cap <= 0:

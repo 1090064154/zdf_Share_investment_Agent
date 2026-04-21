@@ -59,6 +59,10 @@ def researcher_bull_agent(state: AgentState):
             "metadata": state["metadata"],
         }
 
+    def parse_confidence(confidence_str):
+        raw_val = float(str(confidence_str).replace("%", "")) / 100
+        return min(max(raw_val, 0.0), 1.0)
+
     # Analyze from bullish perspective
     bullish_points = []
     confidence_scores = []
@@ -68,7 +72,7 @@ def researcher_bull_agent(state: AgentState):
         bullish_points.append(
             f"技术指标显示看多动能，置信度为{technical_signals['confidence']}")
         confidence_scores.append(
-            float(str(technical_signals["confidence"]).replace("%", "")) / 100)
+            parse_confidence(technical_signals["confidence"]))
     else:
         bullish_points.append(
             "技术指标可能较为保守，提供了买入机会")
@@ -79,7 +83,7 @@ def researcher_bull_agent(state: AgentState):
         bullish_points.append(
             f"基本面强劲，置信度为{fundamental_signals['confidence']}")
         confidence_scores.append(
-            float(str(fundamental_signals["confidence"]).replace("%", "")) / 100)
+            parse_confidence(fundamental_signals["confidence"]))
     else:
         bullish_points.append(
             "公司基本面有改善潜力")
@@ -90,7 +94,7 @@ def researcher_bull_agent(state: AgentState):
         bullish_points.append(
             f"市场情绪积极，置信度为{sentiment_signals['confidence']}")
         confidence_scores.append(
-            float(str(sentiment_signals["confidence"]).replace("%", "")) / 100)
+            parse_confidence(sentiment_signals["confidence"]))
     else:
         bullish_points.append(
             "市场情绪可能过于悲观，创造了价值机会")
@@ -101,7 +105,7 @@ def researcher_bull_agent(state: AgentState):
         bullish_points.append(
             f"股票被低估，置信度为{valuation_signals['confidence']}")
         confidence_scores.append(
-            float(str(valuation_signals["confidence"]).replace("%", "")) / 100)
+            parse_confidence(valuation_signals["confidence"]))
     else:
         bullish_points.append(
             "当前估值可能未完全反映增长潜力")
