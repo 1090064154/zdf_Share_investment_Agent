@@ -190,10 +190,17 @@ def risk_management_agent(state: AgentState):
     # Consider debate room signal along with risk assessment
     debate_signal = debate_results["signal"]
 
+    # 获取当前持仓
+    current_position = data.get("portfolio", {}).get("stock", 0)
+
     if risk_score >= 9:
         trading_action = "hold"
     elif risk_score >= 7:
-        trading_action = "reduce"
+        # 如果当前持仓为0，reduce没有意义，改为hold
+        if current_position <= 0:
+            trading_action = "hold"
+        else:
+            trading_action = "reduce"
     else:
         if debate_signal == "bullish" and debate_confidence > 0.5:
             trading_action = "buy"

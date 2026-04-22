@@ -135,21 +135,83 @@ def valuation_agent(state: AgentState):
     )
 
     # DCF Valuation
+    # 如果free_cash_flow为0或负数，使用净利润作为替代
+    fcff = current_financial_line_item.get('free_cash_flow', 0)
+    if not fcff or fcff <= 0:
+        fcff = current_financial_line_item.get('net_income', 0)
     dcf_value = calculate_intrinsic_value(
-        free_cash_flow=current_financial_line_item.get('free_cash_flow'),
+        free_cash_flow=fcff,
         growth_rate=metrics.get("earnings_growth", 0),
         discount_rate=0.10,
         terminal_growth_rate=0.03,
         num_years=5,
     )
 
-    # Calculate combined valuation gap (average of both methods)
-    dcf_gap = (dcf_value - market_cap) / market_cap if market_cap else 0
-    owner_earnings_gap = (owner_earnings_value - market_cap) / market_cap if market_cap else 0
-    valuation_gap = (dcf_gap + owner_earnings_gap) / 2
+    # 收集有效的估值结果
+    valid_valuations = []
+    reasoning = {}
 
-    if dcf_value == 0 and owner_earnings_value == 0:
-        reason = "DCF和所有者收益法都未得到有效估值结果，避免输出误导性的极端看空结论。"
+    # DCF分析
+    if dcf_value > 0:
+        dcf_gap = (dcf_value - market_cap) / market_cap
+        capped_dcf_gap = max(-1.0, min(1.0, dcf_gap))
+        valid_valuations.append({
+            "method": "dcf",
+            "gap": dcf_gap,
+            "weight": 0.4,  # DCF权重40%
+            "signal": "bullish" if dcf_gap > 0.15 else "bearish" if dcf_gap < -0.25 else "neutral"
+        })
+        reasoning["dcf_analysis"] = {
+            "signal": valid_valuations[-1]["signal"],
+            "details": f"Intrinsic Value: ${dcf_value:,.2f}, Market Cap: ${market_cap:,.2f}, Gap: {capped_dcf_gap:.1%}"
+        }
+    else:
+        reasoning["dcf_analysis"] = {
+            "signal": "neutral",
+            "details": f"DCF计算无效（自由现金流: ${fcff:,.2f}），已跳过"
+        }
+
+    # 所有者收益分析
+    if owner_earnings_value > 0:
+        owner_earnings_gap = (owner_earnings_value - market_cap) / market_cap
+        capped_owner_gap = max(-1.0, min(1.0, owner_earnings_gap))
+        valid_valuations.append({
+            "method": "owner_earnings",
+            "gap": owner_earnings_gap,
+            "weight": 0.35,  # 所有者收益权重35%
+            "signal": "bullish" if owner_earnings_gap > 0.15 else "bearish" if owner_earnings_gap < -0.25 else "neutral"
+        })
+        reasoning["owner_earnings_analysis"] = {
+            "signal": valid_valuations[-1]["signal"],
+            "details": f"Owner Earnings Value: ${owner_earnings_value:,.2f}, Market Cap: ${market_cap:,.2f}, Gap: {capped_owner_gap:.1%}"
+        }
+    else:
+        reasoning["owner_earnings_analysis"] = {
+            "signal": "neutral",
+            "details": "所有者收益计算无效，已跳过"
+        }
+
+    # 市盈率分析（作为补充）
+    pe_ratio = metrics.get("pe_ratio", 0)
+    if pe_ratio > 0:
+        # 行业平均市盈率参考
+        industry_avg_pe = 20  # 默认使用20倍作为参考
+        pe_gap = (industry_avg_pe - pe_ratio) / pe_ratio
+        pe_signal = "bullish" if pe_gap > 0.3 else "bearish" if pe_gap < -0.3 else "neutral"
+        valid_valuations.append({
+            "method": "pe_ratio",
+            "gap": pe_gap,
+            "weight": 0.25,  # 市盈率权重25%
+            "signal": pe_signal
+        })
+        reasoning["pe_analysis"] = {
+            "signal": pe_signal,
+            "details": f"市盈率: {pe_ratio:.2f}, 行业平均: {industry_avg_pe}, 相对估值: {'低估' if pe_gap > 0 else '高估' if pe_gap < 0 else '合理'}"
+        }
+
+    # 如果没有有效的估值结果
+    if not valid_valuations:
+        reason = "所有估值方法都未得到有效结果，无法进行估值分析。"
         logger.warning(reason)
         message_content = {
             "signal": "neutral",
@@ -178,31 +240,36 @@ def valuation_agent(state: AgentState):
             "metadata": state["metadata"],
         }
 
-    if valuation_gap > 0.10:  # Changed from 0.15 to 0.10 (10% undervalued)
-        signal = 'bullish'
-    elif valuation_gap < -0.20:  # Changed from -0.15 to -0.20 (20% overvalued)
-        signal = 'bearish'
+    # 计算加权平均估值差距
+    total_weight = sum(v["weight"] for v in valid_valuations)
+    weighted_gap = sum(v["gap"] * v["weight"] for v in valid_valuations) / total_weight
+
+    # 统计各信号的数量
+    bullish_count = sum(1 for v in valid_valuations if v["signal"] == "bullish")
+    bearish_count = sum(1 for v in valid_valuations if v["signal"] == "bearish")
+    neutral_count = sum(1 for v in valid_valuations if v["signal"] == "neutral")
+
+    # 确定最终信号
+    # 如果多数方法看空，则看空；如果多数看多，则看多；否则中性
+    if bearish_count > bullish_count and bearish_count >= len(valid_valuations) / 2:
+        signal = "bearish"
+        # 置信度基于加权差距的绝对值
+        confidence = min(abs(weighted_gap) * 100, 90)
+    elif bullish_count > bearish_count and bullish_count >= len(valid_valuations) / 2:
+        signal = "bullish"
+        confidence = min(abs(weighted_gap) * 100, 90)
     else:
-        signal = 'neutral'
+        signal = "neutral"
+        # 中性信号的置信度基于估值方法的一致性
+        confidence = 50 - abs(bullish_count - bearish_count) * 10
 
-    capped_dcf_gap = min(abs(dcf_gap), 1.0) * (1 if dcf_gap >= 0 else -1)
-    capped_owner_gap = min(abs(owner_earnings_gap), 1.0) * (1 if owner_earnings_gap >= 0 else -1)
-
-    reasoning["dcf_analysis"] = {
-        "signal": "bullish" if dcf_gap > 0.10 else "bearish" if dcf_gap < -0.20 else "neutral",
-        "details": f"Intrinsic Value: ${dcf_value:,.2f}, Market Cap: ${market_cap:,.2f}, Gap: {capped_dcf_gap:.1%}"
-    }
-
-    reasoning["owner_earnings_analysis"] = {
-        "signal": "bullish" if owner_earnings_gap > 0.10 else "bearish" if owner_earnings_gap < -0.20 else "neutral",
-        "details": f"Owner Earnings Value: ${owner_earnings_value:,.2f}, Market Cap: ${market_cap:,.2f}, Gap: {capped_owner_gap:.1%}"
-    }
-
-    capped_valuation_gap = min(abs(valuation_gap), 1.0)
+    # 确保置信度在合理范围内
+    confidence = max(10, min(95, confidence))
+    confidence_str = f"{confidence:.0f}%"
 
     message_content = {
         "signal": signal,
-        "confidence": f"{capped_valuation_gap:.0%}",
+        "confidence": confidence_str,
         "reasoning": reasoning
     }
 

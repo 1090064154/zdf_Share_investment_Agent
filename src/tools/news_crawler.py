@@ -252,6 +252,63 @@ def get_stock_news_via_sina(symbol: str, stock_name: str = "", max_news: int = 1
         return []
 
 
+def get_stock_news_via_akshare(symbol: str, stock_name: str = "", max_news: int = 10) -> list:
+    """使用akshare获取个股新闻，作为最后的备用来源。"""
+    if ak is None:
+        return []
+
+    news_list = []
+    keyword = stock_name or symbol
+
+    try:
+        # 尝试获取个股新闻
+        df = ak.stock_news_em(symbol=symbol)
+        if df is not None and not df.empty:
+            for _, row in df.head(max_news).iterrows():
+                news_item = {
+                    "title": str(row.get("新闻标题", row.get("title", ""))),
+                    "content": str(row.get("新闻内容", row.get("content", ""))),
+                    "source": str(row.get("来源", row.get("source", "东方财富"))),
+                    "url": str(row.get("新闻链接", row.get("url", ""))),
+                    "keyword": keyword,
+                }
+                # 尝试获取发布时间
+                publish_time = row.get("发布时间", row.get("publish_time", ""))
+                if publish_time:
+                    news_item["publish_time"] = str(publish_time)
+                if news_item["title"]:
+                    news_list.append(news_item)
+            print(f"通过akshare获取到{len(news_list)}条新闻")
+            return news_list
+    except Exception as e:
+        print(f"akshare获取新闻时出错: {e}")
+
+    # 如果上面失败，尝试使用股票名称搜索
+    try:
+        if stock_name:
+            df = ak.stock_news_em(symbol=stock_name)
+            if df is not None and not df.empty:
+                for _, row in df.head(max_news).iterrows():
+                    news_item = {
+                        "title": str(row.get("新闻标题", row.get("title", ""))),
+                        "content": str(row.get("新闻内容", row.get("content", ""))),
+                        "source": str(row.get("来源", row.get("source", "东方财富"))),
+                        "url": str(row.get("新闻链接", row.get("url", ""))),
+                        "keyword": keyword,
+                    }
+                    publish_time = row.get("发布时间", row.get("publish_time", ""))
+                    if publish_time:
+                        news_item["publish_time"] = str(publish_time)
+                    if news_item["title"]:
+                        news_list.append(news_item)
+                print(f"通过akshare(股票名称)获取到{len(news_list)}条新闻")
+                return news_list
+    except Exception as e:
+        print(f"akshare通过股票名称获取新闻时出错: {e}")
+
+    return news_list
+
+
 def get_stock_news(symbol: str, max_news: int = 10, date: str = None) -> list:
     """获取并处理个股新闻
 
@@ -383,6 +440,15 @@ def get_stock_news(symbol: str, max_news: int = 10, date: str = None) -> list:
             stock_name=stock_name,
             max_news=fetch_count,
             date=date,
+        )
+
+    # 如果新浪搜索也失败，尝试akshare
+    if not new_news_list:
+        print("使用akshare获取新闻...")
+        new_news_list = get_stock_news_via_akshare(
+            symbol,
+            stock_name=stock_name,
+            max_news=fetch_count,
         )
 
     # 合并缓存和新获取的新闻，去重

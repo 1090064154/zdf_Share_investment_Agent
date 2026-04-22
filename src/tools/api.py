@@ -97,6 +97,22 @@ def get_financial_metrics(symbol: str) -> Dict[str, Any]:
     latest_financial = pd.Series()
     latest_income = pd.Series()
 
+    # 检查财务指标缓存
+    financial_cache_file = "src/data/financial_metrics_cache.json"
+    try:
+        if os.path.exists(financial_cache_file):
+            with open(financial_cache_file, 'r', encoding='utf-8') as f:
+                cache = json.load(f)
+                if symbol in cache:
+                    cached_data = cache[symbol]
+                    # 检查缓存是否在当天
+                    cache_time = datetime.fromisoformat(cached_data.get("updated", "2000-01-01"))
+                    if cache_time.date() == datetime.now().date():
+                        logger.info(f"✓ 使用缓存的财务指标数据")
+                        return cached_data.get("metrics", {})
+    except Exception as e:
+        logger.warning(f"读取财务指标缓存失败: {e}")
+
     cache_file = "src/data/market_cap_cache.json"
     cached_price = 0
 
@@ -112,17 +128,7 @@ def get_financial_metrics(symbol: str) -> Dict[str, Any]:
     if cached_price > 0:
         logger.info(f"✓ 使用缓存的价格: {cached_price}")
     else:
-        try:
-            logger.info("Fetching real-time quotes...")
-            realtime_data = ak.stock_zh_a_spot()
-            if realtime_data is not None and not realtime_data.empty:
-                stock_code = f"sz{symbol}" if symbol.startswith("3") or symbol.startswith("0") else f"sh{symbol}"
-                stock_data_match = realtime_data[realtime_data['代码'] == stock_code]
-                if not stock_data_match.empty:
-                    stock_data = stock_data_match.iloc[0]
-                    logger.info("✓ Real-time quotes fetched")
-        except Exception as e:
-            logger.warning(f"Failed to get real-time quotes: {e}")
+        logger.info("跳过实时行情API，尝试使用其他方式获取价格")
 
     # 获取财务分析指标 - 先尝试sina，失败则用东方财富备用
     try:
@@ -185,9 +191,15 @@ def get_financial_metrics(symbol: str) -> Dict[str, Any]:
     logger.info("Building indicators...")
     try:
         def convert_percentage(value: float) -> float:
-            """将百分比值转换为小数"""
+            """将百分比值转换为小数
+            如果值>1，说明已经是百分比形式(如34.21表示34.21%)，不需要再除以100
+            如果值<=1，说明已经是小数形式(如0.3421表示34.21%)，直接返回
+            """
             try:
-                return float(value) / 100.0 if value is not None else 0.0
+                fv = float(value) if value is not None else 0.0
+                if fv > 1:
+                    return fv / 100.0
+                return fv
             except:
                 return 0.0
 
@@ -280,6 +292,23 @@ def get_financial_metrics(symbol: str) -> Dict[str, Any]:
         if all(v == 0 for v in agent_metrics.values()):
             logger.warning("All metrics are zero, returning empty")
             return [{}]
+
+        # 写入缓存
+        try:
+            cache = {}
+            if os.path.exists(financial_cache_file):
+                with open(financial_cache_file, 'r', encoding='utf-8') as f:
+                    cache = json.load(f)
+            cache[symbol] = {
+                "metrics": agent_metrics,
+                "updated": datetime.now().isoformat()
+            }
+            os.makedirs(os.path.dirname(financial_cache_file), exist_ok=True)
+            with open(financial_cache_file, 'w', encoding='utf-8') as f:
+                json.dump(cache, f, ensure_ascii=False, indent=2)
+            logger.info(f"✓ 财务指标已缓存")
+        except Exception as e:
+            logger.warning(f"写入财务指标缓存失败: {e}")
 
         return [agent_metrics]
 
@@ -744,50 +773,80 @@ def get_price_history(symbol: str, start_date: str = None, end_date: str = None,
         # 1. 赫斯特指数 (使用过去120天的数据)
         def calculate_hurst(series):
             """
-            计算Hurst指数。
+            计算Hurst指数 - 使用R/S分析方法。
 
             Args:
                 series: 价格序列
 
             Returns:
                 float: Hurst指数，或在计算失败时返回np.nan
+                   H < 0.5: 均值回归
+                   H = 0.5: 随机游走
+                   H > 0.5: 趋势性
             """
             try:
                 series = series.dropna()
-                if len(series) < 30:  # 降低最小数据点要求
+                if len(series) < 50:  # 需要足够的数据点
                     return np.nan
 
                 # 使用对数收益率
                 log_returns = np.log(series / series.shift(1)).dropna()
-                if len(log_returns) < 30:  # 降低最小数据点要求
+                if len(log_returns) < 50:
                     return np.nan
 
-                # 使用更小的lag范围
-                # 减少lag范围到2-10天
-                lags = range(2, min(11, len(log_returns) // 4))
+                # R/S分析计算赫斯特指数
+                # 将序列分成多个子序列，计算每个子序列的R/S值
+                n = len(log_returns)
+                max_k = min(n // 2, 50)  # 最大子序列长度
 
-                # 计算每个lag的标准差
-                tau = []
-                for lag in lags:
-                    # 计算滚动标准差
-                    std = log_returns.rolling(window=lag).std().dropna()
-                    if len(std) > 0:
-                        tau.append(np.mean(std))
+                rs_values = []
+                k_values = []
 
-                # 基本的数值检查
-                if len(tau) < 3:  # 进一步降低最小要求
+                for k in [10, 20, 30, 40, 50]:
+                    if k >= n:
+                        continue
+
+                    # 将序列分成 n/k 个子序列
+                    m = n // k
+                    if m < 2:
+                        continue
+
+                    rs_list = []
+                    for i in range(m):
+                        sub_series = log_returns[i * k:(i + 1) * k]
+                        if len(sub_series) < k:
+                            continue
+
+                        # 计算累积偏差
+                        mean = sub_series.mean()
+                        cum_dev = (sub_series - mean).cumsum()
+
+                        # 极差 R
+                        R = cum_dev.max() - cum_dev.min()
+
+                        # 标准差 S
+                        S = sub_series.std()
+
+                        if S > 0:
+                            rs_list.append(R / S)
+
+                    if rs_list:
+                        rs_values.append(np.mean(rs_list))
+                        k_values.append(k)
+
+                if len(rs_values) < 3:
                     return np.nan
 
-                # 使用对数回归
-                lags_log = np.log(list(lags))
-                tau_log = np.log(tau)
+                # 对数回归: log(R/S) = H * log(k) + c
+                log_k = np.log(k_values)
+                log_rs = np.log(rs_values)
 
                 # 计算回归系数
-                reg = np.polyfit(lags_log, tau_log, 1)
-                hurst = reg[0] / 2.0
+                reg = np.polyfit(log_k, log_rs, 1)
+                hurst = reg[0]
 
-                # 只保留基本的数值检查
-                if np.isnan(hurst) or np.isinf(hurst):
+                # 赫斯特指数应该在0到1之间
+                if hurst < 0 or hurst > 1:
                     return np.nan
 
                 return hurst
@@ -811,17 +870,37 @@ def get_price_history(symbol: str, start_date: str = None, end_date: str = None,
         # 按日期升序排序
         df = df.sort_values("date")
 
+        # 使用 forward fill 填充技术指标的 NaN 值
+        # 技术指标列（不包括基础价格数据）
+        indicator_columns = [
+            "momentum_1m", "momentum_3m", "momentum_6m",
+            "volume_ma20", "volume_momentum",
+            "historical_volatility", "volatility_regime", "volatility_z_score",
+            "atr", "atr_ratio",
+            "hurst_exponent", "skewness", "kurtosis"
+        ]
+
+        for col in indicator_columns:
+            if col in df.columns:
+                # 先用 forward fill 填充中间的 NaN
+                df[col] = df[col].ffill()
+                # 再用 backward fill 填充开头的 NaN（使用后续有效值）
+                df[col] = df[col].bfill()
+                # 如果仍有 NaN（如数据不足），用 0 填充
+                df[col] = df[col].fillna(0)
+
         # 重置索引
         df = df.reset_index(drop=True)
 
         logger.info(
             f"Successfully fetched price history data ({len(df)} records)")
 
-        # 检查并报告NaN值
-        nan_columns = df.isna().sum()
+        # 检查并报告NaN值（仅检查基础数据列，技术指标已填充）
+        base_columns = ["open", "close", "high", "low", "volume"]
+        nan_columns = df[base_columns].isna().sum()
         if nan_columns.any():
             logger.warning(
-                "\nWarning: The following indicators contain NaN values:")
+                "\nWarning: The following base columns contain NaN values:")
             for col, nan_count in nan_columns[nan_columns > 0].items():
                 logger.warning(f"- {col}: {nan_count} records")
 
