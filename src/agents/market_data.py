@@ -26,8 +26,11 @@ def _has_meaningful_records(value) -> bool:
 def market_data_agent(state: AgentState):
     """Responsible for gathering and preprocessing market data"""
     show_workflow_status("市场数据Agent")
-    show_reasoning = state["metadata"]["show_reasoning"]
+    logger.info("="*50)
+    logger.info("📊 [MARKET_DATA] 开始收集市场数据")
+    logger.info("="*50)
 
+    show_reasoning = state["metadata"]["show_reasoning"]
     messages = state["messages"]
     data = state["data"]
 
@@ -52,32 +55,44 @@ def market_data_agent(state: AgentState):
     # Get all required data
     ticker = data["ticker"]
 
+    logger.info(f"  📈 股票代码: {ticker}")
+    logger.info(f"  📅 数据区间: {start_date} ~ {end_date}")
+
     # 获取价格数据并验证
+    logger.info("  [1/4] 获取价格历史...")
     prices_df = get_price_history(ticker, start_date, end_date)
     if prices_df is None or prices_df.empty:
-        logger.warning(f"警告：无法获取{ticker}的价格数据，将使用空数据继续")
+        logger.warning(f"  ⚠️ 无法获取{ticker}的价格数据，将使用空数据继续")
         prices_df = pd.DataFrame(
             columns=['close', 'open', 'high', 'low', 'volume'])
+    else:
+        logger.info(f"  ✅ 获取到 {len(prices_df)} 条价格记录")
 
     # 获取财务指标
+    logger.info("  [2/4] 获取财务指标...")
     try:
         financial_metrics = get_financial_metrics(ticker)
+        logger.info(f"  ✅ 财务指标获取成功")
     except Exception as e:
-        logger.error(f"获取财务指标失败: {str(e)}")
+        logger.error(f"  ❌ 获取财务指标失败: {str(e)}")
         financial_metrics = {}
 
     # 获取财务报表
+    logger.info("  [3/4] 获取财务报表...")
     try:
         financial_line_items = get_financial_statements(ticker)
+        logger.info(f"  ✅ 财务报表获取成功")
     except Exception as e:
-        logger.error(f"获取财务报表失败: {str(e)}")
+        logger.error(f"  ❌ 获取财务报表失败: {str(e)}")
         financial_line_items = {}
 
     # 获取市场数据
+    logger.info("  [4/4] 获取市场数据...")
     try:
         market_data = get_market_data(ticker)
+        logger.info(f"  ✅ 市场数据获取成功")
     except Exception as e:
-        logger.error(f"获取市场数据失败: {str(e)}")
+        logger.error(f"  ❌ 获取市场数据失败: {str(e)}")
         market_data = {"market_cap": 0}
 
     # 确保数据格式正确

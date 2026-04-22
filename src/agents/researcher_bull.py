@@ -9,6 +9,11 @@ import ast
 def researcher_bull_agent(state: AgentState):
     """Analyzes signals from a bullish perspective and generates optimistic investment thesis."""
     show_workflow_status("看多研究员")
+    import logging
+    logger = logging.getLogger('researcher_bull')
+    logger.info("="*50)
+    logger.info("🐂 [RESEARCHER_BULL] 开始多方研究分析")
+    logger.info("="*50)
     show_reasoning = state["metadata"]["show_reasoning"]
 
     # Fetch messages from analysts

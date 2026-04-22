@@ -48,8 +48,10 @@ def technical_analyst_agent(state: AgentState):
     4. Volatility Analysis
     5. Statistical Arbitrage Signals
     """
-    logger.info("\n--- DEBUG: technical_analyst_agent START ---")
     show_workflow_status("技术分析师")
+    logger.info("="*50)
+    logger.info("📈 [TECHNICAL] 开始技术分析")
+    logger.info("="*50)
     show_reasoning = state["metadata"]["show_reasoning"]
     data = state["data"]
     prices = data["prices"]

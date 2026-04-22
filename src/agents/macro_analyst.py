@@ -30,10 +30,13 @@ def _normalize_news_item(news: dict) -> dict:
 def macro_analyst_agent(state: AgentState):
     """Responsible for macro analysis"""
     show_workflow_status("宏观分析师")
+    logger.info("="*50)
+    logger.info("🌍 [MACRO_ANALYST] 开始宏观分析")
+    logger.info("="*50)
     show_reasoning = state["metadata"]["show_reasoning"]
     data = state["data"]
     symbol = data["ticker"]
-    logger.info(f"正在进行宏观分析: {symbol}")
+    logger.info(f"  股票代码: {symbol}")
 
     # 获取 end_date 并传递给 get_stock_news
     end_date = data.get("end_date")  # 从 run_hedge_fund 传递来的 end_date

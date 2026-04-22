@@ -67,6 +67,7 @@ def _build_fallback_portfolio_decision(
     valuation_payload: dict,
     risk_payload: dict,
     macro_payload: dict,
+    debate_payload: dict,
     has_macro_news_summary: bool,
 ) -> str:
     risk_entry = {
@@ -75,18 +76,25 @@ def _build_fallback_portfolio_decision(
         "confidence": 1.0 if risk_payload else 0.0,
     }
 
+    debate_entry = _extract_signal_entry("debate_room", debate_payload)
+
     agent_signals = [
         _extract_signal_entry("technical_analysis", technical_payload),
         _extract_signal_entry("fundamental_analysis", fundamentals_payload),
         _extract_signal_entry("sentiment_analysis", sentiment_payload),
         _extract_signal_entry("valuation_analysis", valuation_payload),
         risk_entry,
-        _extract_signal_entry("macro_analysis", macro_payload, signal_key="impact_on_stock", confidence_key="confidence"),
+        {
+            "agent_name": "macro_analysis",
+            "signal": macro_payload.get("impact_on_stock", "neutral") if isinstance(macro_payload, dict) else "neutral",
+            "confidence": 0.5 if macro_payload and isinstance(macro_payload, dict) and macro_payload.get("key_factors") else 0.3,
+        },
         {
             "agent_name": "macro_news_analysis",
             "signal": "neutral" if has_macro_news_summary else "unavailable",
             "confidence": 0.1 if has_macro_news_summary else 0.0,
         },
+        debate_entry,
     ]
 
     risk_signal = risk_entry["signal"]
@@ -125,29 +133,25 @@ def _has_usable_macro_news_summary(summary: str) -> bool:
 def portfolio_management_agent(state: AgentState):
     """Responsible for portfolio management"""
     agent_name = "portfolio_management_agent"
-    logger.info(f"\n--- DEBUG: {agent_name} START ---")
-
-    # Log raw incoming messages
-    # logger.info(
-    # f"--- DEBUG: {agent_name} RAW INCOMING messages: {[msg.name for msg in state['messages']]} ---")
-    # for i, msg in enumerate(state['messages']):
-    #     logger.info(
-    #         f"  DEBUG RAW MSG {i}: name='{msg.name}', content_preview='{str(msg.content)[:100]}...'")
+    logger.info("="*60)
+    logger.info("🎯 [PORTFOLIO_MANAGER] 开始执行投资组合管理")
+    logger.info("="*60)
 
     # Clean and unique messages by agent name, taking the latest if duplicates exist
-    # This is crucial because this agent is a sink for multiple paths.
     unique_incoming_messages = {}
     for msg in state["messages"]:
-        # Keep overriding with later messages to get the latest by name
         unique_incoming_messages[msg.name] = msg
 
     cleaned_messages_for_processing = list(unique_incoming_messages.values())
-    # logger.info(
-    # f"--- DEBUG: {agent_name} CLEANED messages for processing: {[msg.name for msg in cleaned_messages_for_processing]} ---")
+
+    logger.info(f"  收集到 {len(cleaned_messages_for_processing)} 个 Agent 的分析结果:")
+    for msg in cleaned_messages_for_processing:
+        logger.info(f"    - {msg.name}")
 
     show_workflow_status(f"{agent_name}: --- 正在执行投资组合管理 ---")
     show_reasoning_flag = state["metadata"]["show_reasoning"]
     portfolio = state["data"]["portfolio"]
+    logger.info(f"  当前投资组合: 现金={portfolio.get('cash', 0):.2f}元, 持仓={portfolio.get('stock', 0)}股")
 
     # Get messages from other agents using the cleaned list
     technical_message = get_latest_message_by_name(
@@ -161,7 +165,9 @@ def portfolio_management_agent(state: AgentState):
     risk_message = get_latest_message_by_name(
         cleaned_messages_for_processing, "risk_management_agent")
     tool_based_macro_message = get_latest_message_by_name(
-        cleaned_messages_for_processing, "macro_analyst_agent")  # This is the main analysis path output
+        cleaned_messages_for_processing, "macro_analyst_agent")
+    debate_message = get_latest_message_by_name(
+        cleaned_messages_for_processing, "debate_room_agent")
 
     # Extract content, handling potential None if message not found by get_latest_message_by_name
     technical_content = technical_message.content if technical_message else json.dumps(
@@ -180,9 +186,12 @@ def portfolio_management_agent(state: AgentState):
     # Market-wide news summary from macro_news_agent (already correctly fetched from state["data"])
     market_wide_news_summary_content = state["data"].get(
         "macro_news_analysis_result", "大盘宏观新闻分析不可用或未提供。")
-    # Optional: also try to get the message object for consistency in agent_signals, though data field is primary source
     macro_news_agent_message_obj = get_latest_message_by_name(
         cleaned_messages_for_processing, "macro_news_agent")
+
+    # Debate room analysis - newly added
+    debate_content = debate_message.content if debate_message else json.dumps(
+        {"signal": "neutral", "confidence": 0.5, "details": "Debate room analysis not available"})
 
     technical_payload = _parse_message_json(technical_content) or {}
     fundamentals_payload = _parse_message_json(fundamentals_content) or {}
@@ -190,41 +199,67 @@ def portfolio_management_agent(state: AgentState):
     valuation_payload = _parse_message_json(valuation_content) or {}
     risk_payload = _parse_message_json(risk_content) or {}
     macro_payload = _parse_message_json(tool_based_macro_content) or {}
+    debate_payload = _parse_message_json(debate_content) or {}
+
+    # 构建信号列表供强制规则使用
+    risk_entry = {
+        "agent_name": "risk_management",
+        "signal": (risk_payload or {}).get("交易行动", "hold"),
+        "confidence": 1.0 if risk_payload else 0.0,
+    }
+    agent_signals = [
+        _extract_signal_entry("technical_analysis", technical_payload),
+        _extract_signal_entry("fundamental_analysis", fundamentals_payload),
+        _extract_signal_entry("sentiment_analysis", sentiment_payload),
+        _extract_signal_entry("valuation_analysis", valuation_payload),
+        risk_entry,
+        {
+            "agent_name": "macro_analysis",
+            "signal": macro_payload.get("impact_on_stock", "neutral") if isinstance(macro_payload, dict) else "neutral",
+            "confidence": 0.5 if macro_payload and isinstance(macro_payload, dict) and macro_payload.get("key_factors") else 0.3,
+        },
+        {
+            "agent_name": "macro_news_analysis",
+            "signal": "neutral",
+            "confidence": 0.1,
+        },
+        _extract_signal_entry("debate_room", debate_payload),
+    ]
 
     system_message_content = """你是一位专业的投资组合经理，负责做出最终的交易决策。
             你的任务是在严格遵守风险管理约束的前提下，根据团队的分析做出交易决策。
 
-            风险管理约束（硬性要求，必须遵守）：
-            - 禁止超过风险管理师规定的最大持仓量
-            - 必须遵循风险管理师推荐的交易操作（买入/卖出/持有）
-            - 这些是硬性约束，不能被其他信号Override
+            ========== 风险管理约束（最高优先级）==========
+            1. 禁止超过风险管理师规定的最大持仓量
+            2. 必须遵循风险管理师推荐的交易操作（买入/卖出/持有）
+            3. 如果风险评分 >= 7，强制执行 hold
+            4. 如果风险管理建议 sell 或 reduce，必须执行卖出或减持
+            ========== 以上是硬性约束，不可违背 ==========
 
-            各分析维度权重：
-            1. 估值分析 (30%权重)
-            2. 基本面分析 (25%权重)
-            3. 技术分析 (20%权重)
-            4. 宏观分析 (15%权重) - 包含两部分：
-               a) 常规宏观环境（来自宏观分析师 Agent，基于工具分析）
-               b) 每日大盘新闻摘要（来自宏观新闻 Agent）
-               两者都为外部风险和机会提供背景参考。
-            5. 情绪分析 (10%权重)
+            ========== 各分析维度权重 ==========
+            1. 估值分析 (25%权重) - DCF、所有者收益法
+            2. 基本面分析 (20%权重) - 盈利能力、增长、财务健康
+            3. 技术分析 (15%权重) - 趋势、动量、RSI等
+            4. 宏观分析 (10%权重) - 宏观经济对个股影响
+            5. 情绪分析 (5%权重) - 新闻情绪
+            6. 辩论室分析 (15%权重) - 多空辩论的平衡结论
+            7. 风险管理 (10%权重) - 风险评分和仓位控制
+            ======================================
 
             决策流程：
-            1. 首先检查风险管理约束
-            2. 然后评估估值信号
-            3. 接着评估基本面信号
-            4. 综合考虑常规宏观环境和每日大盘新闻摘要
-            5. 使用技术分析把握时机
-            6. 参考情绪分析进行最终调整
+            1. 首先检查风险管理约束（硬性）
+            2. 然后评估辩论室的多空平衡结论
+            3. 接着评估估值信号
+            4. 评估基本面信号
+            5. 综合考虑宏观环境和新闻
+            6. 使用技术分析把握时机
+            7. 参考情绪分析进行最终调整
 
             请按以下JSON格式输出：
             - "action": "buy" | "sell" | "hold"（买入/卖出/持有）
             - "quantity": <正整数，交易数量>
             - "confidence": <0到1之间的浮点数，表示你对最终决策的置信度>
-            - "agent_signals": <包含各Agent信号的列表，每个信号是一个对象，包含：
-                * "agent_name": Agent名称（见下方列表）
-                * "signal": 信号值（"bullish"/"bearish"/"neutral" 或 "看多"/"看空"/"中性"）
-                * "confidence": 0到1之间的浮点数（从各Agent输出中提取，如果是百分比字符串如"50%"则转换为0.5）
+            - "agent_signals": <包含各Agent信号的列表，每个信号是一个对象>
               你的 'agent_signals' 列表必须包含以下Agent的条目：
                 - "technical_analysis"（技术分析）
                 - "fundamental_analysis"（基本面分析）
@@ -232,25 +267,29 @@ def portfolio_management_agent(state: AgentState):
                 - "valuation_analysis"（估值分析）
                 - "risk_management"（风险管理）
                 - "macro_analysis"（宏观分析）
-            - "reasoning": <简洁解释你的决策过程，包括如何权衡所有信号>
+                - "debate_room"（辩论室多空平衡）
+            - "reasoning": <简洁解释你的决策过程>
 
-            重要提示：
-            1. 从各Agent的JSON输出中正确提取confidence值：
-               - 如果是百分比字符串（如"50%"），转换为浮点数（0.5）
-               - 如果已经是浮点数，直接使用
-               - 不要返回0，除非该Agent确实返回了0或无法确定
-            2. 从各Agent的JSON输出中正确提取signal值（查找"signal"字段）
-
-            交易规则：
-            - 禁止超过风险管理的位置限制
-            - 只有在可用现金充足时才能买入
-            - 只有在持有股票时才能卖出
-            - 卖出数量必须≤当前持仓量
-            - 买入数量必须≤风险管理允许的最大持仓量"""
+            ========== 交易规则（强制校验）==========
+            1. 买入前校验：数量 * 当前股价 <= 可用现金
+            2. 卖出前校验：卖出数量 <= 当前持仓量
+            3. 禁止超过风险管理允许的最大持仓量
+            4. 如果风控强制 hold，必须遵守
+            ========================================"""
     system_message = {
         "role": "system",
         "content": system_message_content
     }
+
+    # Get current stock price from market data
+    current_price = 0.0
+    prices = state["data"].get("prices", [])
+    if prices and len(prices) > 0:
+        latest_price = prices[-1]
+        if isinstance(latest_price, dict) and "close" in latest_price:
+            current_price = float(latest_price.get("close", 0))
+        elif isinstance(latest_price, dict) and "收盘" in latest_price:
+            current_price = float(latest_price.get("收盘", 0))
 
     user_message_content = f"""Based on the team's analysis below, make your trading decision.
 
@@ -260,12 +299,14 @@ def portfolio_management_agent(state: AgentState):
             Valuation Analysis Signal: {valuation_content}
             Risk Management Signal: {risk_content}
             General Macro Analysis (from Macro Analyst Agent): {tool_based_macro_content}
-            Daily Market-Wide News Summary (from Macro News Agent):
-            {market_wide_news_summary_content}
+            Daily Market-Wide News Summary (from Macro News Agent): {market_wide_news_summary_content}
+            Debate Room Analysis (多空平衡): {debate_content}
 
             Current Portfolio:
-            Cash: {portfolio['cash']:.2f}
-            Current Position: {portfolio['stock']} shares
+            Cash: {portfolio['cash']:.2f} 元
+            Current Position: {portfolio['stock']} 股
+            Current Stock Price: {current_price:.2f} 元/股
+            Max Position Allowed by Risk Management: {risk_payload.get('最大持仓规模', 'Not specified')}
 
             Output JSON only. Ensure 'agent_signals' includes all required agents as per system prompt."""
     user_message = {
@@ -300,6 +341,7 @@ def portfolio_management_agent(state: AgentState):
             valuation_payload=valuation_payload,
             risk_payload=risk_payload,
             macro_payload=macro_payload,
+            debate_payload=debate_payload,
             has_macro_news_summary=_has_usable_macro_news_summary(market_wide_news_summary_content),
         )
 
@@ -313,6 +355,7 @@ def portfolio_management_agent(state: AgentState):
             agent_name, f"Final LLM decision JSON: {llm_response_content}")
 
     agent_decision_details_value = {}
+    decision_json = {}
     try:
         decision_json = json.loads(llm_response_content)
         agent_decision_details_value = {
@@ -326,6 +369,138 @@ def portfolio_management_agent(state: AgentState):
             "error": "Failed to parse LLM decision JSON from portfolio manager",
             "raw_response_snippet": llm_response_content[:200] + "..."
         }
+
+    # ===== 强制风险校验 =====
+    # 保存从 LLM 响应中解析的 agent_signals，如果没有则使用前面构建的信号
+    parsed_agent_signals = decision_json.get("agent_signals", None)
+    final_action = decision_json.get("action", "hold")
+    final_quantity = decision_json.get("quantity", 0)
+    risk_score = 0.0
+    risk_signal = "hold"
+    max_position = 0.0
+    trading_action = "hold"
+
+    if risk_payload:
+        try:
+            risk_score = float(risk_payload.get("风险评分", 0))
+        except (TypeError, ValueError):
+            risk_score = 0.0
+        risk_signal = risk_payload.get("交易行动", "hold")
+        try:
+            max_position = float(risk_payload.get("最大持仓规模", 0))
+        except (TypeError, ValueError):
+            max_position = 0.0
+        trading_action = risk_payload.get("交易行动", "hold")
+
+    # 规则1: 风险评分 >= 7，强制 hold
+    if risk_score >= 7:
+        logger.warning(f"风险评分 {risk_score} >= 7，强制执行 hold")
+        final_action = "hold"
+        final_quantity = portfolio.get("stock", 0)
+        signals_to_use = parsed_agent_signals if parsed_agent_signals else agent_signals
+        llm_response_content = json.dumps({
+            "action": "hold",
+            "quantity": final_quantity,
+            "confidence": decision_json.get("confidence", 0.5),
+            "agent_signals": agent_signals,
+            "reasoning": f"风险评分{risk_score:.0f}/10 >= 7，强制执行持有。风险管理约束优先。"
+        }, ensure_ascii=False)
+        final_decision_message = HumanMessage(content=llm_response_content, name=agent_name)
+    # 规则2: 风险管理建议 sell/reduce，必须执行
+    elif trading_action in ["sell", "reduce", "减仓", "清仓"]:
+        logger.warning(f"风险管理建议 {trading_action}，强制执行")
+        final_action = "sell"
+        available_stock = portfolio.get("stock", 0)
+        if available_stock <= 0:
+            final_quantity = 0
+            llm_response_content = json.dumps({
+                "action": final_action,
+                "quantity": final_quantity,
+                "confidence": decision_json.get("confidence", 0.5),
+                "agent_signals": agent_signals,
+                "reasoning": f"风险管理建议{trading_action}，但无持仓可卖"
+            }, ensure_ascii=False)
+        else:
+            final_quantity = min(final_quantity, available_stock)
+            llm_response_content = json.dumps({
+                "action": final_action,
+                "quantity": final_quantity,
+                "confidence": decision_json.get("confidence", 0.5),
+                "agent_signals": agent_signals,
+                "reasoning": f"风险管理建议{trading_action}，强制执行。"
+            }, ensure_ascii=False)
+        final_decision_message = HumanMessage(content=llm_response_content, name=agent_name)
+
+    # 规则3: 资金校验 - 买入时检查现金是否充足
+    if final_action == "buy" and current_price > 0:
+        required_cash = final_quantity * current_price
+        available_cash = portfolio.get("cash", 0)
+        if required_cash > available_cash:
+            max_shares = int(available_cash / current_price)
+            logger.warning(f"现金不足，需要{required_cash:.2f}元，现有{available_cash:.2f}元，调整为{max_shares}股")
+            final_quantity = max_shares
+            if final_quantity <= 0:
+                final_action = "hold"
+            llm_response_content = json.dumps({
+                "action": final_action,
+                "quantity": final_quantity,
+                "confidence": decision_json.get("confidence", 0.5),
+                "agent_signals": agent_signals,
+                "reasoning": f"现金不足，原计划买入{final_quantity}股，现调整为{max_shares}股"
+            }, ensure_ascii=False)
+            final_decision_message = HumanMessage(content=llm_response_content, name=agent_name)
+
+    # 规则4: 持仓校验 - 卖出时检查持仓是否充足
+    if final_action == "sell":
+        available_stock = portfolio.get("stock", 0)
+        if final_quantity > available_stock:
+            logger.warning(f"持仓不足，需要卖出{final_quantity}股，现有{available_stock}股，调整为{available_stock}股")
+            final_quantity = available_stock
+            if final_quantity <= 0:
+                final_action = "hold"
+                final_quantity = 0
+            llm_response_content = json.dumps({
+                "action": final_action,
+                "quantity": final_quantity,
+                "confidence": decision_json.get("confidence", 0.5),
+                "agent_signals": agent_signals,
+                "reasoning": f"持仓不足，原计划卖出{final_quantity}股，现调整为{available_stock}股"
+            }, ensure_ascii=False)
+            final_decision_message = HumanMessage(content=llm_response_content, name=agent_name)
+
+    # 规则5: 最大持仓校验
+    if max_position > 0 and final_action == "buy":
+        current_position = portfolio.get("stock", 0)
+        potential_position = current_position + final_quantity
+        if potential_position > max_position:
+            allowed_quantity = int(max_position - current_position)
+            if allowed_quantity < 0:
+                allowed_quantity = 0
+            logger.warning(f"超过最大持仓限制，需要{final_quantity}股，最大允许{max_position}股，调整为{allowed_quantity}股")
+            final_quantity = allowed_quantity
+            if final_quantity <= 0:
+                final_action = "hold"
+            llm_response_content = json.dumps({
+                "action": final_action,
+                "quantity": final_quantity,
+                "confidence": decision_json.get("confidence", 0.5),
+                "agent_signals": agent_signals,
+                "reasoning": f"超过最大持仓限制{max_position}股，调整为{final_quantity}股"
+            }, ensure_ascii=False)
+            final_decision_message = HumanMessage(content=llm_response_content, name=agent_name)
+
+    logger.info("="*60)
+    logger.info("🎯 [PORTFOLIO_MANAGER] 最终决策")
+    logger.info("="*60)
+    logger.info(f"  📊 风险评分: {risk_score}/10")
+    logger.info(f"  📊 风控建议: {trading_action}")
+    logger.info(f"  📊 最大持仓: {max_position} 股")
+    logger.info(f"  📊 当前价格: {current_price:.2f} 元")
+    logger.info(f"  ━━━━━━━━━━━━━━━━━━━━━━━")
+    logger.info(f"  ✅ 最终行动: {final_action.upper()}")
+    logger.info(f"  ✅ 交易数量: {final_quantity} 股")
+    logger.info(f"  ✅ 置信度: {decision_json.get('confidence', 0)*100:.0f}%")
+    logger.info("="*60)
 
     show_workflow_status(f"{agent_name}: --- 投资组合管理完成 ---")
 

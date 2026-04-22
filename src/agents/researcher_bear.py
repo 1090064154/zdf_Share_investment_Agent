@@ -9,6 +9,11 @@ import ast
 def researcher_bear_agent(state: AgentState):
     """Analyzes signals from a bearish perspective and generates cautionary investment thesis."""
     show_workflow_status("看空研究员")
+    import logging
+    logger = logging.getLogger('researcher_bear')
+    logger.info("="*50)
+    logger.info("🐻 [RESEARCHER_BEAR] 开始空方研究分析")
+    logger.info("="*50)
     show_reasoning = state["metadata"]["show_reasoning"]
 
     # Fetch messages from analysts

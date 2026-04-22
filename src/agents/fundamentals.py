@@ -20,9 +20,19 @@ def _is_missing_metric(value) -> bool:
 def fundamentals_agent(state: AgentState):
     """Responsible for fundamental analysis"""
     show_workflow_status("基本面分析师")
+    logger.info("="*50)
+    logger.info("📝 [FUNDAMENTALS] 开始基本面分析")
+    logger.info("="*50)
     show_reasoning = state["metadata"]["show_reasoning"]
     data = state["data"]
-    metrics = data["financial_metrics"][0]
+    financial_metrics = data.get("financial_metrics", {})
+    if isinstance(financial_metrics, dict):
+        metrics = financial_metrics
+    elif isinstance(financial_metrics, list) and len(financial_metrics) > 0:
+        metrics = financial_metrics[0]
+    else:
+        metrics = {}
+
     populated_metrics = [
         key for key, value in metrics.items()
         if not _is_missing_metric(value)

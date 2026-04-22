@@ -19,6 +19,9 @@ logger = setup_logger('risk_management_agent')
 def risk_management_agent(state: AgentState):
     """Responsible for risk management"""
     show_workflow_status("风险管理师")
+    logger.info("="*50)
+    logger.info("⚠️ [RISK_MANAGER] 开始风险管理分析")
+    logger.info("="*50)
     show_reasoning = state["metadata"]["show_reasoning"]
     portfolio = state["data"]["portfolio"]
     data = state["data"]

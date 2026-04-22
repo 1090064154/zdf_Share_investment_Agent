@@ -11,6 +11,17 @@ from src.utils.logging_config import setup_logger
 logger = setup_logger('api')
 
 
+def _get_stock_prefix(symbol: str) -> str:
+    """根据股票代码判断交易所前缀"""
+    ticker_int = int(symbol)
+    # 沪市: 600000-603999, 688000-688999
+    # 深市: 000001-003999, 300000-300999
+    if 600000 <= ticker_int <= 603999 or 688000 <= ticker_int <= 688999:
+        return f"sh{symbol}"
+    else:  # 深市
+        return f"sz{symbol}"
+
+
 def _is_expected_network_error(error: Exception) -> bool:
     error_msg = str(error).lower()
     markers = [
@@ -131,6 +142,7 @@ def get_financial_metrics(symbol: str) -> Dict[str, Any]:
         logger.info("跳过实时行情API，尝试使用其他方式获取价格")
 
     # 获取财务分析指标 - 先尝试sina，失败则用东方财富备用
+    # 同时获取年报和最新季报数据
     try:
         logger.info("Fetching Sina financial indicators...")
         current_year = datetime.now().year
@@ -139,8 +151,30 @@ def get_financial_metrics(symbol: str) -> Dict[str, Any]:
         if financial_data is not None and not financial_data.empty:
             financial_data['日期'] = pd.to_datetime(financial_data['日期'])
             financial_data = financial_data.sort_values('日期', ascending=False)
-            latest_financial = financial_data.iloc[0]
-            logger.info(f"✓ Financial indicators fetched ({len(financial_data)} records)")
+
+            # 获取年报数据（12月31日）
+            annual_reports = financial_data[financial_data['日期'].dt.month == 12]
+            # 获取最新报告数据（可能是季报或年报）
+            latest_report = financial_data.iloc[0]
+
+            if not annual_reports.empty:
+                annual_report = annual_reports.iloc[0]
+                logger.info(f"✓ 年报数据: {annual_report['日期'].strftime('%Y-%m-%d')}, ROE: {annual_report.get('净资产收益率(%)', 'N/A')}%")
+                # 如果最新报告不是年报，同时记录季报信息
+                if latest_report['日期'] != annual_report['日期']:
+                    logger.info(f"✓ 最新季报数据: {latest_report['日期'].strftime('%Y-%m-%d')}, ROE: {latest_report.get('净资产收益率(%)', 'N/A')}%")
+                    # 将季报数据也保存，供后续使用
+                    latest_financial = latest_report.copy()
+                    # 用年报数据补充一些关键指标（如全年增长率）
+                    for col in ['净利润增长率(%)', '主营业务收入增长率(%)', '净资产增长率(%)']:
+                        if pd.isna(latest_financial.get(col)) or latest_financial.get(col) == 0:
+                            if not pd.isna(annual_report.get(col)):
+                                latest_financial[col] = annual_report[col]
+                else:
+                    latest_financial = annual_report
+            else:
+                latest_financial = latest_report
+                logger.info(f"✓ Financial indicators fetched ({len(financial_data)} records)")
     except Exception as e:
         logger.warning(f"Failed to get Sina financial indicators: {e}")
         try:
@@ -165,10 +199,11 @@ def get_financial_metrics(symbol: str) -> Dict[str, Any]:
         logger.warning("No financial indicator data available")
 
     # 获取利润表数据 - 备用尝试东方财富
+    stock_prefix = _get_stock_prefix(symbol)
     try:
         logger.info("Fetching income statement...")
         income_statement = ak.stock_financial_report_sina(
-            stock=f"sh{symbol}", symbol="利润表")
+            stock=stock_prefix, symbol="利润表")
         if income_statement is not None and not income_statement.empty:
             latest_income = income_statement.iloc[0]
             logger.info("✓ Income statement fetched")
@@ -192,12 +227,12 @@ def get_financial_metrics(symbol: str) -> Dict[str, Any]:
     try:
         def convert_percentage(value: float) -> float:
             """将百分比值转换为小数
-            如果值>1，说明已经是百分比形式(如34.21表示34.21%)，不需要再除以100
-            如果值<=1，说明已经是小数形式(如0.3421表示34.21%)，直接返回
+            如果|值|>1，说明已经是百分比形式(如34.21表示34.21%)，需要除以100
+            如果|值|<=1，说明已经是小数形式(如0.3421表示34.21%)，直接返回
             """
             try:
                 fv = float(value) if value is not None else 0.0
-                if fv > 1:
+                if abs(fv) > 1:
                     return fv / 100.0
                 return fv
             except:
@@ -320,12 +355,13 @@ def get_financial_metrics(symbol: str) -> Dict[str, Any]:
 def get_financial_statements(symbol: str) -> Dict[str, Any]:
     """获取财务报表数据"""
     logger.info(f"Getting financial statements for {symbol}...")
+    stock_prefix = _get_stock_prefix(symbol)
     try:
         # 获取资产负债表数据
         logger.info("Fetching balance sheet...")
         try:
             balance_sheet = ak.stock_financial_report_sina(
-                stock=f"sh{symbol}", symbol="资产负债表")
+                stock=stock_prefix, symbol="资产负债表")
             if not balance_sheet.empty:
                 latest_balance = balance_sheet.iloc[0]
                 previous_balance = balance_sheet.iloc[1] if len(
@@ -346,7 +382,7 @@ def get_financial_statements(symbol: str) -> Dict[str, Any]:
         logger.info("Fetching income statement...")
         try:
             income_statement = ak.stock_financial_report_sina(
-                stock=f"sh{symbol}", symbol="利润表")
+                stock=stock_prefix, symbol="利润表")
             if not income_statement.empty:
                 latest_income = income_statement.iloc[0]
                 previous_income = income_statement.iloc[1] if len(
@@ -367,7 +403,7 @@ def get_financial_statements(symbol: str) -> Dict[str, Any]:
         logger.info("Fetching cash flow statement...")
         try:
             cash_flow = ak.stock_financial_report_sina(
-                stock=f"sh{symbol}", symbol="现金流量表")
+                stock=stock_prefix, symbol="现金流量表")
             if not cash_flow.empty:
                 latest_cash_flow = cash_flow.iloc[0]
                 previous_cash_flow = cash_flow.iloc[1] if len(

@@ -42,6 +42,9 @@ def _has_meaningful_valuation_inputs(current_financial_line_item: dict) -> bool:
 def valuation_agent(state: AgentState):
     """Responsible for valuation analysis"""
     show_workflow_status("估值Agent")
+    logger.info("="*50)
+    logger.info("💰 [VALUATION] 开始估值分析")
+    logger.info("="*50)
     show_reasoning = state["metadata"]["show_reasoning"]
     data = state["data"]
     metrics = _safe_first(data.get("financial_metrics", []))
@@ -193,7 +196,13 @@ def valuation_agent(state: AgentState):
 
     # 市盈率分析（作为补充）
     pe_ratio = metrics.get("pe_ratio", 0)
-    if pe_ratio > 0:
+    pb_ratio = metrics.get("price_to_book", 0)
+
+    # 检查是否是亏损公司
+    net_income = current_financial_line_item.get("net_income", 0)
+    is_profitable = net_income and net_income > 0
+
+    if pe_ratio > 0 and is_profitable:
         # 行业平均市盈率参考
         industry_avg_pe = 20  # 默认使用20倍作为参考
         pe_gap = (industry_avg_pe - pe_ratio) / pe_ratio
@@ -201,13 +210,49 @@ def valuation_agent(state: AgentState):
         valid_valuations.append({
             "method": "pe_ratio",
             "gap": pe_gap,
-            "weight": 0.25,  # 市盈率权重25%
+            "weight": 0.25,
             "signal": pe_signal
         })
         reasoning["pe_analysis"] = {
             "signal": pe_signal,
             "details": f"市盈率: {pe_ratio:.2f}, 行业平均: {industry_avg_pe}, 相对估值: {'低估' if pe_gap > 0 else '高估' if pe_gap < 0 else '合理'}"
         }
+    elif pb_ratio > 0:
+        # 亏损公司使用市净率估值
+        industry_avg_pb = 3.0  # 养殖行业市净率参考
+        pb_gap = (industry_avg_pb - pb_ratio) / pb_ratio
+        pb_signal = "bullish" if pb_gap > 0.3 else "bearish" if pb_gap < -0.3 else "neutral"
+        valid_valuations.append({
+            "method": "pb_ratio",
+            "gap": pb_gap,
+            "weight": 0.25,
+            "signal": pb_signal
+        })
+        reasoning["pb_analysis"] = {
+            "signal": pb_signal,
+            "details": f"市净率: {pb_ratio:.2f}, 行业参考: {industry_avg_pb}, 相对估值: {'低估' if pb_gap > 0 else '高估' if pb_gap < 0 else '合理'}"
+        }
+
+    # 对于亏损公司，添加基本面估值分析
+    if not is_profitable and (pe_ratio <= 0 or pb_ratio > 0):
+        # 基于营收和资产给出一个参考分析
+        revenue = current_financial_line_item.get("operating_revenue", 0)
+        if revenue and revenue > 0:
+            # 营收增速
+            prev_revenue = previous_financial_line_item.get("operating_revenue", 0) if previous_financial_line_item else 0
+            if prev_revenue and prev_revenue > 0:
+                revenue_growth = (revenue - prev_revenue) / prev_revenue
+                revenue_signal = "bullish" if revenue_growth > 0.1 else "bearish" if revenue_growth < -0.1 else "neutral"
+                valid_valuations.append({
+                    "method": "revenue_analysis",
+                    "gap": revenue_growth,
+                    "weight": 0.15,
+                    "signal": revenue_signal
+                })
+                reasoning["revenue_analysis"] = {
+                    "signal": revenue_signal,
+                    "details": f"营收: {revenue/1e8:.2f}亿, 同比增速: {revenue_growth*100:.1f}%"
+                }
 
     # 如果没有有效的估值结果
     if not valid_valuations:

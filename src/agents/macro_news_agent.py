@@ -60,6 +60,9 @@ def macro_news_agent(state: AgentState) -> Dict[str, Any]:
     """
     agent_name = "macro_news_agent"
     show_workflow_status(f"{agent_name}: --- 正在执行宏观新闻 Agent ---")
+    logger.info("="*50)
+    logger.info("📰 [MACRO_NEWS] 开始宏观新闻分析")
+    logger.info("="*50)
     symbol = "000300"  # 沪深300指数
     news_list_for_llm: List[Dict[str, str]] = []
     summary = "今日宏观新闻摘要暂不可用。"  # Default fallback summary

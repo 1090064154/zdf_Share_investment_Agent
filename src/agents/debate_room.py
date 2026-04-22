@@ -15,7 +15,9 @@ def debate_room_agent(state: AgentState):
     """Facilitates debate between bull and bear researchers to reach a balanced conclusion."""
     show_workflow_status("辩论室")
     show_reasoning = state["metadata"]["show_reasoning"]
-    logger.info("开始分析研究员观点并进行辩论...")
+    logger.info("="*50)
+    logger.info("⚖️ [DEBATE_ROOM] 开始辩论室分析")
+    logger.info("="*50)
 
     # 收集所有研究员信息 - 向前兼容设计（添加防御性检查）
     researcher_messages = {}

@@ -1,5 +1,6 @@
 import sys
 import argparse
+import json
 import uuid  # Import uuid for run IDs
 import threading  # Import threading for background task
 import uvicorn  # Import uvicorn to run FastAPI
@@ -63,18 +64,16 @@ logger = setup_logger('main_workflow')
 
 
 def run_hedge_fund(run_id: str, ticker: str, start_date: str, end_date: str, portfolio: dict, show_reasoning: bool = False, num_of_news: int = 5, show_summary: bool = False):
-    print(f"--- 开始执行工作流 Run ID: {run_id} ---")
-    logger.info(
-        "Workflow bootstrap: run_id=%s ticker=%s start=%s end=%s show_reasoning=%s num_of_news=%s show_summary=%s portfolio=%s",
-        run_id,
-        ticker,
-        start_date,
-        end_date,
-        show_reasoning,
-        num_of_news,
-        show_summary,
-        portfolio,
-    )
+    print(f"\n{'='*60}")
+    print(f"🚀 开始执行工作流")
+    print(f"  Run ID: {run_id}")
+    print(f"  股票: {ticker}")
+    print(f"  区间: {start_date} ~ {end_date}")
+    print(f"  现金: {portfolio.get('cash', 0):.2f} 元")
+    print(f"  持仓: {portfolio.get('stock', 0)} 股")
+    print(f"{'='*60}\n")
+    logger.info("STEP 3: 启动 LangGraph 工作流")
+    logger.info(f"  run_id={run_id}, ticker={ticker}, period={start_date}~{end_date}")
     try:
         from backend.state import api_state
         api_state.current_run_id = run_id
@@ -108,7 +107,10 @@ def run_hedge_fund(run_id: str, ticker: str, start_date: str, end_date: str, por
                 run_id,
                 len(final_state.get("messages", [])),
             )
-            print(f"--- 工作流执行完成 Run ID: {run_id} ---")
+            print(f"\n{'='*60}")
+            print(f"✅ 工作流执行完成 Run ID: {run_id}")
+            print(f"  共执行了 {len(final_state.get('messages', []))} 个 Agent 节点")
+            print(f"{'='*60}\n")
 
             if HAS_SUMMARY_REPORT and show_summary:
                 store_final_state(final_state)
@@ -146,7 +148,18 @@ def run_hedge_fund(run_id: str, ticker: str, start_date: str, end_date: str, por
         print(f"--- 工作流执行失败 Run ID: {run_id} ---")
         print(traceback.format_exc())
         raise
-    return final_state["messages"][-1].content
+
+    messages = final_state.get("messages", [])
+    if not messages:
+        logger.error("Workflow completed but no messages in final state")
+        return json.dumps({
+            "action": "hold",
+            "quantity": 0,
+            "confidence": 0.0,
+            "reasoning": "工作流执行完成但无输出消息"
+        })
+
+    return messages[-1].content
 
 
 # --- Define the Workflow Graph ---
@@ -238,18 +251,57 @@ if __name__ == "__main__":
     parser.add_argument('--start-backend', action='store_true',
                         help='Start the FastAPI backend server in the background')
     args = parser.parse_args()
-    logger.info(
-        "CLI arguments parsed: ticker=%s start_date=%s end_date=%s show_reasoning=%s num_of_news=%s initial_capital=%s initial_position=%s show_summary=%s start_backend=%s",
-        args.ticker,
-        args.start_date,
-        args.end_date,
-        args.show_reasoning,
-        args.num_of_news,
-        args.initial_capital,
-        args.initial_position,
-        args.summary,
-        args.start_backend,
-    )
+    logger.info("="*60)
+    logger.info("STEP 0: 命令行参数解析完成")
+    logger.info(f"  股票代码: {args.ticker}")
+    logger.info(f"  开始日期: {args.start_date or '默认一年前'}")
+    logger.info(f"  结束日期: {args.end_date or '昨天'}")
+    logger.info(f"  初始资金: {args.initial_capital}")
+    logger.info(f"  初始持仓: {args.initial_position}")
+    logger.info(f"  新闻数量: {args.num_of_news}")
+    logger.info(f"  显示推理: {args.show_reasoning}")
+    logger.info("="*60)
+
+    # Validate stock ticker format
+    ticker = args.ticker.strip()
+    if not ticker:
+        raise ValueError("Stock ticker cannot be empty")
+
+    # A-share stock code validation
+    # Shanghai: 600000-603999, 688000-688999
+    # Shenzhen: 000001-003999, 300000-300999
+    if not ticker.isdigit():
+        raise ValueError(f"Invalid stock ticker '{ticker}': must be numeric")
+
+    if len(ticker) != 6:
+        raise ValueError(f"Invalid stock ticker '{ticker}': must be 6 digits")
+
+    ticker_int = int(ticker)
+    is_valid = False
+    exchange = "unknown"
+
+    # Shanghai Stock Exchange
+    if 600000 <= ticker_int <= 603999:
+        is_valid = True
+        exchange = "SSE"
+    elif 688000 <= ticker_int <= 688999:
+        is_valid = True
+        exchange = "SSE STAR"
+    # Shenzhen Stock Exchange
+    elif 1 <= ticker_int <= 3999:
+        is_valid = True
+        exchange = "SZSE Main"
+    elif 300000 <= ticker_int <= 300999:
+        is_valid = True
+    elif 1 <= ticker_int <= 3999:
+        is_valid = True
+        exchange = "SZSE ChiNext"
+
+    if not is_valid:
+        raise ValueError(f"Invalid A-share ticker '{ticker}': must be in valid range (600000-603999, 688000-688999, 000001-003999, 300000-300999)")
+
+    logger.info(f"Validated ticker: {ticker} ({exchange} exchange)")
+
     if args.start_backend:
         fastapi_thread = threading.Thread(target=run_fastapi, daemon=True)
         fastapi_thread.start()
@@ -267,6 +319,20 @@ if __name__ == "__main__":
         raise ValueError("Number of news articles must be at least 1")
     if args.num_of_news > 100:
         raise ValueError("Number of news articles cannot exceed 100")
+
+    logger.info("="*60)
+    logger.info("STEP 1: 计算日期范围")
+    logger.info(f"  结束日期: {end_date.strftime('%Y-%m-%d')}")
+    logger.info(f"  开始日期: {start_date.strftime('%Y-%m-%d')}")
+    logger.info(f"  分析天数: {(end_date - start_date).days} 天")
+    logger.info("="*60)
+
+    logger.info("="*60)
+    logger.info("STEP 2: 初始化投资组合")
+    logger.info(f"  现金: {args.initial_capital:.2f} 元")
+    logger.info(f"  持仓: {args.initial_position} 股")
+    logger.info("="*60)
+
     portfolio = {"cash": args.initial_capital, "stock": args.initial_position}
     main_run_id = str(uuid.uuid4())
     result = run_hedge_fund(
@@ -279,5 +345,20 @@ if __name__ == "__main__":
         num_of_news=args.num_of_news,
         show_summary=args.summary
     )
-    print("\n最终投资决策:")
-    print(result)
+
+    # 解析并打印最终决策
+    try:
+        import json
+        decision = json.loads(result)
+        action_cn = {"buy": "买入", "sell": "卖出", "hold": "持有"}.get(decision.get("action", "hold"), "持有")
+        print(f"\n{'='*60}")
+        print(f"🏁 最终投资决策")
+        print(f"{'='*60}")
+        print(f"  股票: {args.ticker}")
+        print(f"  行动: {action_cn} ({decision.get('action', 'hold')})")
+        print(f"  数量: {decision.get('quantity', 0)} 股")
+        print(f"  置信度: {float(decision.get('confidence', 0))*100:.0f}%")
+        print(f"{'='*60}")
+    except:
+        print("\n最终投资决策:")
+        print(result)
