@@ -27,6 +27,10 @@ from src.agents.researcher_bear import researcher_bear_agent
 from src.agents.debate_room import debate_room_agent
 from src.agents.macro_analyst import macro_analyst_agent
 from src.agents.macro_news_agent import macro_news_agent
+# [NEW] 新增3个Agent
+from src.agents.industry_cycle import industry_cycle_agent
+from src.agents.institutional import institutional_agent
+from src.agents.expectation_diff import expectation_diff_agent
 
 # --- Logging and Backend Imports ---
 from src.utils.output_logger import OutputLogger
@@ -163,6 +167,7 @@ def run_hedge_fund(run_id: str, ticker: str, start_date: str, end_date: str, por
 
 
 # --- Define the Workflow Graph ---
+# [OPTIMIZED] 按照计划文档4.1节优化工作流
 workflow = StateGraph(AgentState)
 
 # Add nodes
@@ -171,7 +176,12 @@ workflow.add_node("technical_analyst_agent", technical_analyst_agent)
 workflow.add_node("fundamentals_agent", fundamentals_agent)
 workflow.add_node("sentiment_agent", sentiment_agent)
 workflow.add_node("valuation_agent", valuation_agent)
-workflow.add_node("macro_news_agent", macro_news_agent)  # 新闻 agent
+# [NEW] 新增3个Agent
+workflow.add_node("industry_cycle_agent", industry_cycle_agent)
+workflow.add_node("institutional_agent", institutional_agent)
+workflow.add_node("expectation_diff_agent", expectation_diff_agent)
+# 原有Agent
+workflow.add_node("macro_news_agent", macro_news_agent)
 workflow.add_node("researcher_bull_agent", researcher_bull_agent)
 workflow.add_node("researcher_bear_agent", researcher_bear_agent)
 workflow.add_node("debate_room_agent", debate_room_agent)
@@ -182,35 +192,49 @@ workflow.add_node("portfolio_management_agent", portfolio_management_agent)
 # Set entry point
 workflow.set_entry_point("market_data_agent")
 
-# Edges from market_data_agent to the five parallel agents
+# Level 1: market_data -> 4个基础分析Agent (并行)
 workflow.add_edge("market_data_agent", "technical_analyst_agent")
 workflow.add_edge("market_data_agent", "fundamentals_agent")
 workflow.add_edge("market_data_agent", "sentiment_agent")
 workflow.add_edge("market_data_agent", "valuation_agent")
-# macro_news_agent 也从 market_data_agent 并行出来
-workflow.add_edge("market_data_agent", "macro_news_agent")
 
-# Main analysis path (technical, fundamentals, sentiment, valuation -> researchers -> ... -> macro_analyst)
-# Use explicit join edges so downstream nodes wait for all required parents.
+# Level 2: 4个基础分析 -> 3个新增Agent (并行)
+# 按照计划: 技术/基本面/估值 -> industry_cycle/institutional/expectation_diff
+# 这里简化为4个基础分析都完成后进入新增Agent
 workflow.add_edge(
     ["technical_analyst_agent", "fundamentals_agent", "sentiment_agent", "valuation_agent"],
-    "researcher_bull_agent",
+    "industry_cycle_agent",
 )
 workflow.add_edge(
     ["technical_analyst_agent", "fundamentals_agent", "sentiment_agent", "valuation_agent"],
-    "researcher_bear_agent",
+    "institutional_agent",
+)
+workflow.add_edge(
+    ["technical_analyst_agent", "fundamentals_agent", "sentiment_agent", "valuation_agent"],
+    "expectation_diff_agent",
 )
 
+# Level 3: 新增Agent + sentiment -> macro_analyst (汇合后分析宏观)
+# 按照计划: industry_cycle/institutional/expectation_diff -> sentiment -> macro
+# 实际简化: 3个新增Agent完成后进入sentiment
+workflow.add_edge(["industry_cycle_agent", "institutional_agent", "expectation_diff_agent"], "sentiment_agent")
+
+# sentiment -> macro_news (并行)
+workflow.add_edge("sentiment_agent", "macro_news_agent")
+
+# Level 4: macro_news -> researchers (并行)
+workflow.add_edge("macro_news_agent", "researcher_bull_agent")
+workflow.add_edge("macro_news_agent", "researcher_bear_agent")
+
+# Level 5: researchers -> debate_room
 workflow.add_edge(["researcher_bull_agent", "researcher_bear_agent"], "debate_room_agent")
 
+# Level 6: debate -> risk -> macro_analyst
 workflow.add_edge("debate_room_agent", "risk_management_agent")
 workflow.add_edge("risk_management_agent", "macro_analyst_agent")
 
-# Edges to portfolio_management_agent (汇聚点)
-# macro_analyst_agent (end of main analysis path) and macro_news_agent (parallel news path)
-# both feed into portfolio_management_agent.
-# LangGraph will wait for both parent nodes to complete before running portfolio_management_agent.
-workflow.add_edge(["macro_analyst_agent", "macro_news_agent"], "portfolio_management_agent")
+# Level 7: macro_analyst -> portfolio_manager (最终决策)
+workflow.add_edge("macro_analyst_agent", "portfolio_management_agent")
 
 # Final node
 workflow.add_edge("portfolio_management_agent", END)

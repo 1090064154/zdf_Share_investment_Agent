@@ -211,12 +211,13 @@ def technical_analyst_agent(state: AgentState):
     stat_arb_signals = calculate_stat_arb_signals(prices_df)
 
     # Combine all signals using a weighted ensemble approach
+    # [OPTIMIZED] A股特性：强化趋势(45%)，削弱均值回归(5%)，动量保持(30%)
     strategy_weights = {
-        'trend': 0.30,
-        'mean_reversion': 0.25,  # Increased weight for mean reversion
-        'momentum': 0.25,
-        'volatility': 0.15,
-        'stat_arb': 0.05
+        'trend': 0.45,        # A股牛短熊长，强化趋势
+        'mean_reversion': 0.05, # A股均值回归效果差，削弱
+        'momentum': 0.30,     # 动量保持
+        'volatility': 0.15,     # 波动性保持
+        'stat_arb': 0.05       # 统计套利保持
     }
 
     combined_signal = weighted_signal_combination({
@@ -287,6 +288,7 @@ def technical_analyst_agent(state: AgentState):
 def calculate_trend_signals(prices_df):
     """
     Advanced trend following strategy using multiple timeframes and indicators
+    [OPTIMIZED] 添加A股特色：量价配合、均线多头排列
     """
     # Calculate EMAs for multiple timeframes
     ema_8 = calculate_ema(prices_df, 8)
@@ -296,33 +298,59 @@ def calculate_trend_signals(prices_df):
     # Calculate ADX for trend strength
     adx = calculate_adx(prices_df, 14)
 
-    # Calculate Ichimoku Cloud
-    ichimoku = calculate_ichimoku(prices_df)
-
     # Determine trend direction and strength
     short_trend = ema_8 > ema_21
     medium_trend = ema_21 > ema_55
 
+    # [OPTIMIZED] 新增：均线多头排列识别
+    ma5_above_ma10 = ema_8.iloc[-1] > ema_21.iloc[-1]
+    ma10_above_ma20 = ema_21.iloc[-1] > calculate_ema(prices_df, 55).iloc[-1]
+
+    # [OPTIMIZED] 新增：量价配合指标
+    volume_ma20 = prices_df['volume'].rolling(20).mean()
+    current_price = prices_df['close'].iloc[-1]
+    prev_price = prices_df['close'].iloc[-2]
+    price_up = current_price > prev_price
+    volume_confirmation = (prices_df['volume'].iloc[-1] / volume_ma20.iloc[-1]) > 1.2 if volume_ma20.iloc[-1] > 0 else False
+
     # Combine signals with confidence weighting
     trend_strength = adx['adx'].iloc[-1] / 100.0
 
-    if short_trend.iloc[-1] and medium_trend.iloc[-1]:
-        signal = 'bullish'
-        confidence = trend_strength
-    elif not short_trend.iloc[-1] and not medium_trend.iloc[-1]:
-        signal = 'bearish'
-        confidence = trend_strength
+    # 基础信号判定
+    if ma5_above_ma10 and ma10_above_ma20:
+        base_signal = 'bullish'
+        base_confidence = min(trend_strength * 1.2, 1.0)  # 均线多头强化
+    elif not ma5_above_ma10 and not ma10_above_ma20:
+        base_signal = 'bearish'
+        base_confidence = min(trend_strength * 1.2, 1.0)
     else:
-        signal = 'neutral'
-        confidence = 0.5
+        base_signal = 'neutral'
+        base_confidence = 0.5
+
+    # [OPTIMIZED] 量价确认加成
+    if price_up and volume_confirmation:
+        if base_signal == 'bullish':
+            base_confidence = min(base_confidence * 1.1, 1.0)  # 上涨且放量，确认趋势
+    elif not price_up and not volume_confirmation:
+        if base_signal == 'bearish':
+            base_confidence = min(base_confidence * 1.1, 1.0)
+
+    # 构建均线形态描述
+    if ma5_above_ma10 and ma10_above_ma20:
+        ma_alignment = 'bullish'
+    elif not ma5_above_ma10 and not ma10_above_ma20:
+        ma_alignment = 'bearish'
+    else:
+        ma_alignment = 'neutral'
 
     return {
-        'signal': signal,
-        'confidence': confidence,
+        'signal': base_signal,
+        'confidence': base_confidence,
         'metrics': {
             'adx': float(adx['adx'].iloc[-1]),
             'trend_strength': float(trend_strength),
-            # 'ichimoku': ichimoku
+            'volume_confirmation': float(volume_confirmation),
+            'ma_alignment': ma_alignment
         }
     }
 

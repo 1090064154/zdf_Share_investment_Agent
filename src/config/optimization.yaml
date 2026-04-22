@@ -3,6 +3,7 @@ optimization:
   enable_veto_power: true      # 一票否决权: 风控阻止买入但不强制卖出
   enable_dynamic_weights: true # 动态权重: 根据市场状态调整
   enable_confidence_normalizer: true  # 置信度标准化
+  enable_decision_engine: true  # 规则化决策引擎 - 替换LLM决策
 
 # 权重配置
 weights:
@@ -44,3 +45,17 @@ confidence_fallback:
   risk: 0.60
   researcher_bull: 0.25
   researcher_bear: 0.30
+  industry_cycle: 0.40  # 行业周期
+  institutional: 0.40   # 机构持仓
+  expectation_diff: 0.30  # 预期差
+
+# 规则引擎权重配置
+agent_weights:
+  valuation: 0.25
+  fundamentals: 0.20
+  technical: 0.15
+  industry_cycle: 0.10
+  institutional: 0.10
+  sentiment: 0.05
+  macro: 0.05
+  risk: 0.10

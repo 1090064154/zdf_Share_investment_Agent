@@ -9,9 +9,152 @@ import json
 # 初始化 logger
 logger = setup_logger('fundamentals_agent')
 
+# [OPTIMIZED] A股行业周期分类
+INDUSTRY_CYCLE_CLASSIFICATION = {
+    '强周期': ['农林牧渔', '钢铁', '煤炭', '有色金属', '化工', '建材', '房地产', '汽车', '交通运输', '工程机械'],
+    '弱周期': ['食品饮料', '医药生物', '家用电器', '纺织服装', '日用化工'],
+    '成长': ['电子', '计算机', '通信', '传媒', '新能源'],
+    '防御': ['公用事业', '银行', '保险', '券商']
+}
+
 
 def _is_missing_metric(value) -> bool:
     return value is None or value == 0
+
+
+def _identify_cyclical_stock(ticker: str, industry: str = None) -> tuple:
+    """
+    [OPTIMIZED] 识别是否为周期股
+    返回: (is_cyclical: bool, reason: str)
+    """
+    if not industry:
+        # 简单根据股票代码判断（仅作为后备方案）
+        # 农林牧渔养殖类通常是周期股
+        if ticker.startswith('00') or ticker.startswith('30'):
+            # 中小创股票可能包含养殖类
+            return False, "无法确定行业，默认非周期股"
+
+    # 行业判断
+    for cycle_type, industries in INDUSTRY_CYCLE_CLASSIFICATION.items():
+        if industry and any(ind in industry for ind in industries):
+            return True, f"属于周期行业: {industry}"
+
+    return False, "非周期行业"
+
+
+def _analyze_pb_roe_percentile(pb_ratio: float, roe: float) -> dict:
+    """
+    [OPTIMIZED] PB-ROE分位点简化判断
+    注意：实际应使用10年历史数据计算分位点，此处使用简化规则
+    """
+    # 简化规则：
+    # 低PB (<3) + 高ROE (>10%) = 价值区域
+    # 高PB (>8) = 风险区域
+    # 周期股：PB更重要，ROE可正可负
+
+    if pb_ratio is None or pb_ratio <= 0:
+        return {
+            'signal': 'neutral',
+            'confidence': 0.3,
+            'reasoning': 'PB数据无效',
+            'pb_percentile': None,
+            'roe_percentile': None
+        }
+
+    # 简化分位点估算
+    if pb_ratio < 3:
+        pb_level = 'low'
+    elif pb_ratio < 6:
+        pb_level = 'medium'
+    elif pb_ratio < 10:
+        pb_level = 'high'
+    else:
+        pb_level = 'very_high'
+
+    if roe is None or roe <= 0:
+        roe_level = 'low'
+    elif roe < 10:
+        roe_level = 'medium'
+    elif roe < 20:
+        roe_level = 'high'
+    else:
+        roe_level = 'very_high'
+
+    # 投资象限分析
+    if pb_level == 'low' and roe_level in ['high', 'very_high']:
+        signal = 'bullish'
+        confidence = 0.7
+        reasoning = f"低PB({pb_ratio:.1f})+高ROE({roe:.1f}%)，最佳价值区域"
+    elif pb_level == 'very_high':
+        signal = 'bearish'
+        confidence = 0.7
+        reasoning = f"PB({pb_ratio:.1f})过高，存在估值风险"
+    elif pb_level == 'high' and roe_level == 'low':
+        signal = 'bearish'
+        confidence = 0.6
+        reasoning = f"高PB({pb_ratio:.1f})+低ROE({roe:.1f}%)，盈利支撑不足"
+    elif pb_level == 'low' and roe_level == 'low':
+        signal = 'neutral'
+        confidence = 0.4
+        reasoning = f"低PB({pb_ratio:.1f})+低ROE({roe:.1f}%)，可能处于行业周期底部"
+    else:
+        signal = 'neutral'
+        confidence = 0.5
+        reasoning = f"PB({pb_ratio:.1f}), ROE({roe:.1f}%)处于合理区间"
+
+    return {
+        'signal': signal,
+        'confidence': confidence,
+        'reasoning': reasoning,
+        'pb_percentile': {'level': pb_level, 'value': pb_ratio},
+        'roe_percentile': {'level': roe_level, 'value': roe}
+    }
+
+
+def _analyze_revenue_quality(financial_line_items: dict = None) -> dict:
+    """
+    [OPTIMIZED] 营收质量分析
+    分析应收款/营收比例
+    """
+    if not financial_line_items:
+        return {
+            'signal': 'neutral',
+            'confidence': 0.3,
+            'reasoning': '无财务报表数据'
+        }
+
+    # 尝试从financial_line_items获取数据
+    accounts_receivable = financial_line_items.get('accounts_receivable', 0)
+    revenue = financial_line_items.get('operating_revenue', 1)
+
+    if not revenue or revenue == 0 or not accounts_receivable:
+        return {
+            'signal': 'neutral',
+            'confidence': 0.3,
+            'reasoning': '营收或应收款数据缺失'
+        }
+
+    ar_ratio = accounts_receivable / revenue if revenue else 0
+
+    if ar_ratio < 0.1:
+        signal = 'bullish'
+        confidence = 0.7
+        reasoning = f"应收款占比仅{ar_ratio:.1%}，营收质量高"
+    elif ar_ratio < 0.2:
+        signal = 'neutral'
+        confidence = 0.5
+        reasoning = f"应收款占比{ar_ratio:.1%}，处于正常范围"
+    else:
+        signal = 'bearish'
+        confidence = 0.6
+        reasoning = f"应收款占比{ar_ratio:.1%}过高，存在坏账风险"
+
+    return {
+        'signal': signal,
+        'confidence': confidence,
+        'reasoning': reasoning,
+        'ar_ratio': ar_ratio
+    }
 
 ##### Fundamental Agent #####
 
@@ -183,6 +326,31 @@ def fundamentals_agent(state: AgentState):
         "signal": signals[3],
         "details": f"{pe_str}, {pb_str}, {ps_str}"
     }
+
+    # [OPTIMIZED] 5. PB-ROE分位点分析
+    pb_roe_analysis = _analyze_pb_roe_percentile(price_to_book, return_on_equity)
+    reasoning["pb_roe_analysis"] = pb_roe_analysis
+    signals.append(pb_roe_analysis['signal'])
+
+    # [OPTIMIZED] 6. 周期股识别
+    ticker = data.get("ticker", "")
+    industry = data.get("industry", "")
+    is_cyclical, cyclical_reason = _identify_cyclical_stock(ticker, industry)
+    reasoning["cyclical_analysis"] = {
+        "is_cyclical": is_cyclical,
+        "industry": industry,
+        "reasoning": cyclical_reason
+    }
+
+    # [OPTIMIZED] 7. 营收质量分析
+    financial_line_items = data.get("financial_line_items", [])
+    if financial_line_items and isinstance(financial_line_items, list):
+        fli = financial_line_items[0] if financial_line_items else {}
+    else:
+        fli = financial_line_items
+    revenue_quality = _analyze_revenue_quality(fli)
+    reasoning["revenue_quality_analysis"] = revenue_quality
+    signals.append(revenue_quality['signal'])
 
     # Determine overall signal
     bullish_signals = signals.count('bullish')

@@ -104,6 +104,13 @@ class OptimizationConfig:
             self.load()
         return self._config.get("optimization", {}).get("enable_confidence_normalizer", True)
 
+    @property
+    def enable_decision_engine(self) -> bool:
+        """是否启用规则化决策引擎"""
+        if self._config is None:
+            self.load()
+        return self._config.get("optimization", {}).get("enable_decision_engine", True)
+
     def get_weights(self, market_state: str) -> Dict[str, float]:
         """获取指定市场状态的权重"""
         if self._config is None:
@@ -115,6 +122,21 @@ class OptimizationConfig:
         if self._config is None:
             self.load()
         return self._config.get("confidence_fallback", {}).get(agent_name, 0.30)
+
+    def get_agent_weights(self) -> Dict[str, float]:
+        """获取规则引擎的agent权重配置"""
+        if self._config is None:
+            self.load()
+        return self._config.get("agent_weights", {
+            'valuation': 0.25,
+            'fundamentals': 0.20,
+            'technical': 0.15,
+            'industry_cycle': 0.10,
+            'institutional': 0.10,
+            'sentiment': 0.05,
+            'macro': 0.05,
+            'risk': 0.10
+        })
 
 
 def get_config() -> OptimizationConfig:

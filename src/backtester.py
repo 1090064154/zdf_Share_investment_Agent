@@ -1,472 +1,304 @@
-from datetime import datetime, timedelta
-import json
-import time
-import logging
-import matplotlib.pyplot as plt
+"""
+回测验证框架
+验证策略有效性，计算因子IC值和分组回测
+"""
 import pandas as pd
-from src.tools.api import get_price_data
-from src.main import run_hedge_fund
-import sys
-import matplotlib
+import numpy as np
+from datetime import datetime, timedelta
+from typing import List, Dict, Optional
+import json
 import os
 
-# 根据操作系统配置中文字体
-if sys.platform.startswith('win'):
-    # Windows系统
-    matplotlib.rc('font', family='Microsoft YaHei')
-elif sys.platform.startswith('linux'):
-    # Linux系统
-    matplotlib.rc('font', family='WenQuanYi Micro Hei')
-else:
-    # macOS系统
-    matplotlib.rc('font', family='PingFang SC')
 
-# 用来正常显示负号
-matplotlib.rcParams['axes.unicode_minus'] = False
-
-
-class Backtester:
-    def __init__(self, agent, ticker, start_date, end_date, initial_capital, num_of_news):
-        self.agent = agent
-        self.ticker = ticker
+class BacktestConfig:
+    """回测配置"""
+    def __init__(self,
+                 start_date: str,
+                 end_date: str,
+                 initial_capital: float = 1000000,
+                 commission: float = 0.0003,
+                 slippage: float = 0.001):
         self.start_date = start_date
         self.end_date = end_date
         self.initial_capital = initial_capital
-        self.portfolio = {"cash": initial_capital, "stock": 0}
-        self.portfolio_values = []
-        self.num_of_news = num_of_news
-        # 设置回测日志
-        self.setup_backtest_logging()
-        self.logger = self.setup_logging()
+        self.commission = commission  # 手续费
+        self.slippage = slippage  # 滑点
 
-        # 初始化 API 调用管理
-        self._api_call_count = 0
-        self._api_window_start = time.time()
-        self._last_api_call = 0
 
-        # 验证输入参数
-        self.validate_inputs()
+class BacktestResult:
+    """回测结果"""
+    def __init__(self):
+        self.trades = []
+        self.positions = []
+        self.equity_curve = []
+        self.returns = []
 
-    def setup_logging(self):
-        """设置日志记录器"""
-        logger = logging.getLogger('backtester')
-        logger.setLevel(logging.INFO)
-        if not logger.handlers:
-            handler = logging.StreamHandler()
-            formatter = logging.Formatter(
-                '%(asctime)s - %(levelname)s - %(message)s')
-            handler.setFormatter(formatter)
-            logger.addHandler(handler)
-        return logger
+    def to_dict(self) -> dict:
+        return {
+            'total_trades': len(self.trades),
+            'final_equity': self.equity_curve[-1] if self.equity_curve else 0,
+            'total_return': self.calculate_total_return(),
+            'annual_return': self.calculate_annual_return(),
+            'sharpe_ratio': self.calculate_sharpe(),
+            'max_drawdown': self.calculate_max_drawdown(),
+            'win_rate': self.calculate_win_rate()
+        }
 
-    def validate_inputs(self):
-        """验证输入参数的有效性"""
-        try:
-            start = datetime.strptime(self.start_date, "%Y-%m-%d")
-            end = datetime.strptime(self.end_date, "%Y-%m-%d")
-            if start >= end:
-                raise ValueError("开始日期必须早于结束日期")
-            if self.initial_capital <= 0:
-                raise ValueError("初始资金必须大于0")
-            if not isinstance(self.ticker, str) or len(self.ticker) != 6:
-                raise ValueError("无效的股票代码格式")
-            self.logger.info("输入参数验证通过")
-        except Exception as e:
-            self.logger.error(f"输入参数验证失败: {str(e)}")
-            raise
-
-    def get_agent_decision(self, current_date, lookback_start, portfolio):
-        """获取智能体决策，包含 API 限制处理"""
-        max_retries = 3
-
-        # 检查并重置 API 时间窗口
-        current_time = time.time()
-        if current_time - self._api_window_start >= 60:
-            self._api_call_count = 0
-            self._api_window_start = current_time
-
-        # 如果达到 API 限制，等待新的时间窗口
-        if self._api_call_count >= 8:  # 预留余量
-            wait_time = 60 - (current_time - self._api_window_start)
-            if wait_time > 0:
-                time.sleep(wait_time)
-                self._api_call_count = 0
-                self._api_window_start = time.time()
-
-        for attempt in range(max_retries):
-            try:
-                # 确保调用间隔至少 6 秒
-                if self._last_api_call:
-                    time_since_last_call = time.time() - self._last_api_call
-                    if time_since_last_call < 6:
-                        sleep_time = 6 - time_since_last_call
-                        time.sleep(sleep_time)
-
-                # 更新调用时间和计数
-                self._last_api_call = time.time()
-                self._api_call_count += 1
-
-                # 调用智能体并解析结果
-                result = self.agent(
-                    ticker=self.ticker,
-                    start_date=lookback_start,
-                    end_date=current_date,
-                    portfolio=portfolio,
-                    num_of_news=self.num_of_news,
-                    run_id=f"backtest_{self.ticker}_{current_date.replace('-', '')}"
-                )
-
-                try:
-                    # 尝试解析返回的字符串为 JSON
-                    if isinstance(result, str):
-                        # 清理可能的markdown标记
-                        result = result.replace(
-                            '```json\n', '').replace('\n```', '').strip()
-                        print(f"---------------result------------\n: {result}")
-                        parsed_result = json.loads(result)
-
-                        # 构建标准格式的结果
-                        formatted_result = {
-                            "decision": parsed_result,  # 保持原始决策结构
-                            "analyst_signals": {}
-                        }
-
-                        # 处理智能体信号
-                        if "agent_signals" in parsed_result:
-                            formatted_result["analyst_signals"] = {
-                                signal["agent"]: {
-                                    "signal": signal.get("signal", "unknown"),
-                                    "confidence": signal.get("confidence", 0)
-                                }
-                                for signal in parsed_result["agent_signals"]
-                            }
-
-                        self.logger.info(
-                            f"解析后的决策: {formatted_result['decision']}")  # 添加日志
-                        return formatted_result
-                    return result
-                except json.JSONDecodeError as e:
-                    # 如果无法解析为 JSON，记录错误并返回默认决策
-                    self.logger.warning(f"JSON解析错误: {str(e)}")
-                    self.logger.warning(f"原始返回结果: {result}")
-                    return {
-                        "decision": {"action": "hold", "quantity": 0},
-                        "analyst_signals": {}
-                    }
-
-            except Exception as e:
-                if "AFC is enabled" in str(e):
-                    self.logger.warning(f"触发 AFC 限制，等待 60 秒后重试...")
-                    time.sleep(60)
-                    self._api_call_count = 0
-                    self._api_window_start = time.time()
-                    continue
-
-                self.logger.warning(
-                    f"获取智能体决策失败 (尝试 {attempt + 1}/{max_retries}): {str(e)}")
-                if attempt == max_retries - 1:
-                    return {"decision": {"action": "hold", "quantity": 0}, "analyst_signals": {}}
-                time.sleep(2 ** attempt)
-
-    def parse_decision_from_text(self, text):
-        """从文本中解析交易决策"""
-        text = text.lower()
-
-        # 默认决策
-        decision = {"action": "hold", "quantity": 0}
-
-        # 检查是否包含决策关键词
-        if "buy" in text or "bullish" in text:
-            decision["action"] = "buy"
-            decision["quantity"] = 100  # 默认购买数量
-        elif "sell" in text or "bearish" in text:
-            decision["action"] = "sell"
-            decision["quantity"] = 100  # 默认卖出数量
-
-        return decision
-
-    def execute_trade(self, action, quantity, current_price):
-        """执行交易，验证组合约束"""
-        if action == "buy" and quantity > 0:
-            cost = quantity * current_price
-            if cost <= self.portfolio["cash"]:
-                self.portfolio["stock"] += quantity
-                self.portfolio["cash"] -= cost
-                return quantity
-            else:
-                # 计算最大可买数量
-                max_quantity = int(self.portfolio["cash"] // current_price)
-                if max_quantity > 0:
-                    self.portfolio["stock"] += max_quantity
-                    self.portfolio["cash"] -= max_quantity * current_price
-                    return max_quantity
-                return 0
-        elif action == "sell" and quantity > 0:
-            quantity = min(quantity, self.portfolio["stock"])
-            if quantity > 0:
-                self.portfolio["cash"] += quantity * current_price
-                self.portfolio["stock"] -= quantity
-                return quantity
+    def calculate_total_return(self) -> float:
+        if not self.equity_curve or self.equity_curve[0] == 0:
             return 0
+        return (self.equity_curve[-1] - self.equity_curve[0]) / self.equity_curve[0]
+
+    def calculate_annual_return(self) -> float:
+        total_ret = self.calculate_total_return()
+        if not self.equity_curve:
+            return 0
+        days = len(self.equity_curve)
+        years = days / 252
+        if years > 0:
+            return (1 + total_ret) ** (1 / years) - 1
         return 0
 
-    def setup_backtest_logging(self):
-        """设置回测日志"""
-        # 创建日志目录
-        log_dir = os.path.join(os.path.dirname(
-            os.path.abspath(__file__)), '..', 'logs')
-        os.makedirs(log_dir, exist_ok=True)
+    def calculate_sharpe(self) -> float:
+        if not self.returns or len(self.returns) < 2:
+            return 0
+        returns = np.array(self.returns)
+        mean_return = np.mean(returns)
+        std_return = np.std(returns)
+        if std_return == 0:
+            return 0
+        return mean_return / std_return * np.sqrt(252)
 
-        # 创建回测日志记录器
-        self.backtest_logger = logging.getLogger('backtest')
-        self.backtest_logger.setLevel(logging.INFO)
+    def calculate_max_drawdown(self) -> float:
+        if not self.equity_curve:
+            return 0
+        equity = np.array(self.equity_curve)
+        cummax = np.maximum.accumulate(equity)
+        drawdown = (equity - cummax) / cummax
+        return np.min(drawdown)
 
-        # 清除已存在的处理器
-        if self.backtest_logger.handlers:
-            self.backtest_logger.handlers.clear()
+    def calculate_win_rate(self) -> float:
+        if not self.trades:
+            return 0
+        wins = sum(1 for t in self.trades if t.get('profit', 0) > 0)
+        return wins / len(self.trades)
 
-        # 设置文件处理器
-        current_date = datetime.now().strftime('%Y%m%d')
-        backtest_period = f"{self.start_date.replace('-', '')}_{self.end_date.replace('-', '')}"
-        log_file = os.path.join(
-            log_dir, f"backtest_{self.ticker}_{current_date}_{backtest_period}.log")
-        file_handler = logging.FileHandler(log_file, encoding='utf-8')
-        file_handler.setLevel(logging.INFO)
 
-        # 设置日志格式
-        formatter = logging.Formatter('%(message)s')  # 简化格式，只显示消息
-        file_handler.setFormatter(formatter)
+class FactorValidator:
+    """因子有效性验证"""
 
-        # 添加处理器
-        self.backtest_logger.addHandler(file_handler)
+    def __init__(self, config: BacktestConfig):
+        self.config = config
 
-        # 写入回测初始信息
-        self.backtest_logger.info(
-            f"回测开始时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        self.backtest_logger.info(f"股票代码: {self.ticker}")
-        self.backtest_logger.info(f"回测区间: {self.start_date} 至 {self.end_date}")
-        self.backtest_logger.info(f"初始资金: {self.initial_capital:,.2f}\n")
-        self.backtest_logger.info("-" * 100)
+    def calculate_ic(self, factor_values: pd.Series, future_returns: pd.Series) -> float:
+        """
+        计算IC值（信息系数）
+        """
+        # 去除NaN
+        valid_mask = factor_values.notna() & future_returns.notna()
+        if valid_mask.sum() < 10:
+            return 0
 
-    def run_backtest(self):
-        """运行回测"""
-        dates = pd.date_range(self.start_date, self.end_date, freq="B")
+        ic = np.corrcoef(factor_values[valid_mask], future_returns[valid_mask])[0, 1]
+        return ic if not np.isnan(ic) else 0
 
-        self.logger.info("\n开始回测...")
-        print(f"{'日期':<12} {'代码':<6} {'操作':<6} {'数量':>8} {'价格':>8} {'现金':>12} {'持仓':>8} {'总值':>12} {'看多':>8} {'看空':>8} {'中性':>8}")
-        print("-" * 110)
+    def calculate_ic_series(self, factor_data: pd.DataFrame, forward_days: int = 20) -> pd.Series:
+        """
+        计算IC时间序列
+        """
+        ic_series = []
 
-        for current_date in dates:
-            lookback_start = (current_date - timedelta(days=30)
-                              ).strftime("%Y-%m-%d")
-            current_date_str = current_date.strftime("%Y-%m-%d")
-
-            # 获取智能体决策
-            output = self.get_agent_decision(
-                current_date_str, lookback_start, self.portfolio)
-
-            # 记录每个智能体的信号和分析结果
-            self.backtest_logger.info(f"\n交易日期: {current_date_str}")
-            if "analyst_signals" in output:
-                self.backtest_logger.info("\n各智能体分析结果:")
-                for agent_name, signal in output["analyst_signals"].items():
-                    self.backtest_logger.info(f"\n{agent_name}:")
-
-                    # 记录信号和置信度
-                    signal_str = f"- 信号: {signal.get('signal', 'unknown')}"
-                    if 'confidence' in signal:
-                        signal_str += f", 置信度: {signal.get('confidence', 0)*100:.0f}%"
-                    self.backtest_logger.info(signal_str)
-
-                    # 记录分析结果
-                    if 'analysis' in signal:
-                        self.backtest_logger.info("- 分析结果:")
-                        analysis = signal['analysis']
-                        if isinstance(analysis, dict):
-                            for key, value in analysis.items():
-                                self.backtest_logger.info(f"  {key}: {value}")
-                        elif isinstance(analysis, list):
-                            for item in analysis:
-                                self.backtest_logger.info(f"  • {item}")
-                        else:
-                            self.backtest_logger.info(f"  {analysis}")
-
-                    # 记录理由
-                    if 'reason' in signal:
-                        self.backtest_logger.info("- 决策理由:")
-                        reason = signal['reason']
-                        if isinstance(reason, list):
-                            for item in reason:
-                                self.backtest_logger.info(f"  • {item}")
-                        else:
-                            self.backtest_logger.info(f"  • {reason}")
-
-                    # 记录其他可能的指标
-                    for key, value in signal.items():
-                        if key not in ['signal', 'confidence', 'analysis', 'reason']:
-                            self.backtest_logger.info(f"- {key}: {value}")
-
-                self.backtest_logger.info("\n综合决策:")
-
-            agent_decision = output.get(
-                "decision", {"action": "hold", "quantity": 0})
-            action, quantity = agent_decision.get(
-                "action", "hold"), agent_decision.get("quantity", 0)
-
-            # 记录决策详情
-            self.backtest_logger.info(f"行动: {action.upper()}")
-            self.backtest_logger.info(f"数量: {quantity}")
-            if "reason" in agent_decision:
-                self.backtest_logger.info(f"决策理由: {agent_decision['reason']}")
-
-            # 获取当前价格并执行交易
-            df = get_price_data(self.ticker, lookback_start, current_date_str)
-            if df is None or df.empty:
+        for date in factor_data.index:
+            if date not in factor_data.index:
                 continue
 
-            current_price = df.iloc[-1]['open']
-            executed_quantity = self.execute_trade(
-                action, quantity, current_price)
+            # 获取因子值
+            factor_values = factor_data.loc[date]
 
-            # 更新组合总值
-            total_value = self.portfolio["cash"] + \
-                self.portfolio["stock"] * current_price
-            self.portfolio["portfolio_value"] = total_value
+            # 获取未来收益
+            future_date_idx = factor_data.index.get_loc(date) + forward_days
+            if future_date_idx >= len(factor_data):
+                continue
 
-            # 计算当日收益率
-            if len(self.portfolio_values) > 0:
-                daily_return = (
-                    total_value / self.portfolio_values[-1]["Portfolio Value"] - 1) * 100
-            else:
-                daily_return = 0
+            future_date = factor_data.index[future_date_idx]
+            if future_date not in factor_data.index:
+                continue
 
-            # 记录组合价值和收益率
-            self.portfolio_values.append({
-                "Date": current_date,
-                "Portfolio Value": total_value,
-                "Daily Return": daily_return
+            # 简化：使用当天收益率作为未来收益代理
+            future_returns = factor_data['return'].loc[date] if 'return' in factor_data.columns else 0
+
+            ic = self.calculate_ic(factor_values, future_returns)
+            ic_series.append({'date': date, 'ic': ic})
+
+        return pd.DataFrame(ic_series).set_index('date')['ic']
+
+    def validate_factor(self, factor_name: str, factor_data: pd.DataFrame) -> dict:
+        """
+        验证单个因子有效性
+        """
+        ic_series = self.calculate_ic_series(factor_data)
+
+        if len(ic_series) == 0:
+            return {
+                'factor_name': factor_name,
+                'status': 'insufficient_data',
+                'mean_ic': 0,
+                'ic_std': 0,
+                'ic_ir': 0,
+                'positive_ic_ratio': 0
+            }
+
+        mean_ic = ic_series.mean()
+        ic_std = ic_series.std()
+        ic_ir = mean_ic / ic_std if ic_std > 0 else 0
+        positive_ic_ratio = (ic_series > 0).sum() / len(ic_series)
+
+        # 判断因子有效性
+        if abs(mean_ic) > 0.05 and ic_ir > 0.5:
+            status = 'excellent'
+        elif abs(mean_ic) > 0.03 and ic_ir > 0.3:
+            status = 'good'
+        elif abs(mean_ic) > 0.01:
+            status = 'acceptable'
+        else:
+            status = 'weak'
+
+        return {
+            'factor_name': factor_name,
+            'status': status,
+            'mean_ic': float(mean_ic),
+            'ic_std': float(ic_std),
+            'ic_ir': float(ic_ir),
+            'positive_ic_ratio': float(positive_ic_ratio),
+            'ic_series': ic_series.to_dict()
+        }
+
+
+class Backtester:
+    """策略回测"""
+
+    def __init__(self, config: BacktestConfig):
+        self.config = config
+        self.result = BacktestResult()
+        self.factor_validator = FactorValidator(config)
+
+    def run_simple_backtest(self,
+                           signals: pd.DataFrame,
+                           prices: pd.DataFrame) -> BacktestResult:
+        """
+        简单回测
+        signals: 包含signal, confidence列的DataFrame，index为日期
+        prices: 包含close列的DataFrame
+        """
+        cash = self.config.initial_capital
+        position = 0
+        entry_price = 0
+
+        for date in signals.index:
+            if date not in prices.index:
+                continue
+
+            current_price = prices.loc[date, 'close']
+            signal = signals.loc[date, 'signal'] if 'signal' in signals.columns else 'hold'
+            confidence = signals.loc[date, 'confidence'] if 'confidence' in signals.columns else 0.5
+
+            # 交易逻辑
+            if signal == 'buy' and position == 0:
+                # 买入
+                shares = int(cash / current_price / 100) * 100  # 整手
+                if shares > 0:
+                    cost = shares * current_price * (1 + self.config.commission + self.config.slippage)
+                    if cost <= cash:
+                        position = shares
+                        entry_price = cost / shares
+                        cash -= cost
+                        self.result.trades.append({
+                            'date': date,
+                            'action': 'buy',
+                            'price': current_price,
+                            'shares': shares,
+                            'cost': cost
+                        })
+
+            elif signal == 'sell' and position > 0:
+                # 卖出
+                proceeds = position * current_price * (1 - self.config.commission - self.config.slippage)
+                profit = proceeds - position * entry_price
+                cash += proceeds
+                self.result.trades.append({
+                    'date': date,
+                    'action': 'sell',
+                    'price': current_price,
+                    'shares': position,
+                    'proceeds': proceeds,
+                    'profit': profit
+                })
+                position = 0
+                entry_price = 0
+
+            # 更新权益
+            equity = cash + position * current_price
+            self.result.equity_curve.append(equity)
+
+            # 计算日收益率
+            if len(self.result.equity_curve) > 1:
+                daily_return = (equity - self.result.equity_curve[-2]) / self.result.equity_curve[-2]
+                self.result.returns.append(daily_return)
+
+        # 最后一天如果还有持仓，按收盘价平仓
+        if position > 0 and date in prices.index:
+            final_price = prices.loc[date, 'close']
+            proceeds = position * final_price * (1 - self.config.commission)
+            profit = proceeds - position * entry_price
+            cash += proceeds
+            self.result.trades.append({
+                'date': date,
+                'action': 'close',
+                'price': final_price,
+                'shares': position,
+                'profit': profit
             })
 
-    def analyze_performance(self):
-        """分析回测性能"""
-        performance_df = pd.DataFrame(self.portfolio_values).set_index("Date")
-
-        # 计算累计收益率
-        performance_df["Cumulative Return"] = (
-            performance_df["Portfolio Value"] / self.initial_capital - 1) * 100
-
-        # 将金额转换为千元
-        performance_df["Portfolio Value (K)"] = performance_df["Portfolio Value"] / 1000
-
-        # 创建两个子图
-        fig, (ax1, ax2) = plt.subplots(
-            2, 1, figsize=(12, 10), height_ratios=[1, 1])
-        fig.suptitle("回测结果分析", fontsize=12)
-
-        # 绘制资金变化图
-        line1 = ax1.plot(performance_df.index,
-                         performance_df["Portfolio Value (K)"], label="组合价值", marker='o')
-        ax1.set_ylabel("组合价值 (千元)")
-        ax1.set_title("组合价值变化")
-        ax1.grid(True)
-
-        # 在数据点上添加标签
-        for x, y in zip(performance_df.index, performance_df["Portfolio Value (K)"]):
-            ax1.annotate(f'{y:.1f}K',
-                         (x, y),
-                         textcoords="offset points",
-                         xytext=(0, 10),
-                         ha='center',
-                         fontsize=8)
-
-        # 绘制收益率变化图
-        line2 = ax2.plot(performance_df.index,
-                         performance_df["Cumulative Return"], label="累计收益率", color='green', marker='o')
-        ax2.set_ylabel("累计收益率 (%)")
-        ax2.set_title("累计收益率变化")
-        ax2.grid(True)
-
-        # 在数据点上添加标签
-        for x, y in zip(performance_df.index, performance_df["Cumulative Return"]):
-            ax2.annotate(f'{y:.2f}%',
-                         (x, y),
-                         textcoords="offset points",
-                         xytext=(0, 10),
-                         ha='center',
-                         fontsize=8)
-
-        # 设置x轴标签
-        plt.xlabel("日期")
-
-        # 自动调整布局以防止标签重叠
-        plt.tight_layout()
-
-        # 显示图表
-        plt.show()
-
-        # 计算和打印性能指标
-        total_return = (
-            self.portfolio["portfolio_value"] - self.initial_capital) / self.initial_capital
-        print(f"\n总收益率: {total_return * 100:.2f}%")
-
-        # 记录最终回测结果
-        self.backtest_logger.info("\n" + "=" * 50)
-        self.backtest_logger.info("回测结果汇总")
-        self.backtest_logger.info("=" * 50)
-        self.backtest_logger.info(f"初始资金: {self.initial_capital:,.2f}")
-        self.backtest_logger.info(
-            f"最终总值: {self.portfolio['portfolio_value']:,.2f}")
-        self.backtest_logger.info(f"总收益率: {total_return * 100:.2f}%")
-
-        # 计算夏普比率
-        daily_returns = performance_df["Daily Return"] / 100  # 转换为小数
-        mean_daily_return = daily_returns.mean()
-        std_daily_return = daily_returns.std()
-        sharpe_ratio = (mean_daily_return / std_daily_return) * \
-            (252 ** 0.5) if std_daily_return != 0 else 0
-        # print(f"夏普比率: {sharpe_ratio:.2f}")
-        self.backtest_logger.info(f"夏普比率: {sharpe_ratio:.2f}")
-
-        # 计算最大回撤
-        rolling_max = performance_df["Portfolio Value"].cummax()
-        drawdown = (performance_df["Portfolio Value"] / rolling_max - 1) * 100
-        max_drawdown = drawdown.min()
-        # print(f"最大回撤: {max_drawdown:.2f}%")
-        self.backtest_logger.info(f"最大回撤: {max_drawdown:.2f}%")
-
-        return performance_df
+        return self.result
 
 
-if __name__ == "__main__":
-    import argparse
-
-    # 设置命令行参数解析
-    parser = argparse.ArgumentParser(description='运行回测模拟')
-    parser.add_argument('--ticker', type=str, required=True,
-                        help='股票代码 (例如: 600519)')
-    parser.add_argument('--end-date', type=str,
-                        default=datetime.now().strftime('%Y-%m-%d'), help='结束日期，格式：YYYY-MM-DD')
-    parser.add_argument('--start-date', type=str, default=(datetime.now() -
-                        timedelta(days=90)).strftime('%Y-%m-%d'), help='开始日期，格式：YYYY-MM-DD')
-    parser.add_argument('--initial-capital', type=float,
-                        default=100000, help='初始资金 (默认: 100000)')
-    parser.add_argument('--num-of-news', type=int, default=5,
-                        help='Number of news articles to analyze for sentiment (default: 5)')
-
-    args = parser.parse_args()
-
-    # 创建回测器实例
-    backtester = Backtester(
-        agent=run_hedge_fund,
-        ticker=args.ticker,
-        start_date=args.start_date,
-        end_date=args.end_date,
-        initial_capital=args.initial_capital,
-        num_of_news=args.num_of_news
+def run_factor_validation(factor_data: pd.DataFrame) -> List[dict]:
+    """
+    运行因子有效性验证
+    """
+    config = BacktestConfig(
+        start_date='2020-01-01',
+        end_date='2025-12-31'
     )
 
-    # 运行回测
-    backtester.run_backtest()
+    validator = FactorValidator(config)
 
-    # 分析性能
-    performance_df = backtester.analyze_performance()
+    results = []
+
+    # 验证每个因子
+    factor_columns = [col for col in factor_data.columns if col != 'return']
+    for factor in factor_columns:
+        result = validator.validate_factor(factor, factor_data)
+        results.append(result)
+
+    return results
+
+
+# 测试代码
+if __name__ == '__main__':
+    # 模拟数据测试
+    dates = pd.date_range('2020-01-01', '2024-12-31', freq='D')
+    np.random.seed(42)
+
+    test_data = pd.DataFrame({
+        'return': np.random.randn(len(dates)) * 0.02,
+        'pe_factor': np.random.randn(len(dates)),
+        'pb_factor': np.random.randn(len(dates)),
+        'momentum': np.random.randn(len(dates))
+    }, index=dates)
+
+    results = run_factor_validation(test_data)
+
+    print("因子验证结果:")
+    for r in results:
+        print(f"  {r['factor_name']}: IC={r['mean_ic']:.4f}, IR={r['ic_ir']:.4f}, 状态={r['status']}")

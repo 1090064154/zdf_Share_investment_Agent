@@ -3,6 +3,7 @@ from langchain_core.prompts import ChatPromptTemplate
 import json
 from src.utils.optimization_config import get_config
 from src.utils.logging_config import setup_logger
+from src.utils.decision_engine import DecisionEngine, create_decision_engine
 
 from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status
 from src.tools.openrouter_config import get_chat_completion
@@ -318,12 +319,128 @@ def portfolio_management_agent(state: AgentState):
     show_agent_reasoning(
         agent_name, f"Preparing LLM. User msg includes: TA, FA, Sent, Val, Risk, GeneralMacro, MarketNews.")
 
-    llm_interaction_messages = [system_message, user_message]
-    llm_response_content = get_chat_completion(
-        llm_interaction_messages,
-        max_retries=1,
-        initial_retry_delay=0.5,
-    )
+    # [NEW] 尝试使用DecisionEngine决策
+    config = get_config()
+    use_decision_engine = config.enable_decision_engine if config._config else False
+
+    # 提取risk_score和trading_action（在LLM决策之前）
+    risk_score = 0.0
+    trading_action = "hold"
+    if risk_payload:
+        try:
+            risk_score = float(risk_payload.get("风险评分", 0))
+        except (TypeError, ValueError):
+            risk_score = 0.0
+        trading_action = risk_payload.get("交易行动", "hold")
+
+    if use_decision_engine:
+        logger.info("🎯 启用DecisionEngine规则化决策")
+        try:
+            # 构建信号字典
+            signals = {
+                'technical': {
+                    'signal': technical_payload.get('signal', 'neutral'),
+                    'confidence': _normalize_confidence(technical_payload.get('confidence', 0.3))
+                },
+                'fundamentals': {
+                    'signal': fundamentals_payload.get('signal', 'neutral'),
+                    'confidence': _normalize_confidence(fundamentals_payload.get('confidence', 0.4))
+                },
+                'sentiment': {
+                    'signal': sentiment_payload.get('signal', 'neutral'),
+                    'confidence': _normalize_confidence(sentiment_payload.get('confidence', 0.25))
+                },
+                'valuation': {
+                    'signal': valuation_payload.get('signal', 'neutral'),
+                    'confidence': _normalize_confidence(valuation_payload.get('confidence', 0.35))
+                },
+                'macro': {
+                    'signal': macro_payload.get('impact_on_stock', 'neutral') if isinstance(macro_payload, dict) else 'neutral',
+                    'confidence': 0.5 if macro_payload and isinstance(macro_payload, dict) and macro_payload.get('key_factors') else 0.3
+                },
+                'risk': {
+                    'signal': risk_payload.get('交易行动', 'hold'),
+                    'confidence': 1.0 if risk_payload else 0.0
+                }
+            }
+
+            # 添加新增模块的信号
+            industry_cycle_message = get_latest_message_by_name(cleaned_messages_for_processing, "industry_cycle_agent")
+            if industry_cycle_message:
+                ic_payload = _parse_message_json(industry_cycle_message.content)
+                if ic_payload:
+                    signals['industry_cycle'] = {
+                        'signal': ic_payload.get('signal', 'neutral'),
+                        'confidence': _normalize_confidence(ic_payload.get('confidence', 0.4))
+                    }
+
+            institutional_message = get_latest_message_by_name(cleaned_messages_for_processing, "institutional_agent")
+            if institutional_message:
+                inst_payload = _parse_message_json(institutional_message.content)
+                if inst_payload:
+                    signals['institutional'] = {
+                        'signal': inst_payload.get('signal', 'neutral'),
+                        'confidence': _normalize_confidence(inst_payload.get('confidence', 0.4))
+                    }
+
+            expectation_diff_message = get_latest_message_by_name(cleaned_messages_for_processing, "expectation_diff_agent")
+            if expectation_diff_message:
+                exp_payload = _parse_message_json(expectation_diff_message.content)
+                if exp_payload:
+                    signals['expectation_diff'] = {
+                        'signal': exp_payload.get('signal', 'neutral'),
+                        'confidence': _normalize_confidence(exp_payload.get('confidence', 0.3))
+                    }
+
+            # 获取macro_factor
+            macro_factor = 1.0
+            if isinstance(macro_payload, dict):
+                position_factor = macro_payload.get('position_factor')
+                if position_factor:
+                    try:
+                        macro_factor = float(position_factor)
+                    except (ValueError, TypeError):
+                        macro_factor = 1.0
+
+            # 创建DecisionEngine并决策
+            engine = create_decision_engine(config.get_agent_weights())
+            engine_decision = engine.make_decision(
+                signals=signals,
+                risk_score=risk_score,
+                risk_action=trading_action,
+                macro_factor=macro_factor,
+                portfolio=portfolio
+            )
+
+            logger.info(f"🎯 DecisionEngine决策: {engine_decision}")
+
+            # 使用DecisionEngine的决策结果
+            final_action = engine_decision.get('action', 'hold')
+            final_quantity = engine_decision.get('quantity', 0)
+            engine_reason = engine_decision.get('reason', '')
+
+            llm_response_content = json.dumps({
+                'action': final_action,
+                'quantity': final_quantity,
+                'confidence': engine_decision.get('confidence', 0.5),
+                'agent_signals': agent_signals,
+                'reasoning': f"[DecisionEngine] {engine_reason}"
+            }, ensure_ascii=False)
+
+            show_agent_reasoning(agent_name, f"DecisionEngine决策: {final_action} {final_quantity}股")
+            decision_json = json.loads(llm_response_content)
+
+        except Exception as e:
+            logger.warning(f"DecisionEngine决策失败，回退到LLM: {e}")
+            use_decision_engine = False
+
+    if not use_decision_engine or llm_response_content is None:
+        llm_interaction_messages = [system_message, user_message]
+        llm_response_content = get_chat_completion(
+            llm_interaction_messages,
+            max_retries=1,
+            initial_retry_delay=0.5,
+        )
 
     current_metadata = state["metadata"]
     current_metadata["current_agent_name"] = agent_name

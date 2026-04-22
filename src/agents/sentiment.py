@@ -18,19 +18,109 @@ def _resolve_news_window_end(end_date: str | None) -> datetime:
     return datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1) - timedelta(seconds=1)
 
 
+def _get_north_money_data(ticker: str, days: int = 5) -> dict:
+    """
+    [OPTIMIZED] 获取北向资金数据
+    注意：需要真实的数据源接口，此处为模拟实现
+    """
+    try:
+        import akshare as ak
+        # 尝试使用akshare获取北向资金数据
+        # 注意：akshare的接口可能需要单独安装
+        # 这里使用try-except包裹，如果失败则返回空数据
+        try:
+            # 北向资金持股数据
+            north_df = ak.stock_hsgt_individual_em(symbol=ticker)
+            if north_df is not None and len(north_df) > 0:
+                # 获取最近几天的资金流向
+                recent = north_df.head(days)
+                net_flows = recent['资金流向'].sum() if '资金流向' in recent.columns else 0
+                avg_flow = net_flows / days if days > 0 else 0
+
+                # 判断方向
+                if avg_flow > 0:
+                    signal = 'bullish'
+                    confidence = min(0.3 + abs(avg_flow) / 1e8 * 0.1, 0.8)
+                elif avg_flow < 0:
+                    signal = 'bearish'
+                    confidence = min(0.3 + abs(avg_flow) / 1e8 * 0.1, 0.8)
+                else:
+                    signal = 'neutral'
+                    confidence = 0.3
+
+                return {
+                    'signal': signal,
+                    'confidence': confidence,
+                    'net_flow': avg_flow,
+                    'reason': f"北向资金{avg_flow/1e8:.2f}亿"
+                }
+        except Exception as e:
+            logger.debug(f"北向资金数据获取失败: {e}")
+
+    except ImportError:
+        pass
+
+    # 返回空数据
+    return {
+        'signal': 'neutral',
+        'confidence': 0,
+        'net_flow': 0,
+        'reason': '无北向资金数据'
+    }
+
+
+def _reverse_guba_signal(guba_score: float, post_count: int) -> dict:
+    """
+    [OPTIMIZED] 股吧情绪反向使用
+    散户买入往往是卖点，散户卖出往往是买点
+    """
+    if post_count == 0:
+        return {
+            'reversed_signal': 0,
+            'confidence_boost': 0,
+            'reason': '无股吧数据'
+        }
+
+    # 极端值检测
+    if guba_score < -0.5:  # 极度悲观
+        reversed_signal = -guba_score * 1.5  # 反向
+        confidence_boost = 0.2
+        reason = "股吧极度悲观，可能见底"
+    elif guba_score > 0.5:  # 极度乐观
+        reversed_signal = -guba_score * 1.5  # 反向
+        confidence_boost = 0.2
+        reason = "股吧极度乐观，可能见顶"
+    else:
+        # 非极端值使用原信号但降低权重
+        reversed_signal = guba_score * 0.5
+        confidence_boost = 0
+        reason = "股吧情绪处于中性区间"
+
+    # 热度加成：热度越高，反向信号越可靠
+    if post_count > 100:
+        confidence_boost += 0.1
+
+    return {
+        'reversed_signal': reversed_signal,
+        'confidence_boost': confidence_boost,
+        'reason': reason
+    }
+
+
 def _calculate_combined_sentiment(
     news_score: float,
     guba_result: dict,
     quant_result: dict,
+    north_result: dict,
     news_count: int
 ) -> dict:
     """
-    计算综合情绪分数，整合新闻、股吧、量化指标
-
+    [OPTIMIZED] 计算综合情绪分数，整合新闻、股吧、量化指标、北向资金
     权重分配:
-    - 新闻情绪: 40%
-    - 股吧情绪: 30%
-    - 量化指标: 30%
+    - 新闻情绪: 35%
+    - 股吧情绪: 15% (反向使用)
+    - 量化指标: 35%
+    - 北向资金: 15%
 
     Returns:
         {
@@ -42,23 +132,37 @@ def _calculate_combined_sentiment(
         }
     """
     logger.info("[综合情绪] 开始计算综合情绪分数")
-    logger.info(f"[综合情绪] 输入: news_score={news_score:.3f}, guba_score={guba_result.get('score', 0):.3f}, quant_score={quant_result.get('score', 0):.3f}")
+    logger.info(f"[综合情绪] 输入: news_score={news_score:.3f}, guba_score={guba_result.get('score', 0):.3f}, quant_score={quant_result.get('score', 0):.3f}, north_confidence={north_result.get('confidence', 0):.3f}")
 
-    # 数据源权重
+    # [OPTIMIZED] 数据源权重调整
     weights = {
-        'news': 0.40,
-        'guba': 0.30,
-        'quant': 0.30
+        'news': 0.35,   # 新闻保持
+        'guba': 0.15,  # 股吧降低+反向
+        'quant': 0.35,  # 量化提升
+        'north': 0.15   # 新增北向资金
     }
 
     # 新闻情绪分数 (-1 到 1)
     news_normalized = news_score
 
-    # 股吧情绪分数 (已包含反向信号调整)
+    # [OPTIMIZED] 股吧情绪反向使用
     guba_score = guba_result.get('score', 0)
-    guba_reverse = guba_result.get('reverse_signal', 0)
-    guba_adjusted = guba_score + guba_reverse  # 应用反向信号
-    logger.info(f"[综合情绪] 股吧情绪: 原始={guba_score:.3f}, 反向信号={guba_reverse:.3f}, 调整后={guba_adjusted:.3f}")
+    post_count = guba_result.get('post_count', 0)
+    guba_reverse = _reverse_guba_signal(guba_score, post_count)
+    guba_adjusted = guba_reverse['reversed_signal']
+    logger.info(f"[综合情绪] 股吧情绪: 原始={guba_score:.3f}, 反向调整={guba_reverse['confidence_boost']:.3f}, 调整后={guba_adjusted:.3f}, 原因={guba_reverse['reason']}")
+
+    # 量化情绪分数
+    quant_score = quant_result.get('score', 0)
+
+    # [OPTIMIZED] 北向资金分数转换（0-1范围）
+    north_score = 0.5
+    if north_result.get('signal') == 'bullish':
+        north_score = 0.5 + north_result.get('confidence', 0) * 0.5
+    elif north_result.get('signal') == 'bearish':
+        north_score = 0.5 - north_result.get('confidence', 0) * 0.5
+
+    logger.info(f"[综合情绪] 北向资金: {north_result.get('reason', 'N/A')}")
 
     # 量化情绪分数
     quant_score = quant_result.get('score', 0)
@@ -71,30 +175,59 @@ def _calculate_combined_sentiment(
     )
     logger.info(f"[综合情绪] 初始综合分数: {combined_score:.3f}")
 
-    # 根据数据可用性动态调整权重
+    # [OPTIMIZED] 根据数据可用性动态调整权重，包含北向资金
     actual_weights = weights.copy()
+    has_north_data = north_result.get('confidence', 0) > 0
+
     if news_count == 0:
-        # 无新闻时，提高股吧和量化权重
+        # 无新闻时，提高其他数据源权重
         actual_weights['news'] = 0
-        actual_weights['guba'] = 0.50
-        actual_weights['quant'] = 0.50
-        combined_score = guba_adjusted * 0.50 + quant_score * 0.50
-        logger.info(f"[综合情绪] 无新闻数据，调整权重: guba=50%, quant=50%")
+        if has_north_data:
+            actual_weights['guba'] = 0.30
+            actual_weights['quant'] = 0.35
+            actual_weights['north'] = 0.35
+            combined_score = guba_adjusted * 0.30 + quant_score * 0.35 + north_score * 0.35
+            logger.info(f"[综合情绪] 无新闻数据，调整权重: guba=30%, quant=35%, north=35%")
+        else:
+            actual_weights['guba'] = 0.40
+            actual_weights['quant'] = 0.60
+            actual_weights['north'] = 0
+            combined_score = guba_adjusted * 0.40 + quant_score * 0.60
+            logger.info(f"[综合情绪] 无新闻数据且无北向，调整权重: guba=40%, quant=60%")
 
     if guba_result.get('post_count', 0) == 0:
-        # 无股吧数据时，提高新闻和量化权重
+        # 无股吧数据时，提高新闻和量化/北向权重
         actual_weights['guba'] = 0
-        actual_weights['news'] = 0.60
-        actual_weights['quant'] = 0.40
-        combined_score = news_normalized * 0.60 + quant_score * 0.40
-        logger.info(f"[综合情绪] 无股吧数据，调整权重: news=60%, quant=40%")
+        if has_north_data:
+            actual_weights['news'] = 0.40
+            actual_weights['quant'] = 0.30
+            actual_weights['north'] = 0.30
+            combined_score = news_normalized * 0.40 + quant_score * 0.30 + north_score * 0.30
+            logger.info(f"[综合情绪] 无股吧数据，调整权重: news=40%, quant=30%, north=30%")
+        else:
+            actual_weights['news'] = 0.60
+            actual_weights['quant'] = 0.40
+            actual_weights['north'] = 0
+            combined_score = news_normalized * 0.60 + quant_score * 0.40
+            logger.info(f"[综合情绪] 无股吧数据且无北向，调整权重: news=60%, quant=40%")
+
+    if not has_north_data:
+        # 无北向数据时
+        actual_weights['north'] = 0
+        # 重新分配权重给其他数据源
+        total_other = actual_weights['news'] + actual_weights['guba'] + actual_weights['quant']
+        if total_other > 0:
+            scale = sum(weights.values()) / total_other
+            actual_weights['news'] *= scale
+            actual_weights['guba'] *= scale
+            actual_weights['quant'] *= scale
 
     # 重新归一化权重
     total_weight = sum(actual_weights.values())
     if total_weight > 0:
         combined_score = combined_score / total_weight * sum(weights.values())
 
-    logger.info(f"[综合情绪] 最终权重: news={actual_weights['news']:.2f}, guba={actual_weights['guba']:.2f}, quant={actual_weights['quant']:.2f}")
+    logger.info(f"[综合情绪] 最终权重: news={actual_weights['news']:.2f}, guba={actual_weights['guba']:.2f}, quant={actual_weights['quant']:.2f}, north={actual_weights['north']:.2f}")
 
     # 生成交易信号
     if combined_score >= 0.3:
@@ -124,14 +257,15 @@ def _calculate_combined_sentiment(
         },
         'guba': {
             'score': round(guba_score, 3),
-            'reverse_signal': round(guba_reverse, 3),
+            'reverse_signal': round(guba_reverse.get('reversed_signal', 0), 3),
             'adjusted_score': round(guba_adjusted, 3),
             'weight': round(actual_weights['guba'], 2),
             'post_count': guba_result.get('post_count', 0),
             'bull_ratio': round(guba_result.get('bull_ratio', 0), 2),
             'bear_ratio': round(guba_result.get('bear_ratio', 0), 2),
             'heat': round(guba_result.get('heat', 0), 2),
-            'contribution': round(guba_adjusted * actual_weights['guba'], 3)
+            'contribution': round(guba_adjusted * actual_weights['guba'], 3),
+            'reverse_reason': guba_reverse.get('reason', '')
         },
         'quant': {
             'score': round(quant_score, 3),
@@ -141,10 +275,19 @@ def _calculate_combined_sentiment(
             'institution': quant_result.get('institution', {}).get('current_participation', 50),
             'focus': quant_result.get('focus', {}).get('current_focus', 50),
             'contribution': round(quant_score * actual_weights['quant'], 3)
+        },
+        'north_money': {
+            'signal': north_result.get('signal', 'neutral'),
+            'score': round(north_score, 3),
+            'weight': round(actual_weights['north'], 2),
+            'confidence': round(north_result.get('confidence', 0), 2),
+            'net_flow': north_result.get('net_flow', 0),
+            'reason': north_result.get('reason', ''),
+            'contribution': round(north_score * actual_weights['north'], 3)
         }
     }
 
-    logger.info(f"[综合情绪] 各数据源贡献: news={components['news']['contribution']:.3f}, guba={components['guba']['contribution']:.3f}, quant={components['quant']['contribution']:.3f}")
+    logger.info(f"[综合情绪] 各数据源贡献: news={components['news']['contribution']:.3f}, guba={components['guba']['contribution']:.3f}, quant={components['quant']['contribution']:.3f}, north={components['north_money']['contribution']:.3f}")
     logger.info(f"[综合情绪] 最终结果: combined_score={combined_score:.3f}, signal={signal}, confidence={confidence}")
 
     return {
@@ -375,15 +518,28 @@ def sentiment_agent(state: AgentState):
         logger.exception("[量化情绪] 获取失败: %s", exc)
         quant_result = {'score': 0.0}
 
-    # ========== 4. 计算综合情绪分数 ==========
+    # ========== 4. [OPTIMIZED] 获取北向资金数据 ==========
     logger.info("-" * 30)
-    logger.info("[步骤4] 计算综合情绪分数")
+    logger.info("[步骤4] 获取北向资金数据")
+    logger.info("-" * 30)
+
+    try:
+        north_result = _get_north_money_data(symbol)
+        logger.info(f"[北向资金] 获取完成: {north_result.get('reason', 'N/A')}")
+    except Exception as exc:
+        logger.exception("[北向资金] 获取失败: %s", exc)
+        north_result = {'signal': 'neutral', 'confidence': 0, 'net_flow': 0, 'reason': '数据获取失败'}
+
+    # ========== 5. 计算综合情绪分数 ==========
+    logger.info("-" * 30)
+    logger.info("[步骤5] 计算综合情绪分数")
     logger.info("-" * 30)
 
     combined_result = _calculate_combined_sentiment(
         news_sentiment_score,
         guba_result,
         quant_result,
+        north_result,
         len(recent_news)
     )
 

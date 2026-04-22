@@ -1,0 +1,153 @@
+{
+  "score": 0.251,
+  "rating": {
+    "current_rating": 71.17,
+    "rating_change": -1.44,
+    "avg_rating": 66.44,
+    "rating_trend": "stable",
+    "data": [
+      {
+        "date": "2026-04-08",
+        "rating": 71.21541796
+      },
+      {
+        "date": "2026-04-09",
+        "rating": 64.32977124
+      },
+      {
+        "date": "2026-04-10",
+        "rating": 67.74298125
+      },
+      {
+        "date": "2026-04-13",
+        "rating": 69.30779887
+      },
+      {
+        "date": "2026-04-14",
+        "rating": 71.65932805
+      },
+      {
+        "date": "2026-04-15",
+        "rating": 71.3704403
+      },
+      {
+        "date": "2026-04-16",
+        "rating": 67.52328282
+      },
+      {
+        "date": "2026-04-17",
+        "rating": 65.51352229
+      },
+      {
+        "date": "2026-04-20",
+        "rating": 72.60306475
+      },
+      {
+        "date": "2026-04-21",
+        "rating": 71.16570953
+      }
+    ]
+  },
+  "focus": {
+    "current_focus": 86.0,
+    "focus_change": -0.8,
+    "avg_focus": 87.57,
+    "data": [
+      {
+        "date": "2026-04-08",
+        "focus": 90.8
+      },
+      {
+        "date": "2026-04-09",
+        "focus": 90.0
+      },
+      {
+        "date": "2026-04-10",
+        "focus": 89.2
+      },
+      {
+        "date": "2026-04-13",
+        "focus": 88.4
+      },
+      {
+        "date": "2026-04-14",
+        "focus": 87.6
+      },
+      {
+        "date": "2026-04-15",
+        "focus": 87.2
+      },
+      {
+        "date": "2026-04-16",
+        "focus": 87.6
+      },
+      {
+        "date": "2026-04-17",
+        "focus": 86.8
+      },
+      {
+        "date": "2026-04-20",
+        "focus": 86.8
+      },
+      {
+        "date": "2026-04-21",
+        "focus": 86.0
+      }
+    ]
+  },
+  "institution": {
+    "current_participation": 49.41,
+    "participation_change": 3.11,
+    "avg_participation": 47.31,
+    "data": [
+      {
+        "date": "2026-04-08",
+        "participation": 47.44704
+      },
+      {
+        "date": "2026-04-09",
+        "participation": 40.53432
+      },
+      {
+        "date": "2026-04-10",
+        "participation": 48.3154
+      },
+      {
+        "date": "2026-04-13",
+        "participation": 46.76592
+      },
+      {
+        "date": "2026-04-14",
+        "participation": 50.115359999999995
+      },
+      {
+        "date": "2026-04-15",
+        "participation": 49.419039999999995
+      },
+      {
+        "date": "2026-04-16",
+        "participation": 44.399680000000004
+      },
+      {
+        "date": "2026-04-17",
+        "participation": 41.1314
+      },
+      {
+        "date": "2026-04-20",
+        "participation": 46.29536
+      },
+      {
+        "date": "2026-04-21",
+        "participation": 49.40704
+      }
+    ]
+  },
+  "score_details": {
+    "score": 0.251,
+    "rating_normalized": 0.423,
+    "institution_normalized": -0.012,
+    "focus_signal": 0,
+    "rating_trend": "stable"
+  },
+  "fetch_time": "2026-04-22T15:35:08.036387"
+}

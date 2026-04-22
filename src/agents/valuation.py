@@ -8,6 +8,14 @@ import math
 # 初始化 logger
 logger = setup_logger('valuation_agent')
 
+# [OPTIMIZED] A股行业分类，用于估值方法选择
+INDUSTRY_CYCLE_CLASSIFICATION = {
+    '强周期': ['农林牧渔', '钢铁', '煤炭', '有色金属', '化工', '建材', '房地产', '汽车', '交通运输', '工程机械'],
+    '弱周期': ['食品饮料', '医药生物', '家用电器', '纺织服装', '日用化工'],
+    '成长': ['电子', '计算机', '通信', '传媒', '新能源'],
+    '防御': ['公用事业', '银行', '保险', '券商']
+}
+
 
 def _safe_first(items):
     return items[0] if isinstance(items, list) and items else {}
@@ -36,6 +44,170 @@ def _has_meaningful_valuation_inputs(current_financial_line_item: dict) -> bool:
         "free_cash_flow",
     ]
     return any(_is_meaningful_number(current_financial_line_item.get(key)) for key in required_keys)
+
+
+def _identify_stock_type(ticker: str, industry: str = None) -> str:
+    """
+    [OPTIMIZED] 识别股票类型
+    返回: 'cyclical', 'growth', 'blue_chip', 'other'
+    """
+    if not industry:
+        return 'other'
+
+    for cycle_type, industries in INDUSTRY_CYCLE_CLASSIFICATION.items():
+        if any(ind in industry for ind in industries):
+            if cycle_type == '强周期':
+                return 'cyclical'
+            elif cycle_type == '成长':
+                return 'growth'
+            elif cycle_type in ['防御', '弱周期']:
+                return 'blue_chip'
+
+    return 'other'
+
+
+def _calculate_pe_pb_percentile(pe_ratio: float, pb_ratio: float) -> dict:
+    """
+    [OPTIMIZED] PE/PB分位点简化判断
+    注意：实际应使用10年历史数据计算分位点，此处使用简化规则
+    """
+    result = {}
+
+    # PE分位点简化判断
+    if pe_ratio and pe_ratio > 0:
+        if pe_ratio < 15:
+            pe_level = 'low'
+        elif pe_ratio < 25:
+            pe_level = 'medium'
+        elif pe_ratio < 40:
+            pe_level = 'high'
+        else:
+            pe_level = 'very_high'
+        result['pe'] = {'level': pe_level, 'value': pe_ratio}
+
+    # PB分位点简化判断
+    if pb_ratio and pb_ratio > 0:
+        if pb_ratio < 2:
+            pb_level = 'low'
+        elif pb_ratio < 4:
+            pb_level = 'medium'
+        elif pb_ratio < 6:
+            pb_level = 'high'
+        else:
+            pb_level = 'very_high'
+        result['pb'] = {'level': pb_level, 'value': pb_ratio}
+
+    return result
+
+
+def _calculate_liquidation_value(financial_line_items: dict) -> float:
+    """
+    [OPTIMIZED] 计算清算价值（适用于周期股）
+    """
+    if not financial_line_items:
+        return 0
+
+    try:
+        cash = financial_line_items.get('cash', 0) or 0
+        accounts_receivable = financial_line_items.get('accounts_receivable', 0) or 0
+        inventory = financial_line_items.get('inventory', 0) or 0
+        fixed_assets = financial_line_items.get('fixed_assets', 0) or 0
+        total_liabilities = financial_line_items.get('total_liabilities', 0) or 0
+
+        # 清算价值计算
+        # 现金：100%清算
+        liquidation_value = cash
+        # 应收款：80%清算
+        liquidation_value += accounts_receivable * 0.8
+        # 存货：50%清算（周期行业存货可能贬值）
+        liquidation_value += inventory * 0.5
+        # 固定资产：30%清算
+        liquidation_value += fixed_assets * 0.3
+        # 减去负债
+        liquidation_value -= total_liabilities
+
+        return max(liquidation_value, 0)
+
+    except Exception as e:
+        logger.debug(f"清算价值计算失败: {e}")
+        return 0
+
+
+def _generate_relative_valuation_signal(percentile_data: dict, industry: str = None) -> dict:
+    """
+    [OPTIMIZED] 相对估值信号判定
+    """
+    signals = []
+    reasoning = {}
+
+    pe_data = percentile_data.get('pe', {})
+    pb_data = percentile_data.get('pb', {})
+
+    # PE分位点判断
+    if pe_data:
+        pe_level = pe_data.get('level', 'medium')
+        pe_value = pe_data.get('value', 0)
+
+        if pe_level == 'low':
+            signal = 'bullish'
+            confidence = 0.7
+            reason = f"PE({pe_value:.1f})处于历史低位"
+        elif pe_level == 'medium':
+            signal = 'neutral'
+            confidence = 0.5
+            reason = f"PE({pe_value:.1f})处于合理区间"
+        elif pe_level == 'high':
+            signal = 'bearish'
+            confidence = 0.6
+            reason = f"PE({pe_value:.1f})处于历史高位"
+        else:  # very_high
+            signal = 'bearish'
+            confidence = 0.7
+            reason = f"PE({pe_value:.1f})极高，估值风险大"
+
+        signals.append((signal, confidence, reason))
+        reasoning['pe_analysis'] = {'signal': signal, 'details': reason}
+
+    # PB分位点判断
+    if pb_data:
+        pb_level = pb_data.get('level', 'medium')
+        pb_value = pb_data.get('value', 0)
+
+        if pb_level == 'low':
+            pb_signal = 'bullish'
+            pb_conf = 0.7
+            pb_reason = f"PB({pb_value:.1f})处于历史低位"
+        elif pb_level == 'medium':
+            pb_signal = 'neutral'
+            pb_conf = 0.5
+            pb_reason = f"PB({pb_value:.1f})处于合理区间"
+        elif pb_level == 'high':
+            pb_signal = 'bearish'
+            pb_conf = 0.6
+            pb_reason = f"PB({pb_value:.1f})处于历史高位"
+        else:
+            pb_signal = 'bearish'
+            pb_conf = 0.7
+            pb_reason = f"PB({pb_value:.1f})极高"
+
+        signals.append((pb_signal, pb_conf, pb_reason))
+        reasoning['pb_analysis'] = {'signal': pb_signal, 'details': pb_reason}
+
+    # 综合判定
+    if not signals:
+        return {'signal': 'neutral', 'confidence': 0.3, 'reasoning': '估值数据不足'}
+
+    bullish_count = sum(1 for s, c, _ in signals if s == 'bullish')
+    bearish_count = sum(1 for s, c, _ in signals if s == 'bearish')
+
+    if bullish_count > bearish_count:
+        avg_conf = sum(c for s, c, _ in signals if s == 'bullish') / bullish_count
+        return {'signal': 'bullish', 'confidence': avg_conf, 'reasoning': '估值偏低'}
+    elif bearish_count > bullish_count:
+        avg_conf = sum(c for s, c, _ in signals if s == 'bearish') / bearish_count
+        return {'signal': 'bearish', 'confidence': avg_conf, 'reasoning': '估值偏高'}
+    else:
+        return {'signal': 'neutral', 'confidence': 0.4, 'reasoning': '估值合理'}
 
 
 @agent_endpoint("valuation", "估值分析师，使用DCF和所有者收益法评估公司内在价值")
@@ -150,23 +322,72 @@ def valuation_agent(state: AgentState):
         num_years=5,
     )
 
-    # 收集有效的估值结果
+    # [OPTIMIZED] 收集有效的估值结果 - 调整权重，使用相对估值为主
     valid_valuations = []
     reasoning = {}
 
-    # DCF分析
+    # 获取股票类型
+    industry = data.get('industry', '')
+    stock_type = _identify_stock_type(data.get('ticker', ''), industry)
+
+    # [OPTIMIZED] 根据股票类型选择估值方法优先级
+    # 周期股：相对估值(PB分位点) > 清算价值 > DCF
+    # 成长股：DCF > 相对估值 > PEG
+    # 其他：相对估值 > DCF
+
+    # 1. PE/PB分位点分析（新增，相对估值）
+    pe_ratio = metrics.get("pe_ratio", 0)
+    pb_ratio = metrics.get("price_to_book", 0)
+    percentile_data = _calculate_pe_pb_percentile(pe_ratio, pb_ratio)
+    relative_signal = _generate_relative_valuation_signal(percentile_data, industry)
+
+    if relative_signal['signal'] != 'neutral' or percentile_data:
+        # 相对估值权重：周期股40%，其他25%
+        weight = 0.40 if stock_type == 'cyclical' else 0.25
+        valid_valuations.append({
+            "method": "relative_valuation",
+            "gap": relative_signal.get('confidence', 0.5) * (1 if relative_signal['signal'] == 'bullish' else -1),
+            "weight": weight,
+            "signal": relative_signal['signal']
+        })
+        reasoning["relative_analysis"] = {
+            "signal": relative_signal['signal'],
+            "details": f"分位点分析: {relative_signal.get('reasoning', '')}"
+        }
+
+    # [OPTIMIZED] 2. 周期股清算价值
+    if stock_type == 'cyclical' and current_financial_line_item:
+        liquidation_value = _calculate_liquidation_value(current_financial_line_item)
+        if liquidation_value > 0 and market_cap > 0:
+            liq_gap = (liquidation_value - market_cap) / market_cap
+            liq_signal = "bullish" if liq_gap > 0.3 else "bearish" if liq_gap < -0.3 else "neutral"
+            if liq_signal != "neutral":
+                valid_valuations.append({
+                    "method": "liquidation_value",
+                    "gap": liq_gap,
+                    "weight": 0.30,
+                    "signal": liq_signal
+                })
+                reasoning["liquidation_analysis"] = {
+                    "signal": liq_signal,
+                    "details": f"清算价值: {liquidation_value/1e8:.1f}亿, 市值: {market_cap/1e8:.1f}亿"
+                }
+
+    # 3. DCF分析（权重降低）
     if dcf_value > 0:
         dcf_gap = (dcf_value - market_cap) / market_cap
         capped_dcf_gap = max(-1.0, min(1.0, dcf_gap))
+        # DCF权重降低：周期股15%，其他25%
+        dcf_weight = 0.15 if stock_type == 'cyclical' else 0.25
         valid_valuations.append({
             "method": "dcf",
             "gap": dcf_gap,
-            "weight": 0.4,  # DCF权重40%
+            "weight": dcf_weight,
             "signal": "bullish" if dcf_gap > 0.15 else "bearish" if dcf_gap < -0.25 else "neutral"
         })
         reasoning["dcf_analysis"] = {
             "signal": valid_valuations[-1]["signal"],
-            "details": f"Intrinsic Value: ${dcf_value:,.2f}, Market Cap: ${market_cap:,.2f}, Gap: {capped_dcf_gap:.1%}"
+            "details": f"DCF内在价值: {dcf_value/1e8:.1f}亿, 市值: {market_cap/1e8:.1f}亿, 差距: {capped_dcf_gap:.1%}"
         }
     else:
         reasoning["dcf_analysis"] = {
@@ -174,19 +395,19 @@ def valuation_agent(state: AgentState):
             "details": f"DCF计算无效（自由现金流: ${fcff:,.2f}），已跳过"
         }
 
-    # 所有者收益分析
+    # 4. 所有者收益分析（权重降低）
     if owner_earnings_value > 0:
         owner_earnings_gap = (owner_earnings_value - market_cap) / market_cap
         capped_owner_gap = max(-1.0, min(1.0, owner_earnings_gap))
         valid_valuations.append({
             "method": "owner_earnings",
             "gap": owner_earnings_gap,
-            "weight": 0.35,  # 所有者收益权重35%
+            "weight": 0.15,  # 降低权重
             "signal": "bullish" if owner_earnings_gap > 0.15 else "bearish" if owner_earnings_gap < -0.25 else "neutral"
         })
         reasoning["owner_earnings_analysis"] = {
             "signal": valid_valuations[-1]["signal"],
-            "details": f"Owner Earnings Value: ${owner_earnings_value:,.2f}, Market Cap: ${market_cap:,.2f}, Gap: {capped_owner_gap:.1%}"
+            "details": f"所有者收益: {owner_earnings_value/1e8:.1f}亿"
         }
     else:
         reasoning["owner_earnings_analysis"] = {
@@ -194,44 +415,11 @@ def valuation_agent(state: AgentState):
             "details": "所有者收益计算无效，已跳过"
         }
 
-    # 市盈率分析（作为补充）
-    pe_ratio = metrics.get("pe_ratio", 0)
-    pb_ratio = metrics.get("price_to_book", 0)
+    # [OPTIMIZED] 注意：PE/PB分位点分析已在上面relative_valuation中完成
 
-    # 检查是否是亏损公司
+    # 检查是否是亏损公司（保持原有逻辑用于营收分析）
     net_income = current_financial_line_item.get("net_income", 0)
     is_profitable = net_income and net_income > 0
-
-    if pe_ratio > 0 and is_profitable:
-        # 行业平均市盈率参考
-        industry_avg_pe = 20  # 默认使用20倍作为参考
-        pe_gap = (industry_avg_pe - pe_ratio) / pe_ratio
-        pe_signal = "bullish" if pe_gap > 0.3 else "bearish" if pe_gap < -0.3 else "neutral"
-        valid_valuations.append({
-            "method": "pe_ratio",
-            "gap": pe_gap,
-            "weight": 0.25,
-            "signal": pe_signal
-        })
-        reasoning["pe_analysis"] = {
-            "signal": pe_signal,
-            "details": f"市盈率: {pe_ratio:.2f}, 行业平均: {industry_avg_pe}, 相对估值: {'低估' if pe_gap > 0 else '高估' if pe_gap < 0 else '合理'}"
-        }
-    elif pb_ratio > 0:
-        # 亏损公司使用市净率估值
-        industry_avg_pb = 3.0  # 养殖行业市净率参考
-        pb_gap = (industry_avg_pb - pb_ratio) / pb_ratio
-        pb_signal = "bullish" if pb_gap > 0.3 else "bearish" if pb_gap < -0.3 else "neutral"
-        valid_valuations.append({
-            "method": "pb_ratio",
-            "gap": pb_gap,
-            "weight": 0.25,
-            "signal": pb_signal
-        })
-        reasoning["pb_analysis"] = {
-            "signal": pb_signal,
-            "details": f"市净率: {pb_ratio:.2f}, 行业参考: {industry_avg_pb}, 相对估值: {'低估' if pb_gap > 0 else '高估' if pb_gap < 0 else '合理'}"
-        }
 
     # 对于亏损公司，添加基本面估值分析
     if not is_profitable and (pe_ratio <= 0 or pb_ratio > 0):
