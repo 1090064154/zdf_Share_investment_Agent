@@ -199,7 +199,7 @@ def fundamentals_agent(state: AgentState):
             name="fundamentals_agent",
         )
         if show_reasoning:
-            show_agent_reasoning(message_content, "Fundamental Analysis Agent")
+            show_agent_reasoning(message_content, "基本面分析师")
             state["metadata"]["agent_reasoning"] = message_content
         show_workflow_status("基本面分析师", "completed")
         return {
@@ -381,7 +381,7 @@ def fundamentals_agent(state: AgentState):
 
     # Print the reasoning if the flag is set
     if show_reasoning:
-        show_agent_reasoning(message_content, "Fundamental Analysis Agent")
+        show_agent_reasoning(message_content, "基本面分析师")
         # 保存推理信息到metadata供API使用
         state["metadata"]["agent_reasoning"] = message_content
 

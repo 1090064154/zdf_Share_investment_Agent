@@ -214,7 +214,7 @@ def debate_room_agent(state: AgentState):
     )
 
     if show_reasoning:
-        show_agent_reasoning(message_content, "Debate Room")
+        show_agent_reasoning(message_content, "辩论室")
         # 保存推理信息到metadata供API使用
         state["metadata"]["agent_reasoning"] = message_content
 

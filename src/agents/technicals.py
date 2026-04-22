@@ -74,7 +74,7 @@ def technical_analyst_agent(state: AgentState):
             name="technical_analyst_agent",
         )
         if show_reasoning:
-            show_agent_reasoning(analysis_report, "Technical Analyst")
+            show_agent_reasoning(analysis_report, "技术分析师")
             state["metadata"]["agent_reasoning"] = analysis_report
         show_workflow_status("技术分析师", "completed")
         return {
@@ -268,7 +268,7 @@ def technical_analyst_agent(state: AgentState):
     )
 
     if show_reasoning:
-        show_agent_reasoning(analysis_report, "Technical Analyst")
+        show_agent_reasoning(analysis_report, "技术分析师")
         # 保存推理信息到state的metadata供API使用
         state["metadata"]["agent_reasoning"] = analysis_report
 

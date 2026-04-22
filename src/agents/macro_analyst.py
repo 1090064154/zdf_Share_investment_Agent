@@ -84,7 +84,7 @@ def macro_analyst_agent(state: AgentState):
 
     # 如果需要显示推理过程
     if show_reasoning:
-        show_agent_reasoning(message_content, "Macro Analysis Agent")
+        show_agent_reasoning(message_content, "宏观分析师")
         # 保存推理信息到metadata供API使用
         state["metadata"]["agent_reasoning"] = message_content
 

@@ -24,8 +24,16 @@ class DecisionEngine:
     规则化决策引擎
     """
 
-    def __init__(self, config: Optional[Dict] = None):
-        self.weights = config.get('agent_weights', DEFAULT_WEIGHTS) if config else DEFAULT_WEIGHTS
+    def __init__(self, config=None):
+        if config is not None:
+            # Handle OptimizationConfig object
+            if hasattr(config, 'get_agent_weights'):
+                self.weights = config.get_agent_weights()
+            else:
+                # Handle dictionary
+                self.weights = config.get('agent_weights', DEFAULT_WEIGHTS)
+        else:
+            self.weights = DEFAULT_WEIGHTS
 
     def make_decision(self, signals: Dict, risk_score: float, risk_action: str, macro_factor: float, portfolio: Dict) -> Dict:
         """

@@ -170,6 +170,12 @@ def portfolio_management_agent(state: AgentState):
         cleaned_messages_for_processing, "macro_analyst_agent")
     debate_message = get_latest_message_by_name(
         cleaned_messages_for_processing, "debate_room_agent")
+    industry_cycle_message = get_latest_message_by_name(
+        cleaned_messages_for_processing, "industry_cycle_agent")
+    institutional_message = get_latest_message_by_name(
+        cleaned_messages_for_processing, "institutional_agent")
+    expectation_diff_message = get_latest_message_by_name(
+        cleaned_messages_for_processing, "expectation_diff_agent")
 
     # Extract content, handling potential None if message not found by get_latest_message_by_name
     technical_content = technical_message.content if technical_message else json.dumps(
@@ -184,6 +190,12 @@ def portfolio_management_agent(state: AgentState):
         {"signal": "error", "details": "Risk message missing"})
     tool_based_macro_content = tool_based_macro_message.content if tool_based_macro_message else json.dumps(
         {"signal": "error", "details": "Tool-based Macro message missing"})
+    industry_cycle_content = industry_cycle_message.content if industry_cycle_message else json.dumps(
+        {"signal": "error", "details": "Industry cycle message missing"})
+    institutional_content = institutional_message.content if institutional_message else json.dumps(
+        {"signal": "error", "details": "Institutional message missing"})
+    expectation_diff_content = expectation_diff_message.content if expectation_diff_message else json.dumps(
+        {"signal": "error", "details": "Expectation diff message missing"})
 
     # Market-wide news summary from macro_news_agent (already correctly fetched from state["data"])
     market_wide_news_summary_content = state["data"].get(
@@ -226,6 +238,9 @@ def portfolio_management_agent(state: AgentState):
             "confidence": 0.1,
         },
         _extract_signal_entry("debate_room", debate_payload),
+        _extract_signal_entry("industry_cycle", _parse_message_json(industry_cycle_content) or {}),
+        _extract_signal_entry("institutional", _parse_message_json(institutional_content) or {}),
+        _extract_signal_entry("expectation_diff", _parse_message_json(expectation_diff_content) or {}),
     ]
 
     system_message_content = """你是一位专业的投资组合经理，负责做出最终的交易决策。
@@ -293,31 +308,31 @@ def portfolio_management_agent(state: AgentState):
         elif isinstance(latest_price, dict) and "收盘" in latest_price:
             current_price = float(latest_price.get("收盘", 0))
 
-    user_message_content = f"""Based on the team's analysis below, make your trading decision.
+    user_message_content = f"""根据团队的分析结果，做出您的交易决策。
 
-            Technical Analysis Signal: {technical_content}
-            Fundamental Analysis Signal: {fundamentals_content}
-            Sentiment Analysis Signal: {sentiment_content}
-            Valuation Analysis Signal: {valuation_content}
-            Risk Management Signal: {risk_content}
-            General Macro Analysis (from Macro Analyst Agent): {tool_based_macro_content}
-            Daily Market-Wide News Summary (from Macro News Agent): {market_wide_news_summary_content}
-            Debate Room Analysis (多空平衡): {debate_content}
+            技术分析信号: {technical_content}
+            基本面分析信号: {fundamentals_content}
+            情绪分析信号: {sentiment_content}
+            估值分析信号: {valuation_content}
+            风险管理信号: {risk_content}
+            宏观分析信号（来自宏观分析师）: {tool_based_macro_content}
+            每日市场新闻摘要（来自宏观新闻分析师）: {market_wide_news_summary_content}
+            辩论室分析（多空平衡）: {debate_content}
 
-            Current Portfolio:
-            Cash: {portfolio['cash']:.2f} 元
-            Current Position: {portfolio['stock']} 股
-            Current Stock Price: {current_price:.2f} 元/股
-            Max Position Allowed by Risk Management: {risk_payload.get('最大持仓规模', 'Not specified')}
+            当前投资组合:
+            现金: {portfolio['cash']:.2f} 元
+            当前持仓: {portfolio['stock']} 股
+            当前股价: {current_price:.2f} 元/股
+            风险管理允许的最大持仓: {risk_payload.get('最大持仓规模', '未指定')}
 
-            Output JSON only. Ensure 'agent_signals' includes all required agents as per system prompt."""
+            请仅输出JSON格式。确保'agent_signals'包含所有必需的agent信息。"""
     user_message = {
         "role": "user",
         "content": user_message_content
     }
 
     show_agent_reasoning(
-        agent_name, f"Preparing LLM. User msg includes: TA, FA, Sent, Val, Risk, GeneralMacro, MarketNews.")
+        agent_name, f"准备LLM调用，包含: 技术分析、基本面、情绪、估值、风险管理、宏观、新闻")
 
     # [NEW] 尝试使用DecisionEngine决策
     config = get_config()

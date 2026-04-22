@@ -512,7 +512,7 @@ def valuation_agent(state: AgentState):
     )
 
     if show_reasoning:
-        show_agent_reasoning(message_content, "Valuation Analysis Agent")
+        show_agent_reasoning(message_content, "估值分析师")
         # 保存推理信息到metadata供API使用
         state["metadata"]["agent_reasoning"] = message_content
 
