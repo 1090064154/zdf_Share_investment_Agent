@@ -1,0 +1,46 @@
+# 优化配置开关
+optimization:
+  enable_veto_power: true      # 一票否决权: 风控阻止买入但不强制卖出
+  enable_dynamic_weights: true # 动态权重: 根据市场状态调整
+  enable_confidence_normalizer: true  # 置信度标准化
+
+# 权重配置
+weights:
+  bull_market:
+    valuation: 0.30
+    technical: 0.35
+    fundamentals: 0.10
+    macro: 0.05
+    sentiment: 0.05
+    debate: 0.05
+    risk: 0.10
+
+  bear_market:
+    valuation: 0.30
+    fundamentals: 0.35
+    technical: 0.10
+    macro: 0.05
+    sentiment: 0.05
+    debate: 0.05
+    risk: 0.10
+
+  震荡市:
+    valuation: 0.25
+    technical: 0.15
+    fundamentals: 0.20
+    macro: 0.10
+    sentiment: 0.10
+    debate: 0.10
+    risk: 0.10
+
+# 置信度Fallback
+confidence_fallback:
+  technical: 0.30
+  fundamentals: 0.40
+  sentiment: 0.25
+  valuation: 0.35
+  macro: 0.20
+  debate: 0.40
+  risk: 0.60
+  researcher_bull: 0.25
+  researcher_bear: 0.30

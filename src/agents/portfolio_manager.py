@@ -1,6 +1,7 @@
 from langchain_core.messages import HumanMessage
 from langchain_core.prompts import ChatPromptTemplate
 import json
+from src.utils.optimization_config import get_config
 from src.utils.logging_config import setup_logger
 
 from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status
@@ -406,30 +407,61 @@ def portfolio_management_agent(state: AgentState):
             "reasoning": f"风险评分{risk_score:.0f}/10 >= 7，强制执行持有。风险管理约束优先。"
         }, ensure_ascii=False)
         final_decision_message = HumanMessage(content=llm_response_content, name=agent_name)
-    # 规则2: 风险管理建议 sell/reduce，必须执行
+    # 规则2: 风险管理建议 - 一票否决或强制执行
     elif trading_action in ["sell", "reduce", "减仓", "清仓"]:
-        logger.warning(f"风险管理建议 {trading_action}，强制执行")
-        final_action = "sell"
-        available_stock = portfolio.get("stock", 0)
-        if available_stock <= 0:
-            final_quantity = 0
-            llm_response_content = json.dumps({
-                "action": final_action,
-                "quantity": final_quantity,
-                "confidence": decision_json.get("confidence", 0.5),
-                "agent_signals": agent_signals,
-                "reasoning": f"风险管理建议{trading_action}，但无持仓可卖"
-            }, ensure_ascii=False)
+        config = get_config()
+        current_position = portfolio.get("stock", 0)
+        
+        if config.enable_veto_power and trading_action == "sell":
+            # 新逻辑: 一票否决 - 阻止买入但不强制卖出
+            if current_position > 0:
+                # 有持仓时,执行卖出
+                logger.warning(f"风险管理建议 {trading_action}，有持仓执行卖出")
+                final_action = "sell"
+                final_quantity = min(final_quantity, current_position)
+                llm_response_content = json.dumps({
+                    "action": final_action,
+                    "quantity": final_quantity,
+                    "confidence": decision_json.get("confidence", 0.5),
+                    "agent_signals": agent_signals,
+                    "reasoning": f"风险管理建议{trading_action}，有持仓执行卖出"
+                }, ensure_ascii=False)
+            else:
+                # 无持仓时,阻止买入但不强制卖出
+                logger.warning(f"风险管理建议{trading_action}，但无持仓可卖，阻止新买入")
+                final_action = "hold"
+                final_quantity = 0
+                llm_response_content = json.dumps({
+                    "action": final_action,
+                    "quantity": final_quantity,
+                    "confidence": decision_json.get("confidence", 0.5),
+                    "agent_signals": agent_signals,
+                    "reasoning": f"风控一票否决:风险管理建议{trading_action}，无持仓可卖，阻止新买入"
+                }, ensure_ascii=False)
+            final_decision_message = HumanMessage(content=llm_response_content, name=agent_name)
         else:
-            final_quantity = min(final_quantity, available_stock)
-            llm_response_content = json.dumps({
-                "action": final_action,
-                "quantity": final_quantity,
-                "confidence": decision_json.get("confidence", 0.5),
-                "agent_signals": agent_signals,
-                "reasoning": f"风险管理建议{trading_action}，强制执行。"
-            }, ensure_ascii=False)
-        final_decision_message = HumanMessage(content=llm_response_content, name=agent_name)
+            # 旧逻辑: 强制执行
+            logger.warning(f"风险管理建议 {trading_action}，强制执行")
+            final_action = "sell"
+            if available_stock <= 0:
+                final_quantity = 0
+                llm_response_content = json.dumps({
+                    "action": final_action,
+                    "quantity": final_quantity,
+                    "confidence": decision_json.get("confidence", 0.5),
+                    "agent_signals": agent_signals,
+                    "reasoning": f"风险管理建议{trading_action}，但无持仓可卖"
+                }, ensure_ascii=False)
+            else:
+                final_quantity = min(final_quantity, available_stock)
+                llm_response_content = json.dumps({
+                    "action": final_action,
+                    "quantity": final_quantity,
+                    "confidence": decision_json.get("confidence", 0.5),
+                    "agent_signals": agent_signals,
+                    "reasoning": f"风险管理建议{trading_action}，强制执行。"
+                }, ensure_ascii=False)
+            final_decision_message = HumanMessage(content=llm_response_content, name=agent_name)
 
     # 规则3: 资金校验 - 买入时检查现金是否充足
     if final_action == "buy" and current_price > 0:
