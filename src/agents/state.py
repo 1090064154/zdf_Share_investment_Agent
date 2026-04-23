@@ -19,6 +19,8 @@ class AgentState(TypedDict):
     messages: Annotated[Sequence[BaseMessage], operator.add]
     data: Annotated[Dict[str, Any], merge_dicts]
     metadata: Annotated[Dict[str, Any], merge_dicts]
+    # [OPTIMIZED] 新增：Agent结果缓存，避免重复遍历messages
+    agent_results: Annotated[Dict[str, Any], merge_dicts]
 
 
 def show_workflow_status(agent_name: str, status: str = "processing"):

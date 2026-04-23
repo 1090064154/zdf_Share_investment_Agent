@@ -1,10 +1,12 @@
 from langchain_core.messages import HumanMessage
 from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status
 from src.utils.api_utils import agent_endpoint, log_llm_interaction
+from src.utils.error_handler import resilient_agent
 import json
 import ast
 
 
+@resilient_agent
 @agent_endpoint("researcher_bull", "多方研究员，从看多角度分析市场数据并提出投资论点")
 def researcher_bull_agent(state: AgentState):
     """Analyzes signals from a bullish perspective and generates optimistic investment thesis."""

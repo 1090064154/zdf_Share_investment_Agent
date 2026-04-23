@@ -6,6 +6,7 @@ from langchain_core.messages import HumanMessage
 from src.utils.logging_config import setup_logger
 from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status
 from src.utils.api_utils import agent_endpoint, log_llm_interaction
+from src.utils.error_handler import resilient_agent
 import json
 
 logger = setup_logger('institutional_agent')
@@ -167,6 +168,7 @@ def _analyze_institutional_signals(north_result: dict, fund_result: dict) -> dic
     }
 
 
+@resilient_agent
 @agent_endpoint("institutional", "机构持仓分析师，分析北向资金、基金持仓等机构持仓变化")
 def institutional_agent(state: AgentState):
     """分析机构持仓"""

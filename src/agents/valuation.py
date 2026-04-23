@@ -2,6 +2,7 @@ from langchain_core.messages import HumanMessage
 from src.utils.logging_config import setup_logger
 from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status
 from src.utils.api_utils import agent_endpoint, log_llm_interaction
+from src.utils.error_handler import resilient_agent
 import json
 import math
 
@@ -210,6 +211,7 @@ def _generate_relative_valuation_signal(percentile_data: dict, industry: str = N
         return {'signal': 'neutral', 'confidence': 0.4, 'reasoning': '估值合理'}
 
 
+@resilient_agent
 @agent_endpoint("valuation", "估值分析师，使用DCF和所有者收益法评估公司内在价值")
 def valuation_agent(state: AgentState):
     """Responsible for valuation analysis"""

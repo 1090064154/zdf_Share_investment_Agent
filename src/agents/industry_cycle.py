@@ -6,6 +6,7 @@ from langchain_core.messages import HumanMessage
 from src.utils.logging_config import setup_logger
 from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status
 from src.utils.api_utils import agent_endpoint, log_llm_interaction
+from src.utils.error_handler import resilient_agent
 import json
 
 logger = setup_logger('industry_cycle_agent')
@@ -157,6 +158,7 @@ def _generate_cycle_signal(cycle_info: dict) -> dict:
     }
 
 
+@resilient_agent
 @agent_endpoint("industry_cycle", "行业周期分析师，分析行业周期位置，判断当前所处阶段")
 def industry_cycle_agent(state: AgentState):
     """分析行业周期"""

@@ -5,6 +5,7 @@ from src.tools.guba_crawler import get_guba_sentiment
 from src.tools.quant_sentiment import get_quant_sentiment
 from src.utils.logging_config import setup_logger
 from src.utils.api_utils import agent_endpoint, log_llm_interaction
+from src.utils.error_handler import resilient_agent
 import json
 from datetime import datetime, timedelta
 
@@ -69,10 +70,15 @@ def _get_north_money_data(ticker: str, days: int = 5) -> dict:
     }
 
 
-def _reverse_guba_signal(guba_score: float, post_count: int) -> dict:
+def _reverse_guba_signal(guba_score: float, post_count: int, sector_heat: float = 0.5) -> dict:
     """
-    [OPTIMIZED] 股吧情绪反向使用
+    [OPTIMIZED] 股吧情绪反向使用 - 改进版
     散户买入往往是卖点，散户卖出往往是买点
+    
+    Args:
+        guba_score: 股吧情绪分数 (-1到1)
+        post_count: 帖子数量
+        sector_heat: 板块热度 (0-1)，越高说明越受关注
     """
     if post_count == 0:
         return {
@@ -81,24 +87,37 @@ def _reverse_guba_signal(guba_score: float, post_count: int) -> dict:
             'reason': '无股吧数据'
         }
 
-    # 极端值检测
-    if guba_score < -0.5:  # 极度悲观
-        reversed_signal = -guba_score * 1.5  # 反向
-        confidence_boost = 0.2
+    # [OPTIMIZED] 降低反向系数，避免过度反向
+    if guba_score < -0.6:  # 极度悲观
+        reversed_signal = -guba_score * 1.2  # 降低到1.2
+        confidence_boost = 0.15
         reason = "股吧极度悲观，可能见底"
-    elif guba_score > 0.5:  # 极度乐观
-        reversed_signal = -guba_score * 1.5  # 反向
-        confidence_boost = 0.2
+    elif guba_score > 0.6:  # 极度乐观
+        reversed_signal = -guba_score * 1.2  # 降低到1.2
+        confidence_boost = 0.15
         reason = "股吧极度乐观，可能见顶"
-    else:
-        # 非极端值使用原信号但降低权重
-        reversed_signal = guba_score * 0.5
+    elif abs(guba_score) < 0.3:  # 中性区间
+        reversed_signal = guba_score * 0.3  # 不反向，仅降低权重
         confidence_boost = 0
         reason = "股吧情绪处于中性区间"
+    else:  # 中等情绪
+        reversed_signal = -guba_score * 0.8  # 部分反向
+        confidence_boost = 0.1
+        reason = "股吧情绪中等，适度反向"
+    
+    # [OPTIMIZED] 板块热度调整：热门板块散户情绪更有参考性，减弱反向
+    if sector_heat > 0.7:
+        reversed_signal *= 0.7  # 减弱反向
+        confidence_boost += 0.05
+        reason += f"，板块热度高({sector_heat:.2f})"
 
     # 热度加成：热度越高，反向信号越可靠
     if post_count > 100:
-        confidence_boost += 0.1
+        confidence_boost += 0.05
+    
+    # [OPTIMIZED] 限制输出范围在[-1, 1]
+    reversed_signal = max(-1.0, min(1.0, reversed_signal))
+    confidence_boost = min(confidence_boost, 0.3)
 
     return {
         'reversed_signal': reversed_signal,
@@ -435,6 +454,7 @@ def _format_reasoning(result: dict, news_count: int) -> str:
     return "\n".join(reasoning_parts)
 
 
+@resilient_agent
 @agent_endpoint("sentiment", "情感分析师，综合分析新闻、股吧、量化情绪指标")
 def sentiment_agent(state: AgentState):
     """Responsible for sentiment analysis - 整合多数据源"""

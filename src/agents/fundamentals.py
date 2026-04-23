@@ -3,6 +3,7 @@ from src.utils.logging_config import setup_logger
 
 from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status
 from src.utils.api_utils import agent_endpoint, log_llm_interaction
+from src.utils.error_handler import resilient_agent
 
 import json
 
@@ -158,7 +159,7 @@ def _analyze_revenue_quality(financial_line_items: dict = None) -> dict:
 
 ##### Fundamental Agent #####
 
-
+@resilient_agent
 @agent_endpoint("fundamentals", "基本面分析师，分析公司财务指标、盈利能力和增长潜力")
 def fundamentals_agent(state: AgentState):
     """Responsible for fundamental analysis"""

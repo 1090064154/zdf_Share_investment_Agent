@@ -9,12 +9,14 @@ from src.utils.api_utils import agent_endpoint, log_llm_interaction
 import json
 import ast
 from src.utils.logging_config import setup_logger
+from src.utils.error_handler import resilient_agent
 
 ##### Risk Management Agent #####
 
 logger = setup_logger('risk_management_agent')
 
 
+@resilient_agent(critical=True)
 @agent_endpoint("risk_management", "风险管理专家，评估投资风险并给出风险调整后的交易建议")
 def risk_management_agent(state: AgentState):
     """Responsible for risk management"""

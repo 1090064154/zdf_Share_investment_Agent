@@ -2,6 +2,7 @@ from langchain_core.messages import HumanMessage
 from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status
 from src.tools.openrouter_config import get_chat_completion
 from src.utils.api_utils import agent_endpoint, log_llm_interaction
+from src.utils.error_handler import resilient_agent
 import json
 import ast
 import logging
@@ -10,6 +11,7 @@ import logging
 logger = logging.getLogger('debate_room')
 
 
+@resilient_agent(critical=True)
 @agent_endpoint("debate_room", "辩论室，分析多空双方观点，得出平衡的投资结论")
 def debate_room_agent(state: AgentState):
     """Facilitates debate between bull and bear researchers to reach a balanced conclusion."""
@@ -163,19 +165,28 @@ def debate_room_agent(state: AgentState):
         llm_analysis = {"analysis": "LLM API call failed",
                         "score": 0, "reasoning": "API error"}
 
-    # 计算混合置信度差异
+    # [OPTIMIZED] 计算混合置信度差异 - 改进版
     confidence_diff = bull_confidence - bear_confidence
 
-    # 默认 LLM 权重为 30%
-    llm_weight = 0.3
+    # [OPTIMIZED] 动态LLM权重：根据LLM自身的不确定性调整
+    llm_weight = 0.3 * (llm_score if llm_analysis else 0.5)  # 范围[0, 0.3]
 
-    # 将 LLM 评分（-1 到 1范围）转换为与 confidence_diff 相同的比例
+    # [OPTIMIZED] 一致性检查：研究员和LLM方向一致时加分
+    researcher_direction = 1 if confidence_diff > 0 else -1
+    llm_direction = 1 if llm_score > 0 else -1 if llm_analysis else 0
+    consistency_bonus = 0.1 if (researcher_direction == llm_direction and llm_direction != 0) else -0.1
+
     # 计算混合置信度差异
-    mixed_confidence_diff = (1 - llm_weight) * \
-        confidence_diff + llm_weight * llm_score
+    mixed_confidence_diff = (
+        (1 - llm_weight) * confidence_diff + 
+        llm_weight * llm_score + 
+        consistency_bonus
+    )
 
     logger.info(
-        f"计算混合置信度差异: 原始差异={confidence_diff:.4f}, LLM评分={llm_score:.4f}, 混合差异={mixed_confidence_diff:.4f}")
+        f"计算混合置信度差异: 原始差异={confidence_diff:.4f}, LLM评分={llm_score:.4f}, "
+        f"LLM权重={llm_weight:.2f}, 一致性={'aligned' if consistency_bonus > 0 else 'conflicted'}, "
+        f"混合差异={mixed_confidence_diff:.4f}")
 
     # 基于混合置信度差异确定最终建议
     if abs(mixed_confidence_diff) < 0.1:  # 接近争论

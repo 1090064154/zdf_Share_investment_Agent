@@ -4,6 +4,8 @@ import json
 from src.utils.optimization_config import get_config
 from src.utils.logging_config import setup_logger
 from src.utils.decision_engine import DecisionEngine, create_decision_engine
+from src.utils.error_handler import resilient_agent
+from src.utils.decision_validator import create_decision_validator, DecisionPriority
 
 from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status
 from src.tools.openrouter_config import get_chat_completion
@@ -131,6 +133,7 @@ def _has_usable_macro_news_summary(summary: str) -> bool:
     return not any(marker in summary for marker in invalid_markers)
 
 
+@resilient_agent(critical=True)
 @agent_endpoint("portfolio_management", "负责投资组合管理和最终交易决策")
 def portfolio_management_agent(state: AgentState):
     """
@@ -571,164 +574,68 @@ def portfolio_management_agent(state: AgentState):
             "raw_response_snippet": llm_response_content[:200] + "..."
         }
 
-    # ==================== 步骤11: 强制风险校验 ====================
-    # 这是最后的安全检查，确保所有交易决策都符合风险管理要求
-    # 即使LLM或DecisionEngine给出了建议，也必须通过这里的校验
+    # ==================== 步骤11: 统一决策验证 ====================
+    # 使用DecisionValidator框架进行统一的决策验证，消除规则冲突
     
-    # 保存从 LLM 响应中解析的 agent_signals，如果没有则使用前面构建的信号
+    # 保存从 LLM 响应中解析的 agent_signals
     parsed_agent_signals = decision_json.get("agent_signals", None)
     final_action = decision_json.get("action", "hold")
     final_quantity = decision_json.get("quantity", 0)
+    
+    # 提取风险管理信息
     risk_score = 0.0
-    risk_signal = "hold"
     max_position = 0.0
     trading_action = "hold"
-
+    
     if risk_payload:
         try:
             risk_score = float(risk_payload.get("风险评分", 0))
         except (TypeError, ValueError):
             risk_score = 0.0
-        risk_signal = risk_payload.get("交易行动", "hold")
+        trading_action = risk_payload.get("交易行动", "hold")
         try:
             max_position = float(risk_payload.get("最大持仓规模", 0))
         except (TypeError, ValueError):
             max_position = 0.0
-        trading_action = risk_payload.get("交易行动", "hold")
-
-    # 规则1: 风险评分 >= 7，强制 hold
-    # 当市场风险过高时，无论其他信号如何，都必须保持观望
-    if risk_score >= 7:
-        logger.warning(f"风险评分 {risk_score} >= 7，强制执行 hold")
-        final_action = "hold"
-        final_quantity = portfolio.get("stock", 0)
-        signals_to_use = parsed_agent_signals if parsed_agent_signals else agent_signals
-        llm_response_content = json.dumps({
-            "action": "hold",
-            "quantity": final_quantity,
-            "confidence": decision_json.get("confidence", 0.5),
-            "agent_signals": agent_signals,
-            "reasoning": f"风险评分{risk_score:.0f}/10 >= 7，强制执行持有。风险管理约束优先。"
-        }, ensure_ascii=False)
-        final_decision_message = HumanMessage(content=llm_response_content, name=agent_name)
     
-    # 规则2: 风险管理建议 - 一票否决或强制执行
-    # 如果风险管理Agent建议卖出或减仓，必须执行
-    elif trading_action in ["sell", "reduce", "减仓", "清仓"]:
-        config = get_config()
-        current_position = portfolio.get("stock", 0)
-        
-        if config.enable_veto_power and trading_action == "sell":
-            # 新逻辑: 一票否决 - 阻止买入但不强制卖出
-            if current_position > 0:
-                # 有持仓时,执行卖出
-                logger.warning(f"风险管理建议 {trading_action}，有持仓执行卖出")
-                final_action = "sell"
-                final_quantity = min(final_quantity, current_position)
-                llm_response_content = json.dumps({
-                    "action": final_action,
-                    "quantity": final_quantity,
-                    "confidence": decision_json.get("confidence", 0.5),
-                    "agent_signals": agent_signals,
-                    "reasoning": f"风险管理建议{trading_action}，有持仓执行卖出"
-                }, ensure_ascii=False)
-            else:
-                # 无持仓时,阻止买入但不强制卖出
-                logger.warning(f"风险管理建议{trading_action}，但无持仓可卖，阻止新买入")
-                final_action = "hold"
-                final_quantity = 0
-                llm_response_content = json.dumps({
-                    "action": final_action,
-                    "quantity": final_quantity,
-                    "confidence": decision_json.get("confidence", 0.5),
-                    "agent_signals": agent_signals,
-                    "reasoning": f"风控一票否决:风险管理建议{trading_action}，无持仓可卖，阻止新买入"
-                }, ensure_ascii=False)
-            final_decision_message = HumanMessage(content=llm_response_content, name=agent_name)
-        else:
-            # 旧逻辑: 强制执行
-            logger.warning(f"风险管理建议 {trading_action}，强制执行")
-            final_action = "sell"
-            if available_stock <= 0:
-                final_quantity = 0
-                llm_response_content = json.dumps({
-                    "action": final_action,
-                    "quantity": final_quantity,
-                    "confidence": decision_json.get("confidence", 0.5),
-                    "agent_signals": agent_signals,
-                    "reasoning": f"风险管理建议{trading_action}，但无持仓可卖"
-                }, ensure_ascii=False)
-            else:
-                final_quantity = min(final_quantity, available_stock)
-                llm_response_content = json.dumps({
-                    "action": final_action,
-                    "quantity": final_quantity,
-                    "confidence": decision_json.get("confidence", 0.5),
-                    "agent_signals": agent_signals,
-                    "reasoning": f"风险管理建议{trading_action}，强制执行。"
-                }, ensure_ascii=False)
-            final_decision_message = HumanMessage(content=llm_response_content, name=agent_name)
-
-    # 规则3: 资金校验 - 买入时检查现金是否充足
-    # 确保不会超出可用资金进行交易
-    if final_action == "buy" and current_price > 0:
-        required_cash = final_quantity * current_price
-        available_cash = portfolio.get("cash", 0)
-        if required_cash > available_cash:
-            max_shares = int(available_cash / current_price)
-            logger.warning(f"现金不足，需要{required_cash:.2f}元，现有{available_cash:.2f}元，调整为{max_shares}股")
-            final_quantity = max_shares
-            if final_quantity <= 0:
-                final_action = "hold"
-            llm_response_content = json.dumps({
-                "action": final_action,
-                "quantity": final_quantity,
-                "confidence": decision_json.get("confidence", 0.5),
-                "agent_signals": agent_signals,
-                "reasoning": f"现金不足，原计划买入{final_quantity}股，现调整为{max_shares}股"
-            }, ensure_ascii=False)
-            final_decision_message = HumanMessage(content=llm_response_content, name=agent_name)
-
-    # 规则4: 持仓校验 - 卖出时检查持仓是否充足
-    # 确保不会卖出超过实际持有的股票数量
-    if final_action == "sell":
-        available_stock = portfolio.get("stock", 0)
-        if final_quantity > available_stock:
-            logger.warning(f"持仓不足，需要卖出{final_quantity}股，现有{available_stock}股，调整为{available_stock}股")
-            final_quantity = available_stock
-            if final_quantity <= 0:
-                final_action = "hold"
-                final_quantity = 0
-            llm_response_content = json.dumps({
-                "action": final_action,
-                "quantity": final_quantity,
-                "confidence": decision_json.get("confidence", 0.5),
-                "agent_signals": agent_signals,
-                "reasoning": f"持仓不足，原计划卖出{final_quantity}股，现调整为{available_stock}股"
-            }, ensure_ascii=False)
-            final_decision_message = HumanMessage(content=llm_response_content, name=agent_name)
-
-    # 规则5: 最大持仓校验
-    # 确保总持仓不超过风险管理Agent设定的上限
-    if max_position > 0 and final_action == "buy":
-        current_position = portfolio.get("stock", 0)
-        potential_position = current_position + final_quantity
-        if potential_position > max_position:
-            allowed_quantity = int(max_position - current_position)
-            if allowed_quantity < 0:
-                allowed_quantity = 0
-            logger.warning(f"超过最大持仓限制，需要{final_quantity}股，最大允许{max_position}股，调整为{allowed_quantity}股")
-            final_quantity = allowed_quantity
-            if final_quantity <= 0:
-                final_action = "hold"
-            llm_response_content = json.dumps({
-                "action": final_action,
-                "quantity": final_quantity,
-                "confidence": decision_json.get("confidence", 0.5),
-                "agent_signals": agent_signals,
-                "reasoning": f"超过最大持仓限制{max_position}股，调整为{final_quantity}股"
-            }, ensure_ascii=False)
-            final_decision_message = HumanMessage(content=llm_response_content, name=agent_name)
+    # 创建决策验证器并执行验证
+    validator = create_decision_validator()
+    config = get_config()
+    
+    validation_context = {
+        "risk_score": risk_score,
+        "risk_action": trading_action,
+        "max_position": max_position,
+        "portfolio": portfolio,
+        "current_price": current_price,
+        "enable_veto_power": config.enable_veto_power if config._config else False,
+    }
+    
+    initial_decision = {
+        "action": final_action,
+        "quantity": final_quantity,
+        "confidence": decision_json.get("confidence", 0.5),
+        "reasoning": decision_json.get("reasoning", ""),
+    }
+    
+    # 执行验证
+    validation_result = validator.validate(initial_decision, validation_context)
+    
+    # 应用验证结果
+    final_action = validation_result.action
+    final_quantity = validation_result.quantity
+    
+    # 构造最终决策消息
+    llm_response_content = json.dumps({
+        "action": final_action,
+        "quantity": final_quantity,
+        "confidence": validation_result.confidence,
+        "agent_signals": parsed_agent_signals if parsed_agent_signals else agent_signals,
+        "reasoning": validation_result.reason,
+        "validation_overridden": validation_result.overridden,
+    }, ensure_ascii=False)
+    
+    final_decision_message = HumanMessage(content=llm_response_content, name=agent_name)
 
     # ==================== 步骤12: 输出最终决策日志 ====================
     logger.info("="*60)

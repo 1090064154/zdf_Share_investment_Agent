@@ -6,6 +6,7 @@ from langchain_core.messages import HumanMessage
 
 from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status
 from src.utils.api_utils import agent_endpoint, log_llm_interaction
+from src.utils.error_handler import resilient_agent
 
 import json
 import pandas as pd
@@ -38,6 +39,7 @@ def _build_fallback_analysis(reason: str) -> dict:
 
 
 ##### Technical Analyst #####
+@resilient_agent
 @agent_endpoint("technical_analyst", "技术分析师，提供基于价格走势、指标和技术模式的交易信号")
 def technical_analyst_agent(state: AgentState):
     """

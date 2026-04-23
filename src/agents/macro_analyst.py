@@ -3,6 +3,7 @@ from src.agents.state import AgentState, show_agent_reasoning, show_workflow_sta
 from src.tools.news_crawler import get_stock_news
 from src.utils.logging_config import setup_logger
 from src.utils.api_utils import agent_endpoint, log_llm_interaction
+from src.utils.error_handler import resilient_agent
 import json
 from datetime import datetime, timedelta
 from src.tools.openrouter_config import get_chat_completion
@@ -26,6 +27,7 @@ def _normalize_news_item(news: dict) -> dict:
     }
 
 
+@resilient_agent
 @agent_endpoint("macro_analyst", "宏观分析师，分析宏观经济环境对目标股票的影响")
 def macro_analyst_agent(state: AgentState):
     """Responsible for macro analysis"""

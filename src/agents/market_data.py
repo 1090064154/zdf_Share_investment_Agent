@@ -4,6 +4,7 @@ from src.agents.state import AgentState, show_agent_reasoning, show_workflow_sta
 from src.tools.api import get_financial_metrics, get_financial_statements, get_market_data, get_price_history, get_industry
 from src.utils.logging_config import setup_logger
 from src.utils.api_utils import agent_endpoint, log_llm_interaction
+from src.utils.error_handler import resilient_agent
 
 from datetime import datetime, timedelta
 import pandas as pd
@@ -22,6 +23,7 @@ def _has_meaningful_records(value) -> bool:
     return bool(value)
 
 
+@resilient_agent(critical=True)
 @agent_endpoint("market_data", "市场数据收集，负责获取股价历史、财务指标和市场信息")
 def market_data_agent(state: AgentState):
     """Responsible for gathering and preprocessing market data"""

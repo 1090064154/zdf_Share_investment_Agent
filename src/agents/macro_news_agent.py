@@ -11,6 +11,7 @@ from src.utils.api_utils import agent_endpoint  # Added for alignment
 from src.tools.openrouter_config import get_chat_completion
 from src.tools.news_crawler import get_stock_news
 from langchain_core.messages import HumanMessage  # Added import
+from src.utils.error_handler import resilient_agent
 
 # LLM Prompt for analyzing full news data
 LLM_PROMPT_MACRO_ANALYSIS = """你是一名资深的A股市场宏观分析师。请根据以下提供的沪深300指数（代码：000300）当日的**全部新闻数据**，进行深入分析并生成一份专业的宏观总结报告。
@@ -52,6 +53,7 @@ def _resolve_analysis_date(state: AgentState) -> str:
     return datetime.now().strftime("%Y-%m-%d")
 
 
+@resilient_agent
 @agent_endpoint("macro_news_agent", "获取沪深300全量新闻并进行宏观分析，为投资决策提供市场层面的宏观环境评估")
 def macro_news_agent(state: AgentState) -> Dict[str, Any]:
     """
