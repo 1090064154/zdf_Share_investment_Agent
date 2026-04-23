@@ -1000,3 +1000,75 @@ def get_price_data(
         包含价格数据的DataFrame
     """
     return get_price_history(ticker, start_date, end_date)
+
+
+def get_industry(symbol: str) -> str:
+    """获取股票所属行业
+
+    Args:
+        symbol: 股票代码
+
+    Returns:
+        行业名称，如果获取失败返回空字符串
+    """
+    industry_cache_file = "src/data/industry_cache.json"
+
+    # 尝试从缓存获取
+    try:
+        if os.path.exists(industry_cache_file):
+            with open(industry_cache_file, 'r', encoding='utf-8') as f:
+                cache = json.load(f)
+                if symbol in cache:
+                    cached_industry = cache[symbol].get("industry", "")
+                    logger.info(f"使用缓存的行业信息: {cached_industry}")
+                    return cached_industry
+    except Exception as e:
+        logger.warning(f"读取行业缓存失败: {e}")
+
+    # 备选方案1: 通过研报数据获取行业
+    try:
+        import akshare as ak
+        rating_df = ak.stock_research_report_em(symbol=symbol)
+        if rating_df is not None and not rating_df.empty and '行业' in rating_df.columns:
+            industry = str(rating_df.iloc[0].get('行业', ''))
+            if industry and industry not in ['nan', 'None', '']:
+                logger.info(f"通过研报获取行业: {industry}")
+                _cache_industry(symbol, industry, industry_cache_file)
+                return industry
+    except Exception as e:
+        logger.debug(f"研报获取行业失败: {e}")
+
+    # 备选方案2: 通过 stock_info_a_code_name 获取
+    try:
+        stock_info = ak.stock_info_a_code_name()
+        if stock_info is not None and not stock_info.empty:
+            match = stock_info[stock_info['code'] == symbol]
+            if not match.empty:
+                name = str(match.iloc[0].get('name', ''))
+                if name:
+                    # 可以尝试通过名称匹配行业，但这不太可靠
+                    logger.info(f"找到股票名称: {name}")
+    except Exception as e:
+        logger.debug(f"stock_info_a_code_name 获取失败: {e}")
+
+    logger.warning(f"无法获取股票 {symbol} 的行业信息")
+    return ""
+
+
+def _cache_industry(symbol: str, industry: str, cache_file: str) -> None:
+    """缓存行业信息"""
+    try:
+        cache = {}
+        if os.path.exists(cache_file):
+            with open(cache_file, 'r', encoding='utf-8') as f:
+                cache = json.load(f)
+        cache[symbol] = {
+            "industry": industry,
+            "updated": datetime.now().isoformat()
+        }
+        os.makedirs(os.path.dirname(cache_file), exist_ok=True)
+        with open(cache_file, 'w', encoding='utf-8') as f:
+            json.dump(cache, f, ensure_ascii=False, indent=2)
+        logger.info(f"行业信息已缓存: {symbol} -> {industry}")
+    except Exception as e:
+        logger.warning(f"缓存行业信息失败: {e}")

@@ -200,7 +200,10 @@ class DecisionEngine:
             'action': action,
             'quantity': quantity,
             'confidence': confidence,
-            'reason': self._generate_reason(weighted_signals, total_score, action)
+            'reason': self._generate_reason(
+                weighted_signals, total_score, action,
+                bullish_count, bearish_count, neutral_count, risk_score
+            )
         }
 
     def _calculate_buy_quantity(self, portfolio: Dict, risk_score: float, macro_factor: float) -> int:
@@ -221,25 +224,51 @@ class DecisionEngine:
 
         return int(adjusted_quantity)
 
-    def _generate_reason(self, weighted_signals: Dict, total_score: float, action: str) -> str:
+    def _generate_reason(self, weighted_signals: Dict, total_score: float, action: str, 
+                         bullish_count: int = 0, bearish_count: int = 0, 
+                         neutral_count: int = 0, risk_score: float = 0) -> str:
         """
-        生成决策理由
+        生成详细决策理由
         """
         reasons = []
-
-        positive = [(k, v['value']) for k, v in weighted_signals.items() if v['value'] > 0]
+        
+        reasons.append(f"看多{bullish_count}个、看空{bearish_count}个、中性{neutral_count}个")
+        
+        reasons.append(f"加权总分: {total_score:.3f}")
+        
+        positive = [(k, v['value'], v['raw_signal'], v['confidence']) for k, v in weighted_signals.items() if v['value'] > 0]
         positive.sort(key=lambda x: x[1], reverse=True)
-
-        if positive:
-            reasons.append(f"正向因素: {positive[0][0]}")
-
-        negative = [(k, v['value']) for k, v in weighted_signals.items() if v['value'] < 0]
+        
+        negative = [(k, v['value'], v['raw_signal'], v['confidence']) for k, v in weighted_signals.items() if v['value'] < 0]
         negative.sort(key=lambda x: x[1])
-
+        
+        if positive:
+            reasons.append("正向因素:")
+            for name, val, signal, conf in positive[:4]:
+                reasons.append(f"  - {name}({signal}): {val:.3f}(置信度{conf:.0%})")
+        
         if negative:
-            reasons.append(f"负向因素: {negative[0][0]}")
-
-        reasons.append(f"总分: {total_score:.3f}")
+            reasons.append("负向因素:")
+            for name, val, signal, conf in negative[:4]:
+                reasons.append(f"  - {name}({signal}): {val:.3f}(置信度{conf:.0%})")
+        
+        reasons.append(f"风险评分: {risk_score:.0f}/10")
+        
+        if action == 'buy':
+            if bullish_count >= 4 and total_score > 0.3:
+                reasons.append("触发规则: 多数看多(>=4)且总分>0.3，建议买入")
+            else:
+                reasons.append(f"触发规则: 综合评估，建议买入")
+        elif action == 'sell':
+            if bearish_count >= 3 or total_score < -0.3:
+                reasons.append("触发规则: 多数看空(>=3)或总分<-0.3，建议卖出")
+            else:
+                reasons.append(f"触发规则: 综合评估，建议卖出")
+        else:
+            if bullish_count >= 3 and risk_score >= 5:
+                reasons.append("触发规则: 看多但风险偏高，观望")
+            else:
+                reasons.append("触发规则: 信号均衡或不符合买入条件，观望")
 
         return '; '.join(reasons)
 

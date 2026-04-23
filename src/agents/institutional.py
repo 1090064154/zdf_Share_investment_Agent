@@ -73,33 +73,37 @@ def _get_fund_holding_data(ticker: str) -> dict:
     try:
         import akshare as ak
         try:
-            # 获取基金持仓数据
-            fund_df = ak.stock_fund_flow(stock=ticker)
+            # 判断市场
+            market = "sz" if ticker.startswith("00") or ticker.startswith("30") else "sh"
+            # 获取个股资金流向数据
+            fund_df = ak.stock_individual_fund_flow(stock=ticker, market=market)
             if fund_df is not None and len(fund_df) > 0:
-                # 计算基金持仓变化
+                # 取最新一天的主力净流入
                 latest = fund_df.iloc[0]
-                if '基金持仓变化' in latest:
-                    change = float(str(latest['基金持仓变化']).replace('%', '').replace(',', ''))
-                    if change > 1:
-                        signal = 'bullish'
-                        confidence = min(0.4 + change * 0.1, 0.8)
-                        reason = f"基金增持{change:.2f}%"
-                    elif change < -1:
-                        signal = 'bearish'
-                        confidence = min(0.4 + abs(change) * 0.1, 0.8)
-                        reason = f"基金减持{abs(change):.2f}%"
-                    else:
-                        signal = 'neutral'
-                        confidence = 0.4
-                        reason = "基金持仓变化不大"
+                main_inflow = latest.get('主力净流入-净额', 0) or 0
+                main_ratio = latest.get('主力净流入-净占比', 0) or 0
+                
+                # 判断信号
+                if main_inflow > 0 and main_ratio > 5:
+                    signal = 'bullish'
+                    confidence = min(0.4 + main_ratio * 0.05, 0.8)
+                    reason = f"主力净流入{main_inflow/10000:.1f}万({main_ratio:.1f}%)"
+                elif main_inflow < 0 and main_ratio < -5:
+                    signal = 'bearish'
+                    confidence = min(0.4 + abs(main_ratio) * 0.05, 0.8)
+                    reason = f"主力净流出{abs(main_inflow)/10000:.1f}万({abs(main_ratio):.1f}%)"
+                else:
+                    signal = 'neutral'
+                    confidence = 0.4
+                    reason = "主力资金流动不明显"
 
-                    return {
-                        'signal': signal,
-                        'confidence': confidence,
-                        'change': change,
-                        'reason': reason,
-                        'source': 'fund'
-                    }
+                return {
+                    'signal': signal,
+                    'confidence': float(confidence),
+                    'change': float(main_ratio),
+                    'reason': reason,
+                    'source': 'fund'
+                }
         except Exception as e:
             logger.debug(f"基金持仓数据获取失败: {e}")
     except ImportError:

@@ -1,7 +1,7 @@
 from langchain_core.messages import HumanMessage
 from src.tools.openrouter_config import get_chat_completion
 from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status
-from src.tools.api import get_financial_metrics, get_financial_statements, get_market_data, get_price_history
+from src.tools.api import get_financial_metrics, get_financial_statements, get_market_data, get_price_history, get_industry
 from src.utils.logging_config import setup_logger
 from src.utils.api_utils import agent_endpoint, log_llm_interaction
 
@@ -95,6 +95,18 @@ def market_data_agent(state: AgentState):
         logger.error(f"  ❌ 获取市场数据失败: {str(e)}")
         market_data = {"market_cap": 0}
 
+    # 获取行业信息
+    logger.info("  [5/5] 获取行业信息...")
+    try:
+        industry = get_industry(ticker)
+        if industry:
+            logger.info(f"  ✅ 行业信息获取成功: {industry}")
+        else:
+            logger.warning(f"  ⚠️ 无法获取行业信息")
+    except Exception as e:
+        logger.error(f"  ❌ 获取行业信息失败: {str(e)}")
+        industry = ""
+
     # 确保数据格式正确
     if not isinstance(prices_df, pd.DataFrame):
         prices_df = pd.DataFrame(
@@ -132,6 +144,7 @@ def market_data_agent(state: AgentState):
             "financial_line_items": financial_line_items,
             "market_cap": market_data.get("market_cap", 0),
             "market_data": market_data,
+            "industry": industry,
         },
         "metadata": state["metadata"],
     }

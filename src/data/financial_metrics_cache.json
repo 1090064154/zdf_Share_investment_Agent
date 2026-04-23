@@ -70,5 +70,23 @@
       "price_to_sales": 0
     },
     "updated": "2026-04-22T15:34:21.451206"
+  },
+  "300059": {
+    "metrics": {
+      "return_on_equity": 0.1315,
+      "net_margin": 3.421198,
+      "operating_margin": 3.9735250000000004,
+      "revenue_growth": 0.135511,
+      "earnings_growth": 0.257486,
+      "book_value_growth": 0.1381,
+      "current_ratio": 1.3628,
+      "debt_to_equity": 0.766181,
+      "free_cash_flow_per_share": -0.6468,
+      "earnings_per_share": 0.7647,
+      "pe_ratio": 26.39,
+      "price_to_book": 3.47,
+      "price_to_sales": 19.61
+    },
+    "updated": "2026-04-23T09:25:32.381365"
   }
 }

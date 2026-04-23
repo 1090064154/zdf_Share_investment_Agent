@@ -1,144 +1,138 @@
-admin@admindeMacBook-Pro-101 A_Share_investment_Agent % poetry run python src/main.py --ticker 002714 --show-reasoning
+admin@admindeMacBook-Pro-101 A_Share_investment_Agent % poetry run python src/main.py --ticker 300059 --show-reasoning
 /Users/admin/Library/Caches/pypoetry/virtualenvs/a-share-investment-agent-AoZwxc4d-py3.11/lib/python3.11/site-packages/pydantic/_internal/_config.py:373: UserWarning: Valid config keys have changed in V2:
 * 'schema_extra' has been renamed to 'json_schema_extra'
   warnings.warn(message, UserWarning)
-2026-04-22 18:09:52 - api_calls - INFO - ✓ 已加载环境变量: /Users/admin/code/A_Share_investment_Agent/.env
-2026-04-22 18:09:52 - api_calls - INFO - ✓ Gemini 客户端初始化成功
-2026-04-22 18:09:52 - main_workflow - INFO - ============================================================
-2026-04-22 18:09:52 - main_workflow - INFO - STEP 0: 命令行参数解析完成
-2026-04-22 18:09:52 - main_workflow - INFO -   股票代码: 002714
-2026-04-22 18:09:52 - main_workflow - INFO -   开始日期: 默认一年前
-2026-04-22 18:09:52 - main_workflow - INFO -   结束日期: 昨天
-2026-04-22 18:09:52 - main_workflow - INFO -   初始资金: 100000.0
-2026-04-22 18:09:52 - main_workflow - INFO -   初始持仓: 0
-2026-04-22 18:09:52 - main_workflow - INFO -   新闻数量: 20
-2026-04-22 18:09:52 - main_workflow - INFO -   显示推理: True
-2026-04-22 18:09:52 - main_workflow - INFO - ============================================================
-2026-04-22 18:09:52 - main_workflow - INFO - Validated ticker: 002714 (SZSE Main exchange)
-2026-04-22 18:09:52 - main_workflow - INFO - ============================================================
-2026-04-22 18:09:52 - main_workflow - INFO - STEP 1: 计算日期范围
-2026-04-22 18:09:52 - main_workflow - INFO -   结束日期: 2026-04-21
-2026-04-22 18:09:52 - main_workflow - INFO -   开始日期: 2025-04-21
-2026-04-22 18:09:52 - main_workflow - INFO -   分析天数: 365 天
-2026-04-22 18:09:52 - main_workflow - INFO - ============================================================
-2026-04-22 18:09:52 - main_workflow - INFO - ============================================================
-2026-04-22 18:09:52 - main_workflow - INFO - STEP 2: 初始化投资组合
-2026-04-22 18:09:52 - main_workflow - INFO -   现金: 100000.00 元
-2026-04-22 18:09:52 - main_workflow - INFO -   持仓: 0 股
-2026-04-22 18:09:52 - main_workflow - INFO - ============================================================
+2026-04-23 11:46:29 - api_calls - INFO - ✓ 已加载环境变量: /Users/admin/code/A_Share_investment_Agent/.env
+2026-04-23 11:46:29 - api_calls - INFO - ✓ Gemini 客户端初始化成功
+2026-04-23 11:46:30 - main_workflow - INFO - ============================================================
+2026-04-23 11:46:30 - main_workflow - INFO - STEP 0: 命令行参数解析完成
+2026-04-23 11:46:30 - main_workflow - INFO -   股票代码: 300059
+2026-04-23 11:46:30 - main_workflow - INFO -   开始日期: 默认一年前
+2026-04-23 11:46:30 - main_workflow - INFO -   结束日期: 昨天
+2026-04-23 11:46:30 - main_workflow - INFO -   初始资金: 100000.0
+2026-04-23 11:46:30 - main_workflow - INFO -   初始持仓: 0
+2026-04-23 11:46:30 - main_workflow - INFO -   新闻数量: 20
+2026-04-23 11:46:30 - main_workflow - INFO -   显示推理: True
+2026-04-23 11:46:30 - main_workflow - INFO - ============================================================
+2026-04-23 11:46:30 - main_workflow - INFO - Validated ticker: 300059 (unknown exchange)
+2026-04-23 11:46:30 - main_workflow - INFO - ============================================================
+2026-04-23 11:46:30 - main_workflow - INFO - STEP 1: 计算日期范围
+2026-04-23 11:46:30 - main_workflow - INFO -   结束日期: 2026-04-22
+2026-04-23 11:46:30 - main_workflow - INFO -   开始日期: 2025-04-22
+2026-04-23 11:46:30 - main_workflow - INFO -   分析天数: 365 天
+2026-04-23 11:46:30 - main_workflow - INFO - ============================================================
+2026-04-23 11:46:30 - main_workflow - INFO - ============================================================
+2026-04-23 11:46:30 - main_workflow - INFO - STEP 2: 初始化投资组合
+2026-04-23 11:46:30 - main_workflow - INFO -   现金: 100000.00 元
+2026-04-23 11:46:30 - main_workflow - INFO -   持仓: 0 股
+2026-04-23 11:46:30 - main_workflow - INFO - ============================================================
 
 ============================================================
 🚀 开始执行工作流
-  Run ID: 2061ffa4-9e2e-4911-990b-f91eafc0aa26
-  股票: 002714
-  区间: 2025-04-21 ~ 2026-04-21
+  Run ID: cd233701-bb6a-496e-aba3-8ea73cfb1fcb
+  股票: 300059
+  区间: 2025-04-22 ~ 2026-04-22
   现金: 100000.00 元
   持仓: 0 股
 ============================================================
 
-2026-04-22 18:09:52 - main_workflow - INFO - STEP 3: 启动 LangGraph 工作流
-2026-04-22 18:09:52 - main_workflow - INFO -   run_id=2061ffa4-9e2e-4911-990b-f91eafc0aa26, ticker=002714, period=2025-04-21~2026-04-21
---- API状态已更新 Run ID: 2061ffa4-9e2e-4911-990b-f91eafc0aa26 ---
-2026-04-22 18:09:52 - main_workflow - INFO - Invoking compiled workflow graph for run_id=2061ffa4-9e2e-4911-990b-f91eafc0aa26
-2026-04-22 18:09:52 - agent_state - INFO - 🔄 市场数据Agent 正在分析...
-2026-04-22 18:09:52 - market_data_agent - INFO - ==================================================
-2026-04-22 18:09:52 - market_data_agent - INFO - 📊 [MARKET_DATA] 开始收集市场数据
-2026-04-22 18:09:52 - market_data_agent - INFO - ==================================================
-2026-04-22 18:09:52 - market_data_agent - INFO -   📈 股票代码: 002714
-2026-04-22 18:09:52 - market_data_agent - INFO -   📅 数据区间: 2025-04-21 ~ 2026-04-21
-2026-04-22 18:09:52 - market_data_agent - INFO -   [1/4] 获取价格历史...
-2026-04-22 18:09:52 - api - INFO -
-Getting price history for 002714...
-2026-04-22 18:09:52 - api - INFO - Start date: 2025-04-21
-2026-04-22 18:09:52 - api - INFO - End date: 2026-04-21
-2026-04-22 18:09:58 - api - INFO - Successfully fetched price history data (243 records)
-2026-04-22 18:09:58 - market_data_agent - INFO -   ✅ 获取到 243 条价格记录
-2026-04-22 18:09:58 - market_data_agent - INFO -   [2/4] 获取财务指标...
-2026-04-22 18:09:58 - api - INFO - Getting financial indicators for 002714...
-2026-04-22 18:09:58 - api - INFO - ✓ 使用缓存的财务指标数据
-2026-04-22 18:09:58 - market_data_agent - INFO -   ✅ 财务指标获取成功
-2026-04-22 18:09:58 - market_data_agent - INFO -   [3/4] 获取财务报表...
-2026-04-22 18:09:58 - api - INFO - Getting financial statements for 002714...
-2026-04-22 18:09:58 - api - INFO - Fetching balance sheet...
-2026-04-22 18:09:59 - api - INFO - ✓ Balance sheet fetched
-2026-04-22 18:09:59 - api - INFO - Fetching income statement...
-2026-04-22 18:09:59 - api - INFO - ✓ Income statement fetched
-2026-04-22 18:09:59 - api - INFO - Fetching cash flow statement...
-2026-04-22 18:09:59 - api - INFO - ✓ Cash flow statement fetched
-2026-04-22 18:09:59 - api - INFO - ✓ Latest period data processed successfully
-2026-04-22 18:09:59 - api - INFO - ✓ Previous period data processed successfully
-2026-04-22 18:09:59 - market_data_agent - INFO -   ✅ 财务报表获取成功
-2026-04-22 18:09:59 - market_data_agent - INFO -   [4/4] 获取市场数据...
-2026-04-22 18:09:59 - api - INFO - 使用缓存的市值: 260073408937.44998, 价格: 45.05
-2026-04-22 18:09:59 - api - INFO - ✓ 使用缓存的市值: 260073408937.44998
-2026-04-22 18:09:59 - market_data_agent - INFO -   ✅ 市场数据获取成功
-2026-04-22 18:09:59 - agent_state - INFO - {
-  "ticker": "002714",
-  "start_date": "2025-04-21",
-  "end_date": "2026-04-21",
+2026-04-23 11:46:30 - main_workflow - INFO - STEP 3: 启动 LangGraph 工作流
+2026-04-23 11:46:30 - main_workflow - INFO -   run_id=cd233701-bb6a-496e-aba3-8ea73cfb1fcb, ticker=300059, period=2025-04-22~2026-04-22
+--- API状态已更新 Run ID: cd233701-bb6a-496e-aba3-8ea73cfb1fcb ---
+2026-04-23 11:46:30 - main_workflow - INFO - Invoking compiled workflow graph for run_id=cd233701-bb6a-496e-aba3-8ea73cfb1fcb
+2026-04-23 11:46:30 - agent_state - INFO - 🔄 市场数据Agent 正在分析...
+2026-04-23 11:46:30 - market_data_agent - INFO - ==================================================
+2026-04-23 11:46:30 - market_data_agent - INFO - 📊 [MARKET_DATA] 开始收集市场数据
+2026-04-23 11:46:30 - market_data_agent - INFO - ==================================================
+2026-04-23 11:46:30 - market_data_agent - INFO -   📈 股票代码: 300059
+2026-04-23 11:46:30 - market_data_agent - INFO -   📅 数据区间: 2025-04-22 ~ 2026-04-22
+2026-04-23 11:46:30 - market_data_agent - INFO -   [1/4] 获取价格历史...
+2026-04-23 11:46:30 - api - INFO -
+Getting price history for 300059...
+2026-04-23 11:46:30 - api - INFO - Start date: 2025-04-22
+2026-04-23 11:46:30 - api - INFO - End date: 2026-04-22
+2026-04-23 11:46:45 - api - INFO - Successfully fetched price history data (243 records)
+2026-04-23 11:46:45 - market_data_agent - INFO -   ✅ 获取到 243 条价格记录
+2026-04-23 11:46:45 - market_data_agent - INFO -   [2/4] 获取财务指标...
+2026-04-23 11:46:45 - api - INFO - Getting financial indicators for 300059...
+2026-04-23 11:46:45 - api - INFO - ✓ 使用缓存的财务指标数据
+2026-04-23 11:46:45 - market_data_agent - INFO -   ✅ 财务指标获取成功
+2026-04-23 11:46:45 - market_data_agent - INFO -   [3/4] 获取财务报表...
+2026-04-23 11:46:45 - api - INFO - Getting financial statements for 300059...
+2026-04-23 11:46:45 - api - INFO - Fetching balance sheet...
+2026-04-23 11:46:45 - api - INFO - ✓ Balance sheet fetched
+2026-04-23 11:46:45 - api - INFO - Fetching income statement...
+2026-04-23 11:46:46 - api - INFO - ✓ Income statement fetched
+2026-04-23 11:46:46 - api - INFO - Fetching cash flow statement...
+2026-04-23 11:46:47 - api - INFO - ✓ Cash flow statement fetched
+2026-04-23 11:46:47 - api - INFO - ✓ Latest period data processed successfully
+2026-04-23 11:46:47 - api - INFO - ✓ Previous period data processed successfully
+2026-04-23 11:46:47 - market_data_agent - INFO -   ✅ 财务报表获取成功
+2026-04-23 11:46:47 - market_data_agent - INFO -   [4/4] 获取市场数据...
+2026-04-23 11:46:47 - api - INFO - 使用缓存的市值: 315132511239.5, 价格: 19.94
+2026-04-23 11:46:47 - api - INFO - ✓ 使用缓存的市值: 315132511239.5
+2026-04-23 11:46:47 - market_data_agent - INFO -   ✅ 市场数据获取成功
+2026-04-23 11:46:47 - market_data_agent - INFO -   [5/5] 获取行业信息...
+2026-04-23 11:46:47 - api - INFO - 使用缓存的行业信息: 证券Ⅱ
+2026-04-23 11:46:47 - market_data_agent - INFO -   ✅ 行业信息获取成功: 证券Ⅱ
+2026-04-23 11:46:47 - agent_state - INFO - {
+  "ticker": "300059",
+  "start_date": "2025-04-22",
+  "end_date": "2026-04-22",
   "data_collected": {
     "price_history": true,
     "financial_metrics": true,
     "financial_statements": true,
     "market_data": true
   },
-  "summary": "\u4e3a002714\u6536\u96c6\u4e86\u4ece2025-04-21\u52302026-04-21\u7684\u5e02\u573a\u6570\u636e\uff0c\u5305\u62ec\u4ef7\u683c\u5386\u53f2\u3001\u8d22\u52a1\u6307\u6807\u548c\u5e02\u573a\u4fe1\u606f"
+  "summary": "\u4e3a300059\u6536\u96c6\u4e86\u4ece2025-04-22\u52302026-04-22\u7684\u5e02\u573a\u6570\u636e\uff0c\u5305\u62ec\u4ef7\u683c\u5386\u53f2\u3001\u8d22\u52a1\u6307\u6807\u548c\u5e02\u573a\u4fe1\u606f"
 }
-2026-04-22 18:09:59 - agent_state - INFO - 🔄 技术分析师 正在分析...
-2026-04-22 18:09:59 - sentiment_agent - INFO - ==================================================
-2026-04-22 18:09:59 - agent_state - INFO - 🔄 基本面分析师 正在分析...
-2026-04-22 18:09:59 - technical_analyst_agent - INFO - ==================================================
-2026-04-22 18:09:59 - sentiment_agent - INFO - [情绪分析Agent] 开始执行
-2026-04-22 18:09:59 - agent_state - INFO - 🔄 估值Agent 正在分析...
-2026-04-22 18:09:59 - fundamentals_agent - INFO - ==================================================
-2026-04-22 18:09:59 - technical_analyst_agent - INFO - 📈 [TECHNICAL] 开始技术分析
-2026-04-22 18:09:59 - valuation_agent - INFO - ==================================================
-2026-04-22 18:09:59 - technical_analyst_agent - INFO - ==================================================
-2026-04-22 18:09:59 - sentiment_agent - INFO - ==================================================
-2026-04-22 18:09:59 - agent_state - INFO - 🔄 情绪分析师 正在分析...
-2026-04-22 18:09:59 - fundamentals_agent - INFO - 📝 [FUNDAMENTALS] 开始基本面分析
-2026-04-22 18:09:59 - technical_analyst_agent - INFO - Technical analyst received price frame: rows=243 columns=['date', 'open', 'close', 'high', 'low', 'amount', 'volume', 'amplitude', 'pct_change', 'change_amount', 'turnover', 'momentum_1m', 'momentum_3m', 'momentum_6m', 'volume_ma20', 'volume_momentum', 'historical_volatility', 'volatility_regime', 'volatility_z_score', 'atr', 'atr_ratio', 'hurst_exponent', 'skewness', 'kurtosis']
-2026-04-22 18:09:59 - valuation_agent - INFO - 💰 [VALUATION] 开始估值分析
-2026-04-22 18:09:59 - fundamentals_agent - INFO - ==================================================
-2026-04-22 18:09:59 - valuation_agent - INFO - ==================================================
-2026-04-22 18:09:59 - sentiment_agent - INFO - [情绪分析Agent] 股票代码: 002714
-2026-04-22 18:09:59 - agent_state - INFO - {
-  "signal": "bearish",
-  "confidence": "50%",
+2026-04-23 11:46:47 - agent_state - INFO - 🔄 技术分析师 正在分析...
+2026-04-23 11:46:47 - technical_analyst_agent - INFO - ==================================================
+2026-04-23 11:46:47 - agent_state - INFO - 🔄 基本面分析师 正在分析...
+2026-04-23 11:46:47 - fundamentals_agent - INFO - ==================================================
+2026-04-23 11:46:47 - technical_analyst_agent - INFO - 📈 [TECHNICAL] 开始技术分析
+2026-04-23 11:46:47 - technical_analyst_agent - INFO - ==================================================
+2026-04-23 11:46:47 - technical_analyst_agent - INFO - Technical analyst received price frame: rows=243 columns=['date', 'open', 'close', 'high', 'low', 'amount', 'volume', 'amplitude', 'pct_change', 'change_amount', 'turnover', 'momentum_1m', 'momentum_3m', 'momentum_6m', 'volume_ma20', 'volume_momentum', 'historical_volatility', 'volatility_regime', 'volatility_z_score', 'atr', 'atr_ratio', 'hurst_exponent', 'skewness', 'kurtosis']
+2026-04-23 11:46:47 - fundamentals_agent - INFO - 📝 [FUNDAMENTALS] 开始基本面分析
+2026-04-23 11:46:47 - fundamentals_agent - INFO - ==================================================
+2026-04-23 11:46:47 - agent_state - INFO - {
+  "signal": "neutral",
+  "confidence": "33%",
   "reasoning": {
     "profitability_signal": {
-      "signal": "bearish",
-      "details": "\u51c0\u8d44\u4ea7\u6536\u76ca\u7387(ROE): -1.39%, \u51c0\u5229\u7387(Net Margin): -4.09%, \u8425\u4e1a\u5229\u6da6\u7387(Op Margin): -3.19%"
+      "signal": "bullish",
+      "details": "\u51c0\u8d44\u4ea7\u6536\u76ca\u7387(ROE): 13.15%, \u51c0\u5229\u7387(Net Margin): 342.12%, \u8425\u4e1a\u5229\u6da6\u7387(Op Margin): 397.35%"
     },
     "growth_signal": {
-      "signal": "bearish",
-      "details": "\u8425\u6536\u589e\u957f\u7387(Revenue Growth): -17.10%, \u76c8\u5229\u589e\u957f\u7387(Earnings Growth): -126.46%"
+      "signal": "bullish",
+      "details": "\u8425\u6536\u589e\u957f\u7387(Revenue Growth): 13.55%, \u76c8\u5229\u589e\u957f\u7387(Earnings Growth): 25.75%"
     },
     "financial_health_signal": {
-      "signal": "neutral",
-      "details": "\u6d41\u52a8\u6bd4\u7387(Current Ratio): 0.91, \u8d1f\u503a\u6743\u76ca\u6bd4(D/E): 0.51"
+      "signal": "bearish",
+      "details": "\u6d41\u52a8\u6bd4\u7387(Current Ratio): 1.36, \u8d1f\u503a\u6743\u76ca\u6bd4(D/E): 0.77"
     },
     "price_ratios_signal": {
       "signal": "bearish",
-      "details": "\u5e02\u76c8\u7387(P/E): N/A, \u5e02\u51c0\u7387(P/B): 3.01, \u5e02\u9500\u7387(P/S): 8.70"
+      "details": "\u5e02\u76c8\u7387(P/E): 26.39, \u5e02\u51c0\u7387(P/B): 3.47, \u5e02\u9500\u7387(P/S): 19.61"
     },
     "pb_roe_analysis": {
       "signal": "neutral",
       "confidence": 0.5,
-      "reasoning": "PB(3.0), ROE(-0.0%)\u5904\u4e8e\u5408\u7406\u533a\u95f4",
+      "reasoning": "PB(3.5), ROE(0.1%)\u5904\u4e8e\u5408\u7406\u533a\u95f4",
       "pb_percentile": {
         "level": "medium",
-        "value": 3.01
+        "value": 3.47
       },
       "roe_percentile": {
-        "level": "low",
-        "value": -0.0139
+        "level": "medium",
+        "value": 0.1315
       }
     },
     "cyclical_analysis": {
       "is_cyclical": false,
-      "industry": "",
-      "reasoning": "\u65e0\u6cd5\u786e\u5b9a\u884c\u4e1a\uff0c\u9ed8\u8ba4\u975e\u5468\u671f\u80a1"
+      "industry": "\u8bc1\u5238\u2161",
+      "reasoning": "\u975e\u5468\u671f\u884c\u4e1a"
     },
     "revenue_quality_analysis": {
       "signal": "neutral",
@@ -147,39 +141,17 @@ Getting price history for 002714...
     }
   }
 }
-2026-04-22 18:09:59 - valuation_agent - INFO - Valuation inputs prepared: market_cap=260073408937.44998 metrics_keys=[] current_line_item_keys=['net_income', 'operating_revenue', 'operating_profit', 'working_capital', 'depreciation_and_amortization', 'capital_expenditure', 'free_cash_flow'] previous_line_item_keys=['net_income', 'operating_revenue', 'operating_profit', 'working_capital', 'depreciation_and_amortization', 'capital_expenditure', 'free_cash_flow']
-2026-04-22 18:09:59 - sentiment_agent - INFO - [情绪分析Agent] 新闻数量上限: 20
-2026-04-22 18:09:59 - agent_state - INFO - ✅ 基本面分析师 分析完成
-2026-04-22 18:09:59 - sentiment_agent - INFO - [情绪分析Agent] 截止日期: 2026-04-21
-2026-04-22 18:09:59 - agent_state - INFO - {
+2026-04-23 11:46:47 - agent_state - INFO - ✅ 基本面分析师 分析完成
+2026-04-23 11:46:47 - agent_state - INFO - {
   "signal": "bearish",
-  "confidence": "79%",
-  "reasoning": {
-    "dcf_analysis": {
-      "signal": "neutral",
-      "details": "DCF\u8ba1\u7b97\u65e0\u6548\uff08\u81ea\u7531\u73b0\u91d1\u6d41: $-1,222,150,012.25\uff09\uff0c\u5df2\u8df3\u8fc7"
-    },
-    "owner_earnings_analysis": {
-      "signal": "neutral",
-      "details": "\u6240\u6709\u8005\u6536\u76ca\u8ba1\u7b97\u65e0\u6548\uff0c\u5df2\u8df3\u8fc7"
-    },
-    "revenue_analysis": {
-      "signal": "bearish",
-      "details": "\u8425\u6536: 298.94\u4ebf, \u540c\u6bd4\u589e\u901f: -79.3%"
-    }
-  }
-}
-2026-04-22 18:09:59 - sentiment_agent - INFO - ------------------------------
-2026-04-22 18:09:59 - agent_state - INFO - {
-  "signal": "neutral",
-  "confidence": "11%",
+  "confidence": "41%",
   "strategy_signals": {
     "trend_following": {
       "signal": "neutral",
       "confidence": "50%",
       "metrics": {
-        "adx": 25.484922623062737,
-        "trend_strength": 0.2548492262306274,
+        "adx": 39.43895737680944,
+        "trend_strength": 0.3943895737680944,
         "volume_confirmation": 0.0,
         "ma_alignment": "neutral"
       }
@@ -188,30 +160,30 @@ Getting price history for 002714...
       "signal": "neutral",
       "confidence": "50%",
       "metrics": {
-        "z_score": -0.25570342794449874,
-        "price_vs_bb": 0.7419246125075154,
-        "rsi_14": 68.5349065880039,
-        "rsi_28": 42.92574806058367
+        "z_score": -0.49324602903097275,
+        "price_vs_bb": 0.7960847620678526,
+        "rsi_14": 60.73752711496747,
+        "rsi_28": 43.48785871964679
       }
     },
     "momentum": {
-      "signal": "neutral",
-      "confidence": "50%",
+      "signal": "bearish",
+      "confidence": "80%",
       "metrics": {
-        "momentum_1m": -0.07413517083056909,
-        "momentum_3m": -0.04203072808327657,
-        "momentum_6m": -0.14232300798607023,
-        "volume_momentum": 0.6471947837304745
+        "momentum_1m": 0.03330023563821349,
+        "momentum_3m": -0.19333549040909992,
+        "momentum_6m": -0.2172395993272418,
+        "volume_momentum": 1.1943447754742003
       }
     },
     "volatility": {
-      "signal": "bearish",
-      "confidence": "34%",
+      "signal": "neutral",
+      "confidence": "50%",
       "metrics": {
-        "historical_volatility": 0.48093487672039087,
-        "volatility_regime": 1.278187719398451,
-        "volatility_z_score": 1.0269884264301847,
-        "atr_ratio": 0.030547179293881135
+        "historical_volatility": 0.34314209513704486,
+        "volatility_regime": 1.2787069671144107,
+        "volatility_z_score": 0.8916227637859666,
+        "atr_ratio": 0.02852895370239272
       }
     },
     "statistical_arbitrage": {
@@ -219,114 +191,129 @@ Getting price history for 002714...
       "confidence": "50%",
       "metrics": {
         "hurst_exponent": 3.841714674574873e-15,
-        "skewness": -0.7202806278615007,
-        "kurtosis": 2.0912890981195233
+        "skewness": 0.2837992012508926,
+        "kurtosis": 1.6352712081178822
       }
     }
   }
 }
-2026-04-22 18:09:59 - sentiment_agent - INFO - [步骤1] 获取新闻数据
-2026-04-22 18:09:59 - agent_state - INFO - ✅ 估值Agent 分析完成
-2026-04-22 18:09:59 - sentiment_agent - INFO - ------------------------------
-2026-04-22 18:09:59 - agent_state - INFO - ✅ 技术分析师 分析完成
-成功创建或确认目录存在: src/data/stock_news
-新闻文件路径: src/data/stock_news/002714_news_2026-04-21.json
-缓存的新闻数量(13)不足，需要获取更多新闻(20条)
-开始获取002714的新闻数据...
-已解析股票名称: 牧原股份
-使用 Google 搜索获取新闻...
-搜索查询: ("牧原股份" OR "牧原股份" "002714" OR 002714) (股票 OR 个股 OR 公司) (新闻 OR 公告 OR 财经) after:2026-04-14 before:2026-04-21 (site:sina.com.cn OR site:finance.sina.com.cn OR site:cj.sina.com.cn OR site:163.com OR site:cnstock.com OR site:hexun.com)
-通过 Google 搜索成功获取到10条新闻
-合并缓存新闻(13条)和新获取新闻(0条)，总计13条
-成功保存13条新闻到文件: src/data/stock_news/002714_news_2026-04-21.json
-2026-04-22 18:10:36 - sentiment_agent - INFO - [新闻] 获取到 13 条新闻
-2026-04-22 18:10:36 - sentiment_agent - INFO - [新闻] 时间窗口: 2026-04-14 ~ 2026-04-21
-2026-04-22 18:10:36 - sentiment_agent - INFO - [新闻] 过滤后近期新闻: 13 条
-2026-04-22 18:10:36 - sentiment_agent - INFO - [新闻情绪] 开始分析...
-发现情感分析缓存文件
-使用缓存的情感分析结果
-2026-04-22 18:10:36 - sentiment_agent - INFO - [新闻情绪] 分析完成: score=0.100
-2026-04-22 18:10:36 - sentiment_agent - INFO - ------------------------------
-2026-04-22 18:10:36 - sentiment_agent - INFO - [步骤2] 获取股吧情绪
-2026-04-22 18:10:36 - sentiment_agent - INFO - ------------------------------
-2026-04-22 18:10:36 - guba_crawler - INFO - ========== [股吧情绪分析] 开始 ==========
-2026-04-22 18:10:36 - guba_crawler - INFO - [股吧情绪] 股票代码: 002714, 最大帖子数: 30
-2026-04-22 18:10:36 - guba_crawler - INFO - [股吧] 开始获取帖子列表: symbol=002714, max_posts=30, page=1
-2026-04-22 18:10:36 - guba_crawler - INFO - [缓存] 命中股吧缓存: src/data/guba_cache/002714_posts_p1_2026-04-22.json
-2026-04-22 18:10:36 - guba_crawler - INFO - [股吧] 使用缓存数据，返回 30 条帖子
-2026-04-22 18:10:36 - guba_crawler - INFO - [股吧情绪] 开始分析，帖子数=30, 分析上限=20
-2026-04-22 18:10:36 - guba_crawler - INFO - [股吧情绪] 调用LLM分析...
-2026-04-22 18:10:36 - llm_clients - INFO - 🔄 自动选择 OpenAI Compatible API
-2026-04-22 18:10:36 - llm_clients - INFO - ✓ OpenAI Compatible 客户端初始化成功
-2026-04-22 18:10:36 - llm_clients - INFO - 🔄 使用 OpenAI Compatible 模型: deepseek-chat
-2026-04-22 18:10:36 - llm_clients - INFO - 🔄 正在调用 OpenAI Compatible API...
-2026-04-22 18:10:38 - llm_clients - INFO - ✓ API 调用成功
-2026-04-22 18:10:38 - llm_clients - INFO - ✓ 成功获取 OpenAI Compatible 响应
-2026-04-22 18:10:38 - guba_crawler - INFO - [股吧情绪] LLM分析完成，耗时=1.82s
-2026-04-22 18:10:38 - guba_crawler - INFO - [股吧情绪] LLM结果: score=-0.40, 看多=5, 看空=8, 中性=7
-2026-04-22 18:10:38 - guba_crawler - INFO - [股吧情绪] 热度计算: 总阅读=37664, 总评论=86, 热度=4.63
-2026-04-22 18:10:38 - guba_crawler - INFO - [股吧情绪] 分析完成: score=-0.40, bull_ratio=0.25, bear_ratio=0.40
-2026-04-22 18:10:38 - guba_crawler - INFO - ========== [股吧情绪分析] 完成 ==========
-2026-04-22 18:10:38 - guba_crawler - INFO - [股吧情绪] 最终结果: score=-0.40, posts=30
-2026-04-22 18:10:38 - sentiment_agent - INFO - [股吧情绪] 获取完成: score=-0.400, posts=30
-2026-04-22 18:10:38 - sentiment_agent - INFO - ------------------------------
-2026-04-22 18:10:38 - sentiment_agent - INFO - [步骤3] 获取量化情绪指标
-2026-04-22 18:10:38 - sentiment_agent - INFO - ------------------------------
-2026-04-22 18:10:38 - quant_sentiment - INFO - ========== [量化情绪分析] 开始 ==========
-2026-04-22 18:10:38 - quant_sentiment - INFO - [量化情绪] 股票代码: 002714
-2026-04-22 18:10:38 - quant_sentiment - INFO - [缓存] 命中量化情绪缓存: src/data/quant_sentiment_cache/002714_2026-04-22.json
-2026-04-22 18:10:38 - quant_sentiment - INFO - [量化情绪] 使用缓存数据
-2026-04-22 18:10:38 - quant_sentiment - INFO - ========== [量化情绪分析] 完成(缓存) ==========
-2026-04-22 18:10:38 - sentiment_agent - INFO - [量化情绪] 获取完成: score=0.178
-2026-04-22 18:10:38 - sentiment_agent - INFO - ------------------------------
-2026-04-22 18:10:38 - sentiment_agent - INFO - [步骤4] 获取北向资金数据
-2026-04-22 18:10:38 - sentiment_agent - INFO - ------------------------------
-2026-04-22 18:10:38 - sentiment_agent - INFO - [北向资金] 获取完成: 北向资金0.00亿
-2026-04-22 18:10:38 - sentiment_agent - INFO - ------------------------------
-2026-04-22 18:10:38 - sentiment_agent - INFO - [步骤5] 计算综合情绪分数
-2026-04-22 18:10:38 - sentiment_agent - INFO - ------------------------------
-2026-04-22 18:10:38 - sentiment_agent - INFO - [综合情绪] 开始计算综合情绪分数
-2026-04-22 18:10:38 - sentiment_agent - INFO - [综合情绪] 输入: news_score=0.100, guba_score=-0.400, quant_score=0.178, north_confidence=0.300
-2026-04-22 18:10:38 - sentiment_agent - INFO - [综合情绪] 股吧情绪: 原始=-0.400, 反向调整=0.000, 调整后=-0.200, 原因=股吧情绪处于中性区间
-2026-04-22 18:10:38 - sentiment_agent - INFO - [综合情绪] 北向资金: 北向资金0.00亿
-2026-04-22 18:10:38 - sentiment_agent - INFO - [综合情绪] 初始综合分数: 0.067
-2026-04-22 18:10:38 - sentiment_agent - INFO - [综合情绪] 最终权重: news=0.35, guba=0.15, quant=0.35, north=0.15
-2026-04-22 18:10:38 - sentiment_agent - INFO - [综合情绪] 交易信号判定: combined_score=0.067 -> signal=neutral
-2026-04-22 18:10:38 - sentiment_agent - INFO - [置信度] 最终置信度: 95% (基础=30, 数据源=60, 强度=2.02, 一致性=10)
-2026-04-22 18:10:38 - sentiment_agent - INFO - [综合情绪] 各数据源贡献: news=0.035, guba=-0.030, quant=0.062, north=0.075
-2026-04-22 18:10:38 - sentiment_agent - INFO - [综合情绪] 最终结果: combined_score=0.067, signal=neutral, confidence=95%
-2026-04-22 18:10:38 - agent_state - INFO - {
+2026-04-23 11:46:47 - agent_state - INFO - ✅ 技术分析师 分析完成
+2026-04-23 11:46:47 - sentiment_agent - INFO - ==================================================
+2026-04-23 11:46:47 - agent_state - INFO - 🔄 估值Agent 正在分析...
+2026-04-23 11:46:47 - valuation_agent - INFO - ==================================================
+2026-04-23 11:46:47 - sentiment_agent - INFO - [情绪分析Agent] 开始执行
+2026-04-23 11:46:47 - sentiment_agent - INFO - ==================================================
+2026-04-23 11:46:47 - agent_state - INFO - 🔄 情绪分析师 正在分析...
+2026-04-23 11:46:47 - sentiment_agent - INFO - [情绪分析Agent] 股票代码: 300059
+2026-04-23 11:46:47 - sentiment_agent - INFO - [情绪分析Agent] 新闻数量上限: 20
+2026-04-23 11:46:47 - sentiment_agent - INFO - [情绪分析Agent] 截止日期: 2026-04-22
+2026-04-23 11:46:47 - sentiment_agent - INFO - ------------------------------
+2026-04-23 11:46:47 - sentiment_agent - INFO - [步骤1] 获取新闻数据
+2026-04-23 11:46:47 - sentiment_agent - INFO - ------------------------------
+2026-04-23 11:46:47 - valuation_agent - INFO - 💰 [VALUATION] 开始估值分析
+2026-04-23 11:46:47 - valuation_agent - INFO - ==================================================
+2026-04-23 11:46:47 - valuation_agent - INFO - Valuation inputs prepared: market_cap=315132511239.5 metrics_keys=[] current_line_item_keys=['net_income', 'operating_revenue', 'operating_profit', 'working_capital', 'depreciation_and_amortization', 'capital_expenditure', 'free_cash_flow'] previous_line_item_keys=['net_income', 'operating_revenue', 'operating_profit', 'working_capital', 'depreciation_and_amortization', 'capital_expenditure', 'free_cash_flow']
+2026-04-23 11:46:47 - agent_state - INFO - {
+  "signal": "bearish",
+  "confidence": "71%",
+  "reasoning": {
+    "dcf_analysis": {
+      "signal": "bearish",
+      "details": "DCF\u5185\u5728\u4ef7\u503c: 1208.5\u4ebf, \u5e02\u503c: 3151.3\u4ebf, \u5dee\u8ddd: -61.7%"
+    },
+    "owner_earnings_analysis": {
+      "signal": "bearish",
+      "details": "\u6240\u6709\u8005\u6536\u76ca: 399.2\u4ebf"
+    }
+  }
+}
+2026-04-23 11:46:47 - agent_state - INFO - ✅ 估值Agent 分析完成
+2026-04-23 11:46:47 - sentiment_agent - INFO - [新闻] 获取到 20 条新闻
+2026-04-23 11:46:47 - sentiment_agent - INFO - [新闻] 时间窗口: 2026-04-15 ~ 2026-04-22
+2026-04-23 11:46:47 - sentiment_agent - INFO - [新闻] 过滤后近期新闻: 17 条
+2026-04-23 11:46:47 - sentiment_agent - INFO - [新闻情绪] 开始分析...
+2026-04-23 11:46:47 - sentiment_agent - INFO - [新闻情绪] 分析完成: score=-0.600
+2026-04-23 11:46:47 - sentiment_agent - INFO - ------------------------------
+2026-04-23 11:46:47 - sentiment_agent - INFO - [步骤2] 获取股吧情绪
+2026-04-23 11:46:47 - sentiment_agent - INFO - ------------------------------
+2026-04-23 11:46:47 - guba_crawler - INFO - ========== [股吧情绪分析] 开始 ==========
+2026-04-23 11:46:47 - guba_crawler - INFO - [股吧情绪] 股票代码: 300059, 最大帖子数: 30
+2026-04-23 11:46:47 - guba_crawler - INFO - [股吧] 开始获取帖子列表: symbol=300059, max_posts=30, page=1
+2026-04-23 11:46:47 - guba_crawler - INFO - [缓存] 命中股吧缓存: src/data/guba_cache/300059_posts_p1_2026-04-23.json
+2026-04-23 11:46:47 - guba_crawler - INFO - [股吧] 使用缓存数据，返回 30 条帖子
+2026-04-23 11:46:47 - guba_crawler - INFO - [股吧情绪] 开始分析，帖子数=30, 分析上限=20
+2026-04-23 11:46:47 - guba_crawler - INFO - [股吧情绪] 调用LLM分析...
+2026-04-23 11:46:47 - llm_clients - INFO - 🔄 自动选择 OpenAI Compatible API
+2026-04-23 11:46:47 - llm_clients - INFO - ✓ OpenAI Compatible 客户端初始化成功
+2026-04-23 11:46:47 - llm_clients - INFO - 🔄 使用 OpenAI Compatible 模型: deepseek-chat
+2026-04-23 11:46:47 - llm_clients - INFO - 🔄 正在调用 OpenAI Compatible API...
+2026-04-23 11:47:06 - llm_clients - INFO - ✓ API 调用成功
+2026-04-23 11:47:06 - llm_clients - INFO - ✓ 成功获取 OpenAI Compatible 响应
+2026-04-23 11:47:06 - guba_crawler - INFO - [股吧情绪] LLM分析完成，耗时=19.09s
+2026-04-23 11:47:06 - guba_crawler - INFO - [股吧情绪] LLM结果: score=0.30, 看多=8, 看空=1, 中性=11
+2026-04-23 11:47:06 - guba_crawler - INFO - [股吧情绪] 热度计算: 总阅读=47335, 总评论=415, 热度=8.88
+2026-04-23 11:47:06 - guba_crawler - INFO - [股吧情绪] 分析完成: score=0.30, bull_ratio=0.40, bear_ratio=0.05
+2026-04-23 11:47:06 - guba_crawler - INFO - ========== [股吧情绪分析] 完成 ==========
+2026-04-23 11:47:06 - guba_crawler - INFO - [股吧情绪] 最终结果: score=0.30, posts=30
+2026-04-23 11:47:06 - sentiment_agent - INFO - [股吧情绪] 获取完成: score=0.300, posts=30
+2026-04-23 11:47:06 - sentiment_agent - INFO - ------------------------------
+2026-04-23 11:47:06 - sentiment_agent - INFO - [步骤3] 获取量化情绪指标
+2026-04-23 11:47:06 - sentiment_agent - INFO - ------------------------------
+2026-04-23 11:47:06 - quant_sentiment - INFO - ========== [量化情绪分析] 开始 ==========
+2026-04-23 11:47:06 - quant_sentiment - INFO - [量化情绪] 股票代码: 300059
+2026-04-23 11:47:06 - quant_sentiment - INFO - [缓存] 命中量化情绪缓存: src/data/quant_sentiment_cache/300059_2026-04-23.json
+2026-04-23 11:47:06 - quant_sentiment - INFO - [量化情绪] 使用缓存数据
+2026-04-23 11:47:06 - quant_sentiment - INFO - ========== [量化情绪分析] 完成(缓存) ==========
+2026-04-23 11:47:06 - sentiment_agent - INFO - [量化情绪] 获取完成: score=0.273
+2026-04-23 11:47:06 - sentiment_agent - INFO - ------------------------------
+2026-04-23 11:47:06 - sentiment_agent - INFO - [步骤4] 获取北向资金数据
+2026-04-23 11:47:06 - sentiment_agent - INFO - ------------------------------
+2026-04-23 11:47:08 - sentiment_agent - INFO - [北向资金] 获取完成: 北向资金0.00亿
+2026-04-23 11:47:08 - sentiment_agent - INFO - ------------------------------
+2026-04-23 11:47:08 - sentiment_agent - INFO - [步骤5] 计算综合情绪分数
+2026-04-23 11:47:08 - sentiment_agent - INFO - ------------------------------
+2026-04-23 11:47:08 - sentiment_agent - INFO - [综合情绪] 开始计算综合情绪分数
+2026-04-23 11:47:08 - sentiment_agent - INFO - [综合情绪] 输入: news_score=-0.600, guba_score=0.300, quant_score=0.273, north_confidence=0.300
+2026-04-23 11:47:08 - sentiment_agent - INFO - [综合情绪] 股吧情绪: 原始=0.300, 反向调整=0.000, 调整后=0.150, 原因=股吧情绪处于中性区间
+2026-04-23 11:47:08 - sentiment_agent - INFO - [综合情绪] 北向资金: 北向资金0.00亿
+2026-04-23 11:47:08 - sentiment_agent - INFO - [综合情绪] 初始综合分数: -0.092
+2026-04-23 11:47:08 - sentiment_agent - INFO - [综合情绪] 最终权重: news=0.35, guba=0.15, quant=0.35, north=0.15
+2026-04-23 11:47:09 - sentiment_agent - INFO - [综合情绪] 交易信号判定: combined_score=-0.092 -> signal=neutral
+2026-04-23 11:47:09 - sentiment_agent - INFO - [置信度] 最终置信度: 93% (基础=30, 数据源=60, 强度=2.76, 一致性=0)
+2026-04-23 11:47:09 - sentiment_agent - INFO - [综合情绪] 各数据源贡献: news=-0.210, guba=0.022, quant=0.096, north=0.075
+2026-04-23 11:47:09 - sentiment_agent - INFO - [综合情绪] 最终结果: combined_score=-0.092, signal=neutral, confidence=93%
+2026-04-23 11:47:09 - agent_state - INFO - {
   "signal": "neutral",
-  "confidence": "95%",
-  "reasoning": "\u7efc\u5408\u60c5\u7eea\u5206\u6570: 0.07 \u2192 \u4fe1\u53f7: neutral (\u7f6e\u4fe1\u5ea6: 95%)\n\n\u3010\u6570\u636e\u6e90\u6743\u91cd\u5206\u914d\u3011\n  \u2022 news: 35%\n  \u2022 guba: 15%\n  \u2022 quant: 35%\n  \u2022 north: 15%\n\n\u3010\u5404\u6570\u636e\u6e90\u5206\u6790\u3011\n  \u65b0\u95fb\u60c5\u7eea: \u5206\u6570=0.10, \u6743\u91cd=35%, \u8d21\u732e=0.04, \u65b0\u95fb\u6570=13\n  \u80a1\u5427\u60c5\u7eea: \u5206\u6570=-0.40, \u53cd\u5411\u4fe1\u53f7=-0.20, \u8c03\u6574\u540e=-0.20, \u6743\u91cd=15%, \u8d21\u732e=-0.03\n    (\u5e16\u5b50\u6570=30, \u770b\u591a=25%, \u770b\u7a7a=40%, \u70ed\u5ea6=4.6)\n  \u91cf\u5316\u6307\u6807: \u5206\u6570=0.18, \u6743\u91cd=35%, \u8d21\u732e=0.06\n    (\u8bc4\u5206=70.2 \u8d8b\u52bf=down, \u673a\u6784\u53c2\u4e0e\u5ea6=39.1, \u5173\u6ce8\u5ea6=93.2)",
-  "combined_score": 0.067,
+  "confidence": "93%",
+  "reasoning": "\u7efc\u5408\u60c5\u7eea\u5206\u6570: -0.09 \u2192 \u4fe1\u53f7: neutral (\u7f6e\u4fe1\u5ea6: 93%)\n\n\u3010\u6570\u636e\u6e90\u6743\u91cd\u5206\u914d\u3011\n  \u2022 news: 35%\n  \u2022 guba: 15%\n  \u2022 quant: 35%\n  \u2022 north: 15%\n\n\u3010\u5404\u6570\u636e\u6e90\u5206\u6790\u3011\n  \u65b0\u95fb\u60c5\u7eea: \u5206\u6570=-0.60, \u6743\u91cd=35%, \u8d21\u732e=-0.21, \u65b0\u95fb\u6570=17\n  \u80a1\u5427\u60c5\u7eea: \u5206\u6570=0.30, \u53cd\u5411\u4fe1\u53f7=0.15, \u8c03\u6574\u540e=0.15, \u6743\u91cd=15%, \u8d21\u732e=0.02\n    (\u5e16\u5b50\u6570=30, \u770b\u591a=40%, \u770b\u7a7a=5%, \u70ed\u5ea6=8.9)\n  \u91cf\u5316\u6307\u6807: \u5206\u6570=0.27, \u6743\u91cd=35%, \u8d21\u732e=0.10\n    (\u8bc4\u5206=71.3 \u8d8b\u52bf=\u5e73\u7a33, \u673a\u6784\u53c2\u4e0e\u5ea6=52.9, \u5173\u6ce8\u5ea6=94.0)",
+  "combined_score": -0.092,
   "components": {
     "news": {
-      "score": 0.1,
+      "score": -0.6,
       "weight": 0.35,
-      "count": 13,
-      "contribution": 0.035
+      "count": 17,
+      "contribution": -0.21
     },
     "guba": {
-      "score": -0.4,
-      "reverse_signal": -0.2,
-      "adjusted_score": -0.2,
+      "score": 0.3,
+      "reverse_signal": 0.15,
+      "adjusted_score": 0.15,
       "weight": 0.15,
       "post_count": 30,
-      "bull_ratio": 0.25,
-      "bear_ratio": 0.4,
-      "heat": 4.63,
-      "contribution": -0.03,
+      "bull_ratio": 0.4,
+      "bear_ratio": 0.05,
+      "heat": 8.88,
+      "contribution": 0.022,
       "reverse_reason": "\u80a1\u5427\u60c5\u7eea\u5904\u4e8e\u4e2d\u6027\u533a\u95f4"
     },
     "quant": {
-      "score": 0.178,
+      "score": 0.273,
       "weight": 0.35,
-      "rating": 70.23,
-      "rating_trend": "down",
-      "institution": 39.13,
-      "focus": 93.2,
-      "contribution": 0.062
+      "rating": 71.3,
+      "rating_trend": "stable",
+      "institution": 52.93,
+      "focus": 94.0,
+      "contribution": 0.096
     },
     "north_money": {
       "signal": "neutral",
@@ -345,88 +332,59 @@ Getting price history for 002714...
     "north": 0.15
   }
 }
-2026-04-22 18:10:38 - agent_state - INFO - ✅ 情绪分析师 分析完成
-2026-04-22 18:10:38 - sentiment_agent - INFO - ==================================================
-2026-04-22 18:10:38 - sentiment_agent - INFO - [情绪分析Agent] 执行完成
-2026-04-22 18:10:38 - sentiment_agent - INFO - [情绪分析Agent] 最终结果: signal=neutral, confidence=95%, score=0.067
-2026-04-22 18:10:38 - sentiment_agent - INFO - ==================================================
-2026-04-22 18:10:38 - agent_state - INFO - 🔄 机构持仓分析师 正在分析...
-2026-04-22 18:10:38 - agent_state - INFO - 🔄 预期差分析师 正在分析...
-2026-04-22 18:10:38 - agent_state - INFO - 🔄 macro_news_agent: --- 正在执行宏观新闻 Agent --- 正在分析...
-2026-04-22 18:10:38 - institutional_agent - INFO - ==================================================
-2026-04-22 18:10:39 - agent_state - INFO - 🔄 行业周期分析师 正在分析...
-2026-04-22 18:10:39 - institutional_agent - INFO - 🏦 [INSTITUTIONAL] 开始机构持仓分析
-2026-04-22 18:10:39 - expectation_diff_agent - INFO - ==================================================
-2026-04-22 18:10:39 - institutional_agent - INFO - ==================================================
-2026-04-22 18:10:39 - macro_news_agent - INFO - ==================================================
-2026-04-22 18:10:39 - industry_cycle_agent - INFO - ==================================================
-2026-04-22 18:10:39 - expectation_diff_agent - INFO - 📊 [EXPECTATION_DIFF] 开始预期差分析
-2026-04-22 18:10:39 - institutional_agent - INFO -   股票代码: 002714
-2026-04-22 18:10:39 - expectation_diff_agent - INFO - ==================================================
-2026-04-22 18:10:39 - institutional_agent - INFO -   获取北向资金数据...
-2026-04-22 18:10:39 - industry_cycle_agent - INFO - 🔄 [INDUSTRY_CYCLE] 开始行业周期分析
-2026-04-22 18:10:39 - macro_news_agent - INFO - 📰 [MACRO_NEWS] 开始宏观新闻分析
-2026-04-22 18:10:39 - expectation_diff_agent - INFO -   股票代码: 002714
-2026-04-22 18:10:39 - industry_cycle_agent - INFO - ==================================================
-2026-04-22 18:10:39 - macro_news_agent - INFO - ==================================================
-2026-04-22 18:10:39 - expectation_diff_agent - INFO -   获取业绩预告数据...
-2026-04-22 18:10:39 - industry_cycle_agent - INFO -   股票代码: 002714
-2026-04-22 18:10:39 - industry_cycle_agent - INFO -   行业:
-2026-04-22 18:10:39 - expectation_diff_agent - INFO -   业绩预告: 无法获取业绩预告数据
-2026-04-22 18:10:39 - agent_state - INFO - {
-  "cycle_type": "unknown",
+2026-04-23 11:47:09 - agent_state - INFO - ✅ 情绪分析师 分析完成
+2026-04-23 11:47:09 - sentiment_agent - INFO - ==================================================
+2026-04-23 11:47:09 - sentiment_agent - INFO - [情绪分析Agent] 执行完成
+2026-04-23 11:47:09 - sentiment_agent - INFO - [情绪分析Agent] 最终结果: signal=neutral, confidence=93%, score=-0.092
+2026-04-23 11:47:09 - sentiment_agent - INFO - ==================================================
+2026-04-23 11:47:09 - agent_state - INFO - 🔄 macro_news_agent: --- 正在执行宏观新闻 Agent --- 正在分析...
+2026-04-23 11:47:09 - macro_news_agent - INFO - ==================================================
+2026-04-23 11:47:09 - agent_state - INFO - 🔄 预期差分析师 正在分析...
+2026-04-23 11:47:09 - expectation_diff_agent - INFO - ==================================================
+2026-04-23 11:47:09 - agent_state - INFO - 🔄 机构持仓分析师 正在分析...
+2026-04-23 11:47:09 - institutional_agent - INFO - ==================================================
+2026-04-23 11:47:09 - agent_state - INFO - 🔄 行业周期分析师 正在分析...
+2026-04-23 11:47:09 - industry_cycle_agent - INFO - ==================================================
+2026-04-23 11:47:09 - macro_news_agent - INFO - 📰 [MACRO_NEWS] 开始宏观新闻分析
+2026-04-23 11:47:09 - macro_news_agent - INFO - ==================================================
+2026-04-23 11:47:09 - industry_cycle_agent - INFO - 🔄 [INDUSTRY_CYCLE] 开始行业周期分析
+2026-04-23 11:47:09 - industry_cycle_agent - INFO - ==================================================
+2026-04-23 11:47:09 - industry_cycle_agent - INFO -   股票代码: 300059
+2026-04-23 11:47:09 - industry_cycle_agent - INFO -   行业: 证券Ⅱ
+2026-04-23 11:47:09 - agent_state - INFO - {
+  "cycle_type": "other",
   "phase": "",
   "signal": "neutral",
   "confidence": "30%",
   "reason": "\u975e\u5468\u671f\u80a1\uff0c\u6b63\u5e38\u5206\u6790",
   "weight_factor": 1.0,
-  "industry": "",
+  "industry": "\u8bc1\u5238\u2161",
   "raw_analysis": {
-    "cycle_type": "unknown",
+    "cycle_type": "other",
     "signal": "neutral",
     "confidence": 0.3
   }
 }
-2026-04-22 18:10:39 - expectation_diff_agent - INFO -   获取券商研报评级...
-2026-04-22 18:10:39 - agent_state - INFO - ✅ 行业周期分析师 分析完成
-2026-04-22 18:10:39 - expectation_diff_agent - INFO -   研报评级: 无法获取研报评级数据
-2026-04-22 18:10:39 - agent_state - INFO - {
-  "signal": "neutral",
-  "confidence": "30%",
-  "reason": "\u65e0\u9884\u671f\u5dee\u6570\u636e",
-  "earnings_forecast": {
-    "signal": "neutral",
-    "confidence": 0,
-    "growth": 0,
-    "reason": "\u65e0\u6cd5\u83b7\u53d6\u4e1a\u7ee9\u9884\u544a\u6570\u636e",
-    "source": "earnings_forecast"
-  },
-  "research_rating": {
-    "signal": "neutral",
-    "confidence": 0,
-    "buy_ratio": 0,
-    "total_reports": 0,
-    "reason": "\u65e0\u6cd5\u83b7\u53d6\u7814\u62a5\u8bc4\u7ea7\u6570\u636e",
-    "source": "research_rating"
-  },
-  "combined_analysis": {
-    "signal": "neutral",
-    "confidence": 0.3,
-    "reason": "\u65e0\u9884\u671f\u5dee\u6570\u636e"
-  }
-}
-2026-04-22 18:10:39 - industry_cycle_agent - INFO - [INDUSTRY_CYCLE] 分析完成: neutral, 非周期股，正常分析
-2026-04-22 18:10:39 - agent_state - INFO - 🔄 macro_news_agent: 从缓存加载 2026-04-21 的宏观新闻总结。 正在分析...
-2026-04-22 18:10:39 - agent_state - INFO - ✅ 预期差分析师 分析完成
-2026-04-22 18:10:39 - agent_state - INFO - Loaded macro summary for 2026-04-21 from cache. News count: 1
-2026-04-22 18:10:39 - expectation_diff_agent - INFO - [EXPECTATION_DIFF] 分析完成: neutral
-2026-04-22 18:10:39 - agent_state - INFO - 🔄 macro_news_agent: 执行完成。 正在分析...
-2026-04-22 18:10:39 - institutional_agent - INFO -   北向资金: 北向资金持股变化不大
-2026-04-22 18:10:39 - institutional_agent - INFO -   获取基金持仓数据...
-2026-04-22 18:10:39 - institutional_agent - INFO -   基金持仓: 无法获取基金持仓数据
-2026-04-22 18:10:39 - agent_state - INFO - {
-  "signal": "neutral",
-  "confidence": "40%",
+2026-04-23 11:47:09 - agent_state - INFO - ✅ 行业周期分析师 分析完成
+2026-04-23 11:47:09 - industry_cycle_agent - INFO - [INDUSTRY_CYCLE] 分析完成: neutral, 非周期股，正常分析
+2026-04-23 11:47:09 - institutional_agent - INFO - 🏦 [INSTITUTIONAL] 开始机构持仓分析
+2026-04-23 11:47:09 - institutional_agent - INFO - ==================================================
+2026-04-23 11:47:09 - institutional_agent - INFO -   股票代码: 300059
+2026-04-23 11:47:09 - institutional_agent - INFO -   获取北向资金数据...
+2026-04-23 11:47:09 - expectation_diff_agent - INFO - 📊 [EXPECTATION_DIFF] 开始预期差分析
+2026-04-23 11:47:09 - expectation_diff_agent - INFO - ==================================================
+2026-04-23 11:47:09 - expectation_diff_agent - INFO -   股票代码: 300059
+2026-04-23 11:47:09 - expectation_diff_agent - INFO -   获取业绩预告数据...
+2026-04-23 11:47:09 - agent_state - INFO - 🔄 macro_news_agent: 从缓存加载 2026-04-22 的宏观新闻总结。 正在分析...
+2026-04-23 11:47:09 - agent_state - INFO - Loaded macro summary for 2026-04-22 from cache. News count: 8
+2026-04-23 11:47:09 - agent_state - INFO - 🔄 macro_news_agent: 执行完成。 正在分析...
+ 17%|█████████████████████████████████████████████▎                                                                                                                                                                                                                                  | 1/6 [00:00<00:03,  1.38it/s]2026-04-23 11:47:11 - institutional_agent - INFO -   北向资金: 北向资金持股变化不大
+2026-04-23 11:47:11 - institutional_agent - INFO -   获取基金持仓数据...
+2026-04-23 11:47:11 - institutional_agent - INFO -   基金持仓: 主力净流入59482.2万(6.5%)
+2026-04-23 11:47:11 - agent_state - INFO - {
+  "signal": "bullish",
+  "confidence": "72%",
+  "reason": "\u673a\u6784\u6301\u4ed3\u4fe1\u53f7: \u5317\u5411\u5317\u5411\u8d44\u91d1\u6301\u80a1\u53d8\u5316\u4e0d\u5927, \u57fa\u91d1\u4e3b\u529b\u51c0\u6d41\u516559482.2\u4e07(6.5%)",
   "north_money": {
     "signal": "neutral",
     "confidence": 0.4,
@@ -435,16 +393,16 @@ Getting price history for 002714...
     "source": "north_money"
   },
   "fund_holding": {
-    "signal": "neutral",
-    "confidence": 0,
-    "change": 0,
-    "reason": "\u65e0\u6cd5\u83b7\u53d6\u57fa\u91d1\u6301\u4ed3\u6570\u636e",
+    "signal": "bullish",
+    "confidence": 0.7240000000000001,
+    "change": 6.48,
+    "reason": "\u4e3b\u529b\u51c0\u6d41\u516559482.2\u4e07(6.5%)",
     "source": "fund"
   },
   "combined_analysis": {
-    "signal": "neutral",
-    "confidence": 0.4,
-    "reason": "\u673a\u6784\u6301\u4ed3\u4fe1\u53f7: \u5317\u5411\u5317\u5411\u8d44\u91d1\u6301\u80a1\u53d8\u5316\u4e0d\u5927, \u57fa\u91d1\u65e0\u6cd5\u83b7\u53d6\u57fa\u91d1\u6301\u4ed3\u6570\u636e",
+    "signal": "bullish",
+    "confidence": 0.7240000000000001,
+    "reason": "\u673a\u6784\u6301\u4ed3\u4fe1\u53f7: \u5317\u5411\u5317\u5411\u8d44\u91d1\u6301\u80a1\u53d8\u5316\u4e0d\u5927, \u57fa\u91d1\u4e3b\u529b\u51c0\u6d41\u516559482.2\u4e07(6.5%)",
     "north_analysis": {
       "signal": "neutral",
       "confidence": 0.4,
@@ -453,20 +411,83 @@ Getting price history for 002714...
       "source": "north_money"
     },
     "fund_analysis": {
-      "signal": "neutral",
-      "confidence": 0,
-      "change": 0,
-      "reason": "\u65e0\u6cd5\u83b7\u53d6\u57fa\u91d1\u6301\u4ed3\u6570\u636e",
+      "signal": "bullish",
+      "confidence": 0.7240000000000001,
+      "change": 6.48,
+      "reason": "\u4e3b\u529b\u51c0\u6d41\u516559482.2\u4e07(6.5%)",
       "source": "fund"
     }
   }
 }
-2026-04-22 18:10:39 - agent_state - INFO - ✅ 机构持仓分析师 分析完成
-2026-04-22 18:10:39 - institutional_agent - INFO - [INSTITUTIONAL] 分析完成: neutral
-2026-04-22 18:10:39 - sentiment_agent - INFO - ==================================================
-2026-04-22 18:10:39 - agent_state - INFO - 🔄 看多研究员 正在分析...
-2026-04-22 18:10:39 - sentiment_agent - INFO - [情绪分析Agent] 开始执行
-2026-04-22 18:10:39 - agent_state - INFO - {
+2026-04-23 11:47:11 - agent_state - INFO - ✅ 机构持仓分析师 分析完成
+2026-04-23 11:47:11 - institutional_agent - INFO - [INSTITUTIONAL] 分析完成: bullish
+2026-04-23 11:47:13 - expectation_diff_agent - INFO -   业绩预告: 盈利预测增长21.3%
+2026-04-23 11:47:13 - expectation_diff_agent - INFO -   获取券商研报评级...
+2026-04-23 11:47:14 - expectation_diff_agent - INFO -   研报评级: 机构评级买入占比100%
+2026-04-23 11:47:14 - agent_state - INFO - {
+  "signal": "bullish",
+  "confidence": "75%",
+  "reason": "\u9884\u671f\u5dee\u5206\u6790: \u76c8\u5229\u9884\u6d4b\u589e\u957f21.3%, \u673a\u6784\u8bc4\u7ea7\u4e70\u5165\u5360\u6bd4100%",
+  "earnings_forecast": {
+    "signal": "bullish",
+    "confidence": 0.7,
+    "growth": 21.28273373991619,
+    "eps_2025": 0.764652375281,
+    "eps_2026": 0.927391304348,
+    "reason": "\u76c8\u5229\u9884\u6d4b\u589e\u957f21.3%",
+    "source": "earnings_forecast"
+  },
+  "research_rating": {
+    "signal": "bullish",
+    "confidence": 0.8,
+    "buy_ratio": 1.0,
+    "total_reports": 281,
+    "reason": "\u673a\u6784\u8bc4\u7ea7\u4e70\u5165\u5360\u6bd4100%",
+    "source": "research_rating"
+  },
+  "combined_analysis": {
+    "signal": "bullish",
+    "confidence": 0.75,
+    "reason": "\u9884\u671f\u5dee\u5206\u6790: \u76c8\u5229\u9884\u6d4b\u589e\u957f21.3%, \u673a\u6784\u8bc4\u7ea7\u4e70\u5165\u5360\u6bd4100%",
+    "forecast_analysis": {
+      "signal": "bullish",
+      "confidence": 0.7,
+      "growth": 21.28273373991619,
+      "eps_2025": 0.764652375281,
+      "eps_2026": 0.927391304348,
+      "reason": "\u76c8\u5229\u9884\u6d4b\u589e\u957f21.3%",
+      "source": "earnings_forecast"
+    },
+    "rating_analysis": {
+      "signal": "bullish",
+      "confidence": 0.8,
+      "buy_ratio": 1.0,
+      "total_reports": 281,
+      "reason": "\u673a\u6784\u8bc4\u7ea7\u4e70\u5165\u5360\u6bd4100%",
+      "source": "research_rating"
+    }
+  }
+}
+2026-04-23 11:47:14 - agent_state - INFO - ✅ 预期差分析师 分析完成
+2026-04-23 11:47:14 - expectation_diff_agent - INFO - [EXPECTATION_DIFF] 分析完成: bullish
+2026-04-23 11:47:14 - sentiment_agent - INFO - ==================================================
+2026-04-23 11:47:14 - agent_state - INFO - 🔄 看多研究员 正在分析...
+2026-04-23 11:47:14 - sentiment_agent - INFO - [情绪分析Agent] 开始执行
+2026-04-23 11:47:14 - sentiment_agent - INFO - ==================================================
+2026-04-23 11:47:14 - agent_state - INFO - 🔄 看空研究员 正在分析...
+2026-04-23 11:47:14 - agent_state - INFO - {
+  "perspective": "bearish",
+  "confidence": 0.43,
+  "thesis_points": [
+    "\u6280\u672f\u6307\u6807\u663e\u793a\u770b\u7a7a\u52a8\u80fd\uff0c\u7f6e\u4fe1\u5ea6\u4e3a41%",
+    "\u5f53\u524d\u57fa\u672c\u9762\u7684\u5f3a\u52b2\u53ef\u80fd\u4e0d\u53ef\u6301\u7eed",
+    "\u5e02\u573a\u60c5\u7eea\u53ef\u80fd\u8fc7\u4e8e\u4e50\u89c2\uff0c\u8868\u660e\u5b58\u5728\u6f5c\u5728\u98ce\u9669",
+    "\u80a1\u7968\u88ab\u9ad8\u4f30\uff0c\u7f6e\u4fe1\u5ea6\u4e3a71%"
+  ],
+  "reasoning": "\u57fa\u4e8e\u6280\u672f\u3001\u57fa\u672c\u9762\u3001\u60c5\u7eea\u548c\u4f30\u503c\u56e0\u7d20\u7684\u7efc\u5408\u5206\u6790\u5f97\u51fa\u770b\u7a7a\u89c2\u70b9"
+}
+2026-04-23 11:47:14 - agent_state - INFO - ✅ 看空研究员 分析完成
+2026-04-23 11:47:14 - agent_state - INFO - {
   "perspective": "bullish",
   "confidence": 0.3,
   "thesis_points": [
@@ -477,114 +498,100 @@ Getting price history for 002714...
   ],
   "reasoning": "\u57fa\u4e8e\u6280\u672f\u3001\u57fa\u672c\u9762\u3001\u60c5\u7eea\u548c\u4f30\u503c\u56e0\u7d20\u7684\u7efc\u5408\u5206\u6790\u5f97\u51fa\u770b\u591a\u89c2\u70b9"
 }
-2026-04-22 18:10:39 - sentiment_agent - INFO - ==================================================
-2026-04-22 18:10:39 - agent_state - INFO - 🔄 看空研究员 正在分析...
-2026-04-22 18:10:39 - agent_state - INFO - 🔄 情绪分析师 正在分析...
-2026-04-22 18:10:39 - agent_state - INFO - ✅ 看多研究员 分析完成
-2026-04-22 18:10:39 - agent_state - INFO - {
-  "perspective": "bearish",
-  "confidence": 0.47250000000000003,
-  "thesis_points": [
-    "\u6280\u672f\u53cd\u5f39\u53ef\u80fd\u662f\u6682\u65f6\u7684\uff0c\u6697\u793a\u6f5c\u5728\u53cd\u8f6c",
-    "\u57fa\u672c\u9762\u4ee4\u4eba\u62c5\u5fe7\uff0c\u7f6e\u4fe1\u5ea6\u4e3a50%",
-    "\u5e02\u573a\u60c5\u7eea\u53ef\u80fd\u8fc7\u4e8e\u4e50\u89c2\uff0c\u8868\u660e\u5b58\u5728\u6f5c\u5728\u98ce\u9669",
-    "\u80a1\u7968\u88ab\u9ad8\u4f30\uff0c\u7f6e\u4fe1\u5ea6\u4e3a79%"
-  ],
-  "reasoning": "\u57fa\u4e8e\u6280\u672f\u3001\u57fa\u672c\u9762\u3001\u60c5\u7eea\u548c\u4f30\u503c\u56e0\u7d20\u7684\u7efc\u5408\u5206\u6790\u5f97\u51fa\u770b\u7a7a\u89c2\u70b9"
-}
-2026-04-22 18:10:39 - sentiment_agent - INFO - [情绪分析Agent] 股票代码: 002714
-2026-04-22 18:10:39 - sentiment_agent - INFO - [情绪分析Agent] 新闻数量上限: 20
-2026-04-22 18:10:39 - sentiment_agent - INFO - [情绪分析Agent] 截止日期: 2026-04-21
-2026-04-22 18:10:39 - sentiment_agent - INFO - ------------------------------
-2026-04-22 18:10:39 - agent_state - INFO - ✅ 看空研究员 分析完成
-2026-04-22 18:10:39 - sentiment_agent - INFO - [步骤1] 获取新闻数据
-2026-04-22 18:10:39 - sentiment_agent - INFO - ------------------------------
-2026-04-22 18:11:12 - sentiment_agent - INFO - [新闻] 获取到 13 条新闻
-2026-04-22 18:11:12 - sentiment_agent - INFO - [新闻] 时间窗口: 2026-04-14 ~ 2026-04-21
-2026-04-22 18:11:12 - sentiment_agent - INFO - [新闻] 过滤后近期新闻: 13 条
-2026-04-22 18:11:12 - sentiment_agent - INFO - [新闻情绪] 开始分析...
-2026-04-22 18:11:12 - sentiment_agent - INFO - [新闻情绪] 分析完成: score=0.100
-2026-04-22 18:11:12 - sentiment_agent - INFO - ------------------------------
-2026-04-22 18:11:12 - sentiment_agent - INFO - [步骤2] 获取股吧情绪
-2026-04-22 18:11:12 - sentiment_agent - INFO - ------------------------------
-2026-04-22 18:11:12 - guba_crawler - INFO - ========== [股吧情绪分析] 开始 ==========
-2026-04-22 18:11:12 - guba_crawler - INFO - [股吧情绪] 股票代码: 002714, 最大帖子数: 30
-2026-04-22 18:11:12 - guba_crawler - INFO - [股吧] 开始获取帖子列表: symbol=002714, max_posts=30, page=1
-2026-04-22 18:11:12 - guba_crawler - INFO - [缓存] 命中股吧缓存: src/data/guba_cache/002714_posts_p1_2026-04-22.json
-2026-04-22 18:11:12 - guba_crawler - INFO - [股吧] 使用缓存数据，返回 30 条帖子
-2026-04-22 18:11:12 - guba_crawler - INFO - [股吧情绪] 开始分析，帖子数=30, 分析上限=20
-2026-04-22 18:11:12 - guba_crawler - INFO - [股吧情绪] 调用LLM分析...
-2026-04-22 18:11:12 - llm_clients - INFO - 🔄 自动选择 OpenAI Compatible API
-2026-04-22 18:11:12 - llm_clients - INFO - ✓ OpenAI Compatible 客户端初始化成功
-2026-04-22 18:11:12 - llm_clients - INFO - 🔄 使用 OpenAI Compatible 模型: deepseek-chat
-2026-04-22 18:11:12 - llm_clients - INFO - 🔄 正在调用 OpenAI Compatible API...
-2026-04-22 18:11:13 - llm_clients - INFO - ✓ API 调用成功
-2026-04-22 18:11:13 - llm_clients - INFO - ✓ 成功获取 OpenAI Compatible 响应
-2026-04-22 18:11:13 - guba_crawler - INFO - [股吧情绪] LLM分析完成，耗时=1.32s
-2026-04-22 18:11:13 - guba_crawler - INFO - [股吧情绪] LLM结果: score=-0.50, 看多=3, 看空=8, 中性=9
-2026-04-22 18:11:13 - guba_crawler - INFO - [股吧情绪] 热度计算: 总阅读=37664, 总评论=86, 热度=4.63
-2026-04-22 18:11:13 - guba_crawler - INFO - [股吧情绪] 分析完成: score=-0.50, bull_ratio=0.15, bear_ratio=0.40
-2026-04-22 18:11:13 - guba_crawler - INFO - ========== [股吧情绪分析] 完成 ==========
-2026-04-22 18:11:13 - guba_crawler - INFO - [股吧情绪] 最终结果: score=-0.50, posts=30
-2026-04-22 18:11:13 - sentiment_agent - INFO - [股吧情绪] 获取完成: score=-0.500, posts=30
-2026-04-22 18:11:13 - sentiment_agent - INFO - ------------------------------
-2026-04-22 18:11:13 - sentiment_agent - INFO - [步骤3] 获取量化情绪指标
-2026-04-22 18:11:13 - sentiment_agent - INFO - ------------------------------
-2026-04-22 18:11:13 - quant_sentiment - INFO - ========== [量化情绪分析] 开始 ==========
-2026-04-22 18:11:13 - quant_sentiment - INFO - [量化情绪] 股票代码: 002714
-2026-04-22 18:11:13 - quant_sentiment - INFO - [缓存] 命中量化情绪缓存: src/data/quant_sentiment_cache/002714_2026-04-22.json
-2026-04-22 18:11:13 - quant_sentiment - INFO - [量化情绪] 使用缓存数据
-2026-04-22 18:11:13 - quant_sentiment - INFO - ========== [量化情绪分析] 完成(缓存) ==========
-2026-04-22 18:11:13 - sentiment_agent - INFO - [量化情绪] 获取完成: score=0.178
-2026-04-22 18:11:13 - sentiment_agent - INFO - ------------------------------
-2026-04-22 18:11:13 - sentiment_agent - INFO - [步骤4] 获取北向资金数据
-2026-04-22 18:11:13 - sentiment_agent - INFO - ------------------------------
-2026-04-22 18:11:14 - sentiment_agent - INFO - [北向资金] 获取完成: 北向资金0.00亿
-2026-04-22 18:11:14 - sentiment_agent - INFO - ------------------------------
-2026-04-22 18:11:14 - sentiment_agent - INFO - [步骤5] 计算综合情绪分数
-2026-04-22 18:11:14 - sentiment_agent - INFO - ------------------------------
-2026-04-22 18:11:14 - sentiment_agent - INFO - [综合情绪] 开始计算综合情绪分数
-2026-04-22 18:11:14 - sentiment_agent - INFO - [综合情绪] 输入: news_score=0.100, guba_score=-0.500, quant_score=0.178, north_confidence=0.300
-2026-04-22 18:11:14 - sentiment_agent - INFO - [综合情绪] 股吧情绪: 原始=-0.500, 反向调整=0.000, 调整后=-0.250, 原因=股吧情绪处于中性区间
-2026-04-22 18:11:14 - sentiment_agent - INFO - [综合情绪] 北向资金: 北向资金0.00亿
-2026-04-22 18:11:14 - sentiment_agent - INFO - [综合情绪] 初始综合分数: 0.060
-2026-04-22 18:11:14 - sentiment_agent - INFO - [综合情绪] 最终权重: news=0.35, guba=0.15, quant=0.35, north=0.15
-2026-04-22 18:11:14 - sentiment_agent - INFO - [综合情绪] 交易信号判定: combined_score=0.060 -> signal=neutral
-2026-04-22 18:11:14 - sentiment_agent - INFO - [置信度] 最终置信度: 95% (基础=30, 数据源=60, 强度=1.79, 一致性=10)
-2026-04-22 18:11:14 - sentiment_agent - INFO - [综合情绪] 各数据源贡献: news=0.035, guba=-0.037, quant=0.062, north=0.075
-2026-04-22 18:11:14 - sentiment_agent - INFO - [综合情绪] 最终结果: combined_score=0.060, signal=neutral, confidence=95%
-2026-04-22 18:11:14 - agent_state - INFO - {
+2026-04-23 11:47:14 - agent_state - INFO - 🔄 情绪分析师 正在分析...
+2026-04-23 11:47:14 - agent_state - INFO - ✅ 看多研究员 分析完成
+2026-04-23 11:47:14 - sentiment_agent - INFO - [情绪分析Agent] 股票代码: 300059
+2026-04-23 11:47:14 - sentiment_agent - INFO - [情绪分析Agent] 新闻数量上限: 20
+2026-04-23 11:47:14 - sentiment_agent - INFO - [情绪分析Agent] 截止日期: 2026-04-22
+2026-04-23 11:47:14 - sentiment_agent - INFO - ------------------------------
+2026-04-23 11:47:14 - sentiment_agent - INFO - [步骤1] 获取新闻数据
+2026-04-23 11:47:14 - sentiment_agent - INFO - ------------------------------
+2026-04-23 11:47:14 - sentiment_agent - INFO - [新闻] 获取到 20 条新闻
+2026-04-23 11:47:14 - sentiment_agent - INFO - [新闻] 时间窗口: 2026-04-15 ~ 2026-04-22
+2026-04-23 11:47:14 - sentiment_agent - INFO - [新闻] 过滤后近期新闻: 17 条
+2026-04-23 11:47:14 - sentiment_agent - INFO - [新闻情绪] 开始分析...
+2026-04-23 11:47:14 - sentiment_agent - INFO - [新闻情绪] 分析完成: score=-0.600
+2026-04-23 11:47:14 - sentiment_agent - INFO - ------------------------------
+2026-04-23 11:47:14 - sentiment_agent - INFO - [步骤2] 获取股吧情绪
+2026-04-23 11:47:14 - sentiment_agent - INFO - ------------------------------
+2026-04-23 11:47:14 - guba_crawler - INFO - ========== [股吧情绪分析] 开始 ==========
+2026-04-23 11:47:14 - guba_crawler - INFO - [股吧情绪] 股票代码: 300059, 最大帖子数: 30
+2026-04-23 11:47:14 - guba_crawler - INFO - [股吧] 开始获取帖子列表: symbol=300059, max_posts=30, page=1
+2026-04-23 11:47:14 - guba_crawler - INFO - [缓存] 命中股吧缓存: src/data/guba_cache/300059_posts_p1_2026-04-23.json
+2026-04-23 11:47:14 - guba_crawler - INFO - [股吧] 使用缓存数据，返回 30 条帖子
+2026-04-23 11:47:14 - guba_crawler - INFO - [股吧情绪] 开始分析，帖子数=30, 分析上限=20
+2026-04-23 11:47:14 - guba_crawler - INFO - [股吧情绪] 调用LLM分析...
+2026-04-23 11:47:14 - llm_clients - INFO - 🔄 自动选择 OpenAI Compatible API
+2026-04-23 11:47:14 - llm_clients - INFO - ✓ OpenAI Compatible 客户端初始化成功
+2026-04-23 11:47:14 - llm_clients - INFO - 🔄 使用 OpenAI Compatible 模型: deepseek-chat
+2026-04-23 11:47:14 - llm_clients - INFO - 🔄 正在调用 OpenAI Compatible API...
+2026-04-23 11:47:16 - llm_clients - INFO - ✓ API 调用成功
+2026-04-23 11:47:16 - llm_clients - INFO - ✓ 成功获取 OpenAI Compatible 响应
+2026-04-23 11:47:16 - guba_crawler - INFO - [股吧情绪] LLM分析完成，耗时=2.36s
+2026-04-23 11:47:16 - guba_crawler - INFO - [股吧情绪] LLM结果: score=0.25, 看多=8, 看空=2, 中性=10
+2026-04-23 11:47:16 - guba_crawler - INFO - [股吧情绪] 热度计算: 总阅读=47335, 总评论=415, 热度=8.88
+2026-04-23 11:47:16 - guba_crawler - INFO - [股吧情绪] 分析完成: score=0.25, bull_ratio=0.40, bear_ratio=0.10
+2026-04-23 11:47:16 - guba_crawler - INFO - ========== [股吧情绪分析] 完成 ==========
+2026-04-23 11:47:16 - guba_crawler - INFO - [股吧情绪] 最终结果: score=0.25, posts=30
+2026-04-23 11:47:16 - sentiment_agent - INFO - [股吧情绪] 获取完成: score=0.250, posts=30
+2026-04-23 11:47:16 - sentiment_agent - INFO - ------------------------------
+2026-04-23 11:47:16 - sentiment_agent - INFO - [步骤3] 获取量化情绪指标
+2026-04-23 11:47:18 - sentiment_agent - INFO - ------------------------------
+2026-04-23 11:47:18 - quant_sentiment - INFO - ========== [量化情绪分析] 开始 ==========
+2026-04-23 11:47:18 - quant_sentiment - INFO - [量化情绪] 股票代码: 300059
+2026-04-23 11:47:18 - quant_sentiment - INFO - [缓存] 命中量化情绪缓存: src/data/quant_sentiment_cache/300059_2026-04-23.json
+2026-04-23 11:47:18 - quant_sentiment - INFO - [量化情绪] 使用缓存数据
+2026-04-23 11:47:18 - quant_sentiment - INFO - ========== [量化情绪分析] 完成(缓存) ==========
+2026-04-23 11:47:18 - sentiment_agent - INFO - [量化情绪] 获取完成: score=0.273
+2026-04-23 11:47:18 - sentiment_agent - INFO - ------------------------------
+2026-04-23 11:47:18 - sentiment_agent - INFO - [步骤4] 获取北向资金数据
+2026-04-23 11:47:18 - sentiment_agent - INFO - ------------------------------
+2026-04-23 11:47:19 - sentiment_agent - INFO - [北向资金] 获取完成: 北向资金0.00亿
+2026-04-23 11:47:19 - sentiment_agent - INFO - ------------------------------
+2026-04-23 11:47:19 - sentiment_agent - INFO - [步骤5] 计算综合情绪分数
+2026-04-23 11:47:19 - sentiment_agent - INFO - ------------------------------
+2026-04-23 11:47:19 - sentiment_agent - INFO - [综合情绪] 开始计算综合情绪分数
+2026-04-23 11:47:19 - sentiment_agent - INFO - [综合情绪] 输入: news_score=-0.600, guba_score=0.250, quant_score=0.273, north_confidence=0.300
+2026-04-23 11:47:19 - sentiment_agent - INFO - [综合情绪] 股吧情绪: 原始=0.250, 反向调整=0.000, 调整后=0.125, 原因=股吧情绪处于中性区间
+2026-04-23 11:47:19 - sentiment_agent - INFO - [综合情绪] 北向资金: 北向资金0.00亿
+2026-04-23 11:47:19 - sentiment_agent - INFO - [综合情绪] 初始综合分数: -0.096
+2026-04-23 11:47:19 - sentiment_agent - INFO - [综合情绪] 最终权重: news=0.35, guba=0.15, quant=0.35, north=0.15
+2026-04-23 11:47:19 - sentiment_agent - INFO - [综合情绪] 交易信号判定: combined_score=-0.096 -> signal=neutral
+2026-04-23 11:47:19 - sentiment_agent - INFO - [置信度] 最终置信度: 93% (基础=30, 数据源=60, 强度=2.87, 一致性=0)
+2026-04-23 11:47:19 - sentiment_agent - INFO - [综合情绪] 各数据源贡献: news=-0.210, guba=0.019, quant=0.096, north=0.075
+2026-04-23 11:47:19 - sentiment_agent - INFO - [综合情绪] 最终结果: combined_score=-0.096, signal=neutral, confidence=93%
+2026-04-23 11:47:19 - agent_state - INFO - {
   "signal": "neutral",
-  "confidence": "95%",
-  "reasoning": "\u7efc\u5408\u60c5\u7eea\u5206\u6570: 0.06 \u2192 \u4fe1\u53f7: neutral (\u7f6e\u4fe1\u5ea6: 95%)\n\n\u3010\u6570\u636e\u6e90\u6743\u91cd\u5206\u914d\u3011\n  \u2022 news: 35%\n  \u2022 guba: 15%\n  \u2022 quant: 35%\n  \u2022 north: 15%\n\n\u3010\u5404\u6570\u636e\u6e90\u5206\u6790\u3011\n  \u65b0\u95fb\u60c5\u7eea: \u5206\u6570=0.10, \u6743\u91cd=35%, \u8d21\u732e=0.04, \u65b0\u95fb\u6570=13\n  \u80a1\u5427\u60c5\u7eea: \u5206\u6570=-0.50, \u53cd\u5411\u4fe1\u53f7=-0.25, \u8c03\u6574\u540e=-0.25, \u6743\u91cd=15%, \u8d21\u732e=-0.04\n    (\u5e16\u5b50\u6570=30, \u770b\u591a=15%, \u770b\u7a7a=40%, \u70ed\u5ea6=4.6)\n  \u91cf\u5316\u6307\u6807: \u5206\u6570=0.18, \u6743\u91cd=35%, \u8d21\u732e=0.06\n    (\u8bc4\u5206=70.2 \u8d8b\u52bf=down, \u673a\u6784\u53c2\u4e0e\u5ea6=39.1, \u5173\u6ce8\u5ea6=93.2)",
-  "combined_score": 0.06,
+  "confidence": "93%",
+  "reasoning": "\u7efc\u5408\u60c5\u7eea\u5206\u6570: -0.10 \u2192 \u4fe1\u53f7: neutral (\u7f6e\u4fe1\u5ea6: 93%)\n\n\u3010\u6570\u636e\u6e90\u6743\u91cd\u5206\u914d\u3011\n  \u2022 news: 35%\n  \u2022 guba: 15%\n  \u2022 quant: 35%\n  \u2022 north: 15%\n\n\u3010\u5404\u6570\u636e\u6e90\u5206\u6790\u3011\n  \u65b0\u95fb\u60c5\u7eea: \u5206\u6570=-0.60, \u6743\u91cd=35%, \u8d21\u732e=-0.21, \u65b0\u95fb\u6570=17\n  \u80a1\u5427\u60c5\u7eea: \u5206\u6570=0.25, \u53cd\u5411\u4fe1\u53f7=0.12, \u8c03\u6574\u540e=0.12, \u6743\u91cd=15%, \u8d21\u732e=0.02\n    (\u5e16\u5b50\u6570=30, \u770b\u591a=40%, \u770b\u7a7a=10%, \u70ed\u5ea6=8.9)\n  \u91cf\u5316\u6307\u6807: \u5206\u6570=0.27, \u6743\u91cd=35%, \u8d21\u732e=0.10\n    (\u8bc4\u5206=71.3 \u8d8b\u52bf=\u5e73\u7a33, \u673a\u6784\u53c2\u4e0e\u5ea6=52.9, \u5173\u6ce8\u5ea6=94.0)",
+  "combined_score": -0.096,
   "components": {
     "news": {
-      "score": 0.1,
+      "score": -0.6,
       "weight": 0.35,
-      "count": 13,
-      "contribution": 0.035
+      "count": 17,
+      "contribution": -0.21
     },
     "guba": {
-      "score": -0.5,
-      "reverse_signal": -0.25,
-      "adjusted_score": -0.25,
+      "score": 0.25,
+      "reverse_signal": 0.125,
+      "adjusted_score": 0.125,
       "weight": 0.15,
       "post_count": 30,
-      "bull_ratio": 0.15,
-      "bear_ratio": 0.4,
-      "heat": 4.63,
-      "contribution": -0.037,
+      "bull_ratio": 0.4,
+      "bear_ratio": 0.1,
+      "heat": 8.88,
+      "contribution": 0.019,
       "reverse_reason": "\u80a1\u5427\u60c5\u7eea\u5904\u4e8e\u4e2d\u6027\u533a\u95f4"
     },
     "quant": {
-      "score": 0.178,
+      "score": 0.273,
       "weight": 0.35,
-      "rating": 70.23,
-      "rating_trend": "down",
-      "institution": 39.13,
-      "focus": 93.2,
-      "contribution": 0.062
+      "rating": 71.3,
+      "rating_trend": "stable",
+      "institution": 52.93,
+      "focus": 94.0,
+      "contribution": 0.096
     },
     "north_money": {
       "signal": "neutral",
@@ -603,264 +610,387 @@ Getting price history for 002714...
     "north": 0.15
   }
 }
-2026-04-22 18:11:14 - agent_state - INFO - ✅ 情绪分析师 分析完成
-2026-04-22 18:11:14 - sentiment_agent - INFO - ==================================================
-2026-04-22 18:11:14 - sentiment_agent - INFO - [情绪分析Agent] 执行完成
-2026-04-22 18:11:14 - sentiment_agent - INFO - [情绪分析Agent] 最终结果: signal=neutral, confidence=95%, score=0.060
-2026-04-22 18:11:14 - sentiment_agent - INFO - ==================================================
-2026-04-22 18:11:14 - agent_state - INFO - 🔄 macro_news_agent: --- 正在执行宏观新闻 Agent --- 正在分析...
-2026-04-22 18:11:14 - agent_state - INFO - 🔄 辩论室 正在分析...
-2026-04-22 18:11:14 - macro_news_agent - INFO - ==================================================
-2026-04-22 18:11:14 - macro_news_agent - INFO - 📰 [MACRO_NEWS] 开始宏观新闻分析
-2026-04-22 18:11:14 - llm_clients - INFO - 🔄 自动选择 OpenAI Compatible API
-2026-04-22 18:11:14 - macro_news_agent - INFO - ==================================================
-2026-04-22 18:11:14 - agent_state - INFO - 🔄 macro_news_agent: 从缓存加载 2026-04-21 的宏观新闻总结。 正在分析...
-2026-04-22 18:11:14 - agent_state - INFO - Loaded macro summary for 2026-04-21 from cache. News count: 1
-2026-04-22 18:11:14 - agent_state - INFO - 🔄 macro_news_agent: 执行完成。 正在分析...
-2026-04-22 18:11:14 - llm_clients - INFO - ✓ OpenAI Compatible 客户端初始化成功
-2026-04-22 18:11:14 - llm_clients - INFO - 🔄 使用 OpenAI Compatible 模型: deepseek-chat
-2026-04-22 18:11:14 - llm_clients - INFO - 🔄 正在调用 OpenAI Compatible API...
-2026-04-22 18:11:20 - llm_clients - INFO - ✓ API 调用成功
-2026-04-22 18:11:20 - llm_clients - INFO - ✓ 成功获取 OpenAI Compatible 响应
-2026-04-22 18:11:20 - agent_state - INFO - {
-
-}
-2026-04-22 18:11:20 - agent_state - INFO - ✅ 辩论室 分析完成
-2026-04-22 18:11:20 - agent_state - INFO - 🔄 看多研究员 正在分析...
-2026-04-22 18:11:20 - agent_state - INFO - 🔄 看空研究员 正在分析...
-2026-04-22 18:11:20 - agent_state - INFO - 🔄 风险管理师 正在分析...
-2026-04-22 18:11:20 - agent_state - INFO - {
-
-2026-04-22 18:11:20 - agent_state - INFO - {
-
-2026-04-22 18:11:20 - risk_management_agent - INFO - ==================================================
-2026-04-22 18:11:20 - agent_state - INFO - ✅ 看多研究员 分析完成
-2026-04-22 18:11:20 - agent_state - INFO - ✅ 看空研究员 分析完成
-2026-04-22 18:11:20 - risk_management_agent - INFO - ⚠️ [RISK_MANAGER] 开始风险管理分析
-2026-04-22 18:11:20 - risk_management_agent - INFO - ==================================================
-2026-04-22 18:11:20 - risk_management_agent - INFO - Risk manager received price frame: rows=243 columns=['date', 'open', 'close', 'high', 'low', 'amount', 'volume', 'amplitude', 'pct_change', 'change_amount', 'turnover', 'momentum_1m', 'momentum_3m', 'momentum_6m', 'volume_ma20', 'volume_momentum', 'historical_volatility', 'volatility_regime', 'volatility_z_score', 'atr', 'atr_ratio', 'hurst_exponent', 'skewness', 'kurtosis']
-2026-04-22 18:11:20 - agent_state - INFO - {
-
-}
-2026-04-22 18:11:20 - agent_state - INFO - ✅ 风险管理师 分析完成
-2026-04-22 18:11:20 - agent_state - INFO - 🔄 辩论室 正在分析...
-2026-04-22 18:11:20 - agent_state - INFO - 🔄 宏观分析师 正在分析...
-2026-04-22 18:11:20 - llm_clients - INFO - 🔄 自动选择 OpenAI Compatible API
-2026-04-22 18:11:20 - macro_analyst_agent - INFO - ==================================================
-2026-04-22 18:11:20 - macro_analyst_agent - INFO - 🌍 [MACRO_ANALYST] 开始宏观分析
-2026-04-22 18:11:20 - macro_analyst_agent - INFO - ==================================================
-2026-04-22 18:11:20 - macro_analyst_agent - INFO -   股票代码: 002714
-2026-04-22 18:11:20 - llm_clients - INFO - ✓ OpenAI Compatible 客户端初始化成功
-2026-04-22 18:11:20 - llm_clients - INFO - 🔄 使用 OpenAI Compatible 模型: deepseek-chat
-2026-04-22 18:11:20 - llm_clients - INFO - 🔄 正在调用 OpenAI Compatible API...
-2026-04-22 18:11:26 - llm_clients - INFO - ✓ API 调用成功
-2026-04-22 18:11:26 - llm_clients - INFO - ✓ 成功获取 OpenAI Compatible 响应
-2026-04-22 18:11:26 - agent_state - INFO - {
+2026-04-23 11:47:19 - agent_state - INFO - ✅ 情绪分析师 分析完成
+2026-04-23 11:47:19 - sentiment_agent - INFO - ==================================================
+2026-04-23 11:47:19 - sentiment_agent - INFO - [情绪分析Agent] 执行完成
+2026-04-23 11:47:19 - sentiment_agent - INFO - [情绪分析Agent] 最终结果: signal=neutral, confidence=93%, score=-0.096
+2026-04-23 11:47:19 - sentiment_agent - INFO - ==================================================
+2026-04-23 11:47:19 - agent_state - INFO - 🔄 macro_news_agent: --- 正在执行宏观新闻 Agent --- 正在分析...
+2026-04-23 11:47:19 - macro_news_agent - INFO - ==================================================
+2026-04-23 11:47:19 - agent_state - INFO - 🔄 辩论室 正在分析...
+2026-04-23 11:47:19 - llm_clients - INFO - 🔄 自动选择 OpenAI Compatible API
+2026-04-23 11:47:19 - macro_news_agent - INFO - 📰 [MACRO_NEWS] 开始宏观新闻分析
+2026-04-23 11:47:19 - macro_news_agent - INFO - ==================================================
+2026-04-23 11:47:19 - agent_state - INFO - 🔄 macro_news_agent: 从缓存加载 2026-04-22 的宏观新闻总结。 正在分析...
+2026-04-23 11:47:19 - agent_state - INFO - Loaded macro summary for 2026-04-22 from cache. News count: 8
+2026-04-23 11:47:20 - agent_state - INFO - 🔄 macro_news_agent: 执行完成。 正在分析...
+2026-04-23 11:47:20 - llm_clients - INFO - ✓ OpenAI Compatible 客户端初始化成功
+2026-04-23 11:47:20 - llm_clients - INFO - 🔄 使用 OpenAI Compatible 模型: deepseek-chat
+2026-04-23 11:47:20 - llm_clients - INFO - 🔄 正在调用 OpenAI Compatible API...
+2026-04-23 11:47:34 - llm_clients - INFO - ✓ API 调用成功
+2026-04-23 11:47:34 - llm_clients - INFO - ✓ 成功获取 OpenAI Compatible 响应
+2026-04-23 11:47:34 - agent_state - INFO - {
   "signal": "bearish",
-  "confidence": 0.47250000000000003,
+  "confidence": 0.43,
   "bull_confidence": 0.3,
-  "bear_confidence": 0.47250000000000003,
-  "confidence_diff": -0.17250000000000004,
-  "llm_score": -0.4,
-  "mixed_confidence_diff": -0.24075000000000002,
-
-2026-04-22 18:11:26 - agent_state - INFO - ✅ 辩论室 分析完成
-2026-04-22 18:11:53 - macro_analyst_agent - INFO - 获取到 13 条七天内的新闻
-2026-04-22 18:11:53 - macro_analyst_agent - INFO - 使用缓存的宏观分析结果
-2026-04-22 18:11:53 - agent_state - INFO - {
-  "macro_environment": "neutral",
-  "impact_on_stock": "neutral",
-
-2026-04-22 18:11:53 - agent_state - INFO - ✅ 宏观分析师 分析完成
-2026-04-22 18:11:53 - agent_state - INFO - 🔄 风险管理师 正在分析...
-2026-04-22 18:11:53 - portfolio_management_agent - INFO - ============================================================
-2026-04-22 18:11:53 - risk_management_agent - INFO - ==================================================
-2026-04-22 18:11:53 - portfolio_management_agent - INFO - 🎯 [PORTFOLIO_MANAGER] 开始执行投资组合管理
-2026-04-22 18:11:53 - risk_management_agent - INFO - ⚠️ [RISK_MANAGER] 开始风险管理分析
-2026-04-22 18:11:53 - portfolio_management_agent - INFO - ============================================================
-2026-04-22 18:11:53 - risk_management_agent - INFO - ==================================================
-2026-04-22 18:11:53 - portfolio_management_agent - INFO -   收集到 13 个 Agent 的分析结果:
-2026-04-22 18:11:53 - portfolio_management_agent - INFO -     - fundamentals_agent
-2026-04-22 18:11:53 - portfolio_management_agent - INFO -     - sentiment_agent
-2026-04-22 18:11:53 - portfolio_management_agent - INFO -     - technical_analyst_agent
-2026-04-22 18:11:53 - risk_management_agent - INFO - Risk manager received price frame: rows=243 columns=['date', 'open', 'close', 'high', 'low', 'amount', 'volume', 'amplitude', 'pct_change', 'change_amount', 'turnover', 'momentum_1m', 'momentum_3m', 'momentum_6m', 'volume_ma20', 'volume_momentum', 'historical_volatility', 'volatility_regime', 'volatility_z_score', 'atr', 'atr_ratio', 'hurst_exponent', 'skewness', 'kurtosis']
-2026-04-22 18:11:53 - portfolio_management_agent - INFO -     - valuation_agent
-2026-04-22 18:11:53 - portfolio_management_agent - INFO -     - expectation_diff_agent
-2026-04-22 18:11:53 - agent_state - INFO - {
-
+  "bear_confidence": 0.43,
+  "confidence_diff": -0.13,
+  "llm_score": -0.2,
+  "llm_analysis": "\u4f5c\u4e3a\u7b2c\u4e09\u65b9\u91d1\u878d\u5206\u6790\u5e08\uff0c\u6211\u5bf9\u53cc\u65b9\u89c2\u70b9\u8fdb\u884c\u5982\u4e0b\u8bc4\u4f30\uff1a\n\n\u770b\u7a7a\u89c2\u70b9\uff08\u7f6e\u4fe1\u5ea60.43\uff09\u7684\u4f18\u52bf\uff1a\n1. \u4f30\u503c\u8fc7\u9ad8\u8bba\u70b9\uff0871%\u7f6e\u4fe1\u5ea6\uff09\u5177\u6709\u8f83\u5f3a\u8bf4\u670d\u529b\uff0c\u4f30\u503c\u662f\u6295\u8d44\u51b3\u7b56\u7684\u6838\u5fc3\u8003\u91cf\n2. \u5bf9\u57fa\u672c\u9762\u53ef\u6301\u7eed\u6027\u7684\u8d28\u7591\u7b26\u5408\u5468\u671f\u5206\u6790\u903b\u8f91\n3. \u6307\u51fa\u5e02\u573a\u60c5\u7eea\u8fc7\u4e8e\u4e50\u89c2\u662f\u5408\u7406\u7684\u98ce\u9669\u63d0\u793a\n\n\u770b\u591a\u89c2\u70b9\uff08\u7f6e\u4fe1\u5ea60.3\uff09\u7684\u4f18\u52bf\uff1a\n1. \u5f3a\u8c03\u57fa\u672c\u9762\u6539\u5584\u6f5c\u529b\uff0c\u5173\u6ce8\u516c\u53f8\u5185\u5728\u4ef7\u503c\u53d8\u5316\n2. \u5e02\u573a\u60c5\u7eea\u8fc7\u5ea6\u60b2\u89c2\u53ef\u80fd\u521b\u9020\u673a\u4f1a\u7684\u89c2\u70b9\u7b26\u5408\u9006\u5411\u6295\u8d44\u601d\u7ef4\n3. \u6280\u672f\u6307\u6807\u4fdd\u5b88\u63d0\u4f9b\u4e70\u5165\u673a\u4f1a\u7684\u8bba\u70b9\u6709\u4e00\u5b9a\u5408\u7406\u6027\n\n\u53cc\u65b9\u89c2\u70b9\u7684\u5c40\u9650\u6027\uff1a\n- \u770b\u7a7a\u65b9\uff1a\u6280\u672f\u6307\u6807\u770b\u7a7a\u52a8\u80fd\u7f6e\u4fe1\u5ea6\u4ec541%\uff0c\u8bf4\u670d\u529b\u8f83\u5f31\uff1b\u672a\u63d0\u4f9b\u5177\u4f53\u4f30\u503c\u8fc7\u9ad8\u7684\u91cf\u5316\u4f9d\u636e\n- \u770b\u591a\u65b9\uff1a\u89c2\u70b9\u8f83\u4e3a\u7b3c\u7edf\uff0c\u7f3a\u4e4f\u5177\u4f53\u7684\u57fa\u672c\u9762\u6539\u5584\u8bc1\u636e\u548c\u4f30\u503c\u6d4b\u7b97\n\n\u6700\u6709\u8bf4\u670d\u529b\u7684\u8bba\u70b9\uff1a\n\u770b\u7a7a\u65b9\u7684\"\u80a1\u7968\u88ab\u9ad8\u4f30\uff08\u7f6e\u4fe1\u5ea671%\uff09\"\u8bba\u70b9\u6700\u5177\u8bf4\u670d\u529b\uff0c\u56e0\u4e3a\u4f30\u503c\u662f\u51b3\u5b9a\u957f\u671f\u6295\u8d44\u56de\u62a5\u7684\u5173\u952e\u56e0\u7d20\uff0c\u4e14\u8be5\u8bba\u70b9\u7f6e\u4fe1\u5ea6\u6700\u9ad8\u3002\n\n\u7efc\u5408\u8bc4\u4f30\uff1a\u53cc\u65b9\u89c2\u70b9\u5747\u6709\u4e00\u5b9a\u5408\u7406\u6027\u4f46\u8bc1\u636e\u90fd\u4e0d\u591f\u5145\u5206\u3002\u770b\u7a7a\u65b9\u5728\u4f30\u503c\u98ce\u9669\u65b9\u9762\u63d0\u51fa\u66f4\u5177\u4f53\u7684\u62c5\u5fe7\uff0c\u800c\u770b\u591a\u65b9\u66f4\u591a\u662f\u57fa\u4e8e\u6f5c\u5728\u53ef\u80fd\u6027\u7684\u63a8\u6d4b\u3002",
+  "llm_reasoning": "\u8bc4\u5206-0.2\uff08\u7565\u5fae\u770b\u7a7a\uff09\u7684\u7406\u7531\uff1a1) \u770b\u7a7a\u89c2\u70b9\u6574\u4f53\u7f6e\u4fe1\u5ea6\uff080.43\uff09\u9ad8\u4e8e\u770b\u591a\u89c2\u70b9\uff080.3\uff09\uff1b2) \u4f30\u503c\u8fc7\u9ad8\u8bba\u70b9\u768471%\u7f6e\u4fe1\u5ea6\u662f\u53cc\u65b9\u6240\u6709\u8bba\u70b9\u4e2d\u7f6e\u4fe1\u5ea6\u6700\u9ad8\u7684\uff1b3) \u5f53\u524d\u5e02\u573a\u60c5\u7eea\u53ef\u80fd\u8fc7\u4e8e\u4e50\u89c2\u7684\u8b66\u793a\u503c\u5f97\u91cd\u89c6\uff1b4) \u4f46\u6280\u672f\u6307\u6807\u770b\u7a7a\u52a8\u80fd\u7f6e\u4fe1\u5ea6\u8f83\u4f4e\uff0841%\uff09\uff0c\u4e14\u57fa\u672c\u9762\u53ef\u80fd\u4ecd\u6709\u652f\u6491\uff0c\u56e0\u6b64\u4e0d\u770b\u6781\u5ea6\u770b\u7a7a\u3002",
+  "mixed_confidence_diff": -0.151,
+  "debate_summary": [
+    "\u770b\u591a\u89c2\u70b9:",
+    "+ \u6280\u672f\u6307\u6807\u53ef\u80fd\u8f83\u4e3a\u4fdd\u5b88\uff0c\u63d0\u4f9b\u4e86\u4e70\u5165\u673a\u4f1a",
+    "+ \u516c\u53f8\u57fa\u672c\u9762\u6709\u6539\u5584\u6f5c\u529b",
+    "+ \u5e02\u573a\u60c5\u7eea\u53ef\u80fd\u8fc7\u4e8e\u60b2\u89c2\uff0c\u521b\u9020\u4e86\u4ef7\u503c\u673a\u4f1a",
+    "+ \u5f53\u524d\u4f30\u503c\u53ef\u80fd\u672a\u5b8c\u5168\u53cd\u6620\u589e\u957f\u6f5c\u529b",
+    "\n\u770b\u7a7a\u89c2\u70b9:",
+    "- \u6280\u672f\u6307\u6807\u663e\u793a\u770b\u7a7a\u52a8\u80fd\uff0c\u7f6e\u4fe1\u5ea6\u4e3a41%",
+    "- \u5f53\u524d\u57fa\u672c\u9762\u7684\u5f3a\u52b2\u53ef\u80fd\u4e0d\u53ef\u6301\u7eed",
+    "- \u5e02\u573a\u60c5\u7eea\u53ef\u80fd\u8fc7\u4e8e\u4e50\u89c2\uff0c\u8868\u660e\u5b58\u5728\u6f5c\u5728\u98ce\u9669",
+    "- \u80a1\u7968\u88ab\u9ad8\u4f30\uff0c\u7f6e\u4fe1\u5ea6\u4e3a71%"
+  ],
+  "reasoning": "\u770b\u7a7a\u89c2\u70b9\u66f4\u5177\u8bf4\u670d\u529b"
 }
-2026-04-22 18:11:53 - portfolio_management_agent - INFO -     - industry_cycle_agent
-2026-04-22 18:11:53 - agent_state - INFO - ✅ 风险管理师 分析完成
-2026-04-22 18:11:53 - portfolio_management_agent - INFO -     - institutional_agent
-2026-04-22 18:11:53 - portfolio_management_agent - INFO -     - macro_news_agent
-2026-04-22 18:11:53 - portfolio_management_agent - INFO -     - researcher_bear_agent
-2026-04-22 18:11:53 - portfolio_management_agent - INFO -     - researcher_bull_agent
-2026-04-22 18:11:53 - portfolio_management_agent - INFO -     - debate_room_agent
-2026-04-22 18:11:53 - portfolio_management_agent - INFO -     - risk_management_agent
-2026-04-22 18:11:53 - portfolio_management_agent - INFO -     - macro_analyst_agent
-2026-04-22 18:11:53 - agent_state - INFO - 🔄 portfolio_management_agent: --- 正在执行投资组合管理 --- 正在分析...
-2026-04-22 18:11:53 - portfolio_management_agent - INFO -   当前投资组合: 现金=100000.00元, 持仓=0股
-2026-04-22 18:11:53 - agent_state - INFO - portfolio_management_agent
-2026-04-22 18:11:53 - portfolio_management_agent - INFO - 🎯 启用DecisionEngine规则化决策
-2026-04-22 18:11:53 - decision_engine - INFO - DecisionEngine: 开始决策, signals=['technical', 'fundamentals', 'sentiment', 'valuation', 'macro', 'risk', 'industry_cycle', 'institutional', 'expectation_diff'], risk_score=2.0, risk_action=hold, macro_factor=1.0
-2026-04-22 18:11:53 - decision_engine - INFO - 决策规则: total_score=-0.297, bullish=0, bearish=2, neutral=5
-2026-04-22 18:11:53 - decision_engine - INFO - 决策: 规则4触发 -> hold (信号均衡)
-2026-04-22 18:11:53 - portfolio_management_agent - INFO - 🎯 DecisionEngine决策: {'action': 'hold', 'quantity': 0, 'confidence': 0.3, 'reason': '负向因素: valuation; 总分: -0.297'}
-2026-04-22 18:11:53 - agent_state - INFO - portfolio_management_agent
-2026-04-22 18:11:53 - agent_state - INFO - portfolio_management_agent
-2026-04-22 18:11:53 - portfolio_management_agent - INFO - ============================================================
-2026-04-22 18:11:53 - portfolio_management_agent - INFO - 🎯 [PORTFOLIO_MANAGER] 最终决策
-2026-04-22 18:11:53 - portfolio_management_agent - INFO - ============================================================
-2026-04-22 18:11:53 - portfolio_management_agent - INFO -   📊 风险评分: 2.0/10
-2026-04-22 18:11:53 - portfolio_management_agent - INFO -   📊 风控建议: hold
-2026-04-22 18:11:53 - portfolio_management_agent - INFO -   📊 最大持仓: 18750.0 股
-2026-04-22 18:11:53 - portfolio_management_agent - INFO -   📊 当前价格: 45.48 元
-2026-04-22 18:11:53 - portfolio_management_agent - INFO -   ━━━━━━━━━━━━━━━━━━━━━━━
-2026-04-22 18:11:53 - portfolio_management_agent - INFO -   ✅ 最终行动: HOLD
-2026-04-22 18:11:53 - portfolio_management_agent - INFO -   ✅ 交易数量: 0 股
-2026-04-22 18:11:53 - portfolio_management_agent - INFO -   ✅ 置信度: 30%
-2026-04-22 18:11:53 - portfolio_management_agent - INFO - ============================================================
-2026-04-22 18:11:53 - agent_state - INFO - 🔄 portfolio_management_agent: --- 投资组合管理完成 --- 正在分析...
-2026-04-22 18:11:53 - agent_state - INFO - 🔄 宏观分析师 正在分析...
-2026-04-22 18:11:53 - macro_analyst_agent - INFO - ==================================================
-2026-04-22 18:11:53 - macro_analyst_agent - INFO - 🌍 [MACRO_ANALYST] 开始宏观分析
-2026-04-22 18:11:53 - macro_analyst_agent - INFO - ==================================================
-2026-04-22 18:11:53 - macro_analyst_agent - INFO -   股票代码: 002714
-2026-04-22 18:12:29 - macro_analyst_agent - INFO - 获取到 13 条七天内的新闻
-2026-04-22 18:12:29 - macro_analyst_agent - INFO - 使用缓存的宏观分析结果
-2026-04-22 18:12:29 - agent_state - INFO - {
-  "macro_environment": "neutral",
-  "impact_on_stock": "neutral",
-
+2026-04-23 11:47:34 - agent_state - INFO - ✅ 辩论室 分析完成
+2026-04-23 11:47:34 - agent_state - INFO - 🔄 看空研究员 正在分析...
+2026-04-23 11:47:34 - agent_state - INFO - {
+  "perspective": "bearish",
+  "confidence": 0.43,
+  "thesis_points": [
+    "\u6280\u672f\u6307\u6807\u663e\u793a\u770b\u7a7a\u52a8\u80fd\uff0c\u7f6e\u4fe1\u5ea6\u4e3a41%",
+    "\u5f53\u524d\u57fa\u672c\u9762\u7684\u5f3a\u52b2\u53ef\u80fd\u4e0d\u53ef\u6301\u7eed",
+    "\u5e02\u573a\u60c5\u7eea\u53ef\u80fd\u8fc7\u4e8e\u4e50\u89c2\uff0c\u8868\u660e\u5b58\u5728\u6f5c\u5728\u98ce\u9669",
+    "\u80a1\u7968\u88ab\u9ad8\u4f30\uff0c\u7f6e\u4fe1\u5ea6\u4e3a71%"
+  ],
+  "reasoning": "\u57fa\u4e8e\u6280\u672f\u3001\u57fa\u672c\u9762\u3001\u60c5\u7eea\u548c\u4f30\u503c\u56e0\u7d20\u7684\u7efc\u5408\u5206\u6790\u5f97\u51fa\u770b\u7a7a\u89c2\u70b9"
 }
-2026-04-22 18:12:29 - agent_state - INFO - ✅ 宏观分析师 分析完成
-2026-04-22 18:12:29 - portfolio_management_agent - INFO - ============================================================
-2026-04-22 18:12:29 - portfolio_management_agent - INFO - 🎯 [PORTFOLIO_MANAGER] 开始执行投资组合管理
-2026-04-22 18:12:29 - portfolio_management_agent - INFO - ============================================================
-2026-04-22 18:12:29 - portfolio_management_agent - INFO -   收集到 14 个 Agent 的分析结果:
-2026-04-22 18:12:29 - portfolio_management_agent - INFO -     - fundamentals_agent
-2026-04-22 18:12:29 - portfolio_management_agent - INFO -     - sentiment_agent
-2026-04-22 18:12:29 - portfolio_management_agent - INFO -     - technical_analyst_agent
-2026-04-22 18:12:29 - portfolio_management_agent - INFO -     - valuation_agent
-2026-04-22 18:12:29 - portfolio_management_agent - INFO -     - expectation_diff_agent
-2026-04-22 18:12:29 - portfolio_management_agent - INFO -     - industry_cycle_agent
-2026-04-22 18:12:29 - portfolio_management_agent - INFO -     - institutional_agent
-2026-04-22 18:12:29 - portfolio_management_agent - INFO -     - macro_news_agent
-2026-04-22 18:12:29 - portfolio_management_agent - INFO -     - researcher_bear_agent
-2026-04-22 18:12:29 - portfolio_management_agent - INFO -     - researcher_bull_agent
-2026-04-22 18:12:29 - portfolio_management_agent - INFO -     - debate_room_agent
-2026-04-22 18:12:29 - portfolio_management_agent - INFO -     - risk_management_agent
-2026-04-22 18:12:29 - portfolio_management_agent - INFO -     - macro_analyst_agent
-2026-04-22 18:12:29 - portfolio_management_agent - INFO -     - portfolio_management_agent
-2026-04-22 18:12:29 - agent_state - INFO - 🔄 portfolio_management_agent: --- 正在执行投资组合管理 --- 正在分析...
-2026-04-22 18:12:29 - portfolio_management_agent - INFO -   当前投资组合: 现金=100000.00元, 持仓=0股
-2026-04-22 18:12:29 - agent_state - INFO - portfolio_management_agent
-2026-04-22 18:12:29 - portfolio_management_agent - INFO - 🎯 启用DecisionEngine规则化决策
-2026-04-22 18:12:29 - decision_engine - INFO - DecisionEngine: 开始决策, signals=['technical', 'fundamentals', 'sentiment', 'valuation', 'macro', 'risk', 'industry_cycle', 'institutional', 'expectation_diff'], risk_score=2.0, risk_action=hold, macro_factor=1.0
-2026-04-22 18:12:29 - decision_engine - INFO - 决策规则: total_score=-0.297, bullish=0, bearish=2, neutral=5
-2026-04-22 18:12:29 - decision_engine - INFO - 决策: 规则4触发 -> hold (信号均衡)
-2026-04-22 18:12:29 - portfolio_management_agent - INFO - 🎯 DecisionEngine决策: {'action': 'hold', 'quantity': 0, 'confidence': 0.3, 'reason': '负向因素: valuation; 总分: -0.297'}
-2026-04-22 18:12:29 - agent_state - INFO - portfolio_management_agent
-2026-04-22 18:12:29 - agent_state - INFO - portfolio_management_agent
-2026-04-22 18:12:29 - portfolio_management_agent - INFO - ============================================================
-2026-04-22 18:12:29 - portfolio_management_agent - INFO - 🎯 [PORTFOLIO_MANAGER] 最终决策
-2026-04-22 18:12:29 - portfolio_management_agent - INFO - ============================================================
-2026-04-22 18:12:29 - portfolio_management_agent - INFO -   📊 风险评分: 2.0/10
-2026-04-22 18:12:29 - portfolio_management_agent - INFO -   📊 风控建议: hold
-2026-04-22 18:12:29 - portfolio_management_agent - INFO -   📊 最大持仓: 18750.0 股
-2026-04-22 18:12:29 - portfolio_management_agent - INFO -   📊 当前价格: 45.48 元
-2026-04-22 18:12:29 - portfolio_management_agent - INFO -   ━━━━━━━━━━━━━━━━━━━━━━━
-2026-04-22 18:12:29 - portfolio_management_agent - INFO -   ✅ 最终行动: HOLD
-2026-04-22 18:12:29 - portfolio_management_agent - INFO -   ✅ 交易数量: 0 股
-2026-04-22 18:12:29 - portfolio_management_agent - INFO -   ✅ 置信度: 30%
-2026-04-22 18:12:29 - portfolio_management_agent - INFO - ============================================================
-2026-04-22 18:12:29 - agent_state - INFO - 🔄 portfolio_management_agent: --- 投资组合管理完成 --- 正在分析...
-2026-04-22 18:12:29 - main_workflow - INFO - Workflow graph completed for run_id=2061ffa4-9e2e-4911-990b-f91eafc0aa26 with 2778 messages
-2026-04-22 18:12:29 - structured_terminal - INFO -
+2026-04-23 11:47:34 - agent_state - INFO - ✅ 看空研究员 分析完成
+2026-04-23 11:47:34 - agent_state - INFO - 🔄 风险管理师 正在分析...
+2026-04-23 11:47:34 - risk_management_agent - INFO - ==================================================
+2026-04-23 11:47:34 - agent_state - INFO - 🔄 看多研究员 正在分析...
+2026-04-23 11:47:34 - agent_state - INFO - {
+  "perspective": "bullish",
+  "confidence": 0.3,
+  "thesis_points": [
+    "\u6280\u672f\u6307\u6807\u53ef\u80fd\u8f83\u4e3a\u4fdd\u5b88\uff0c\u63d0\u4f9b\u4e86\u4e70\u5165\u673a\u4f1a",
+    "\u516c\u53f8\u57fa\u672c\u9762\u6709\u6539\u5584\u6f5c\u529b",
+    "\u5e02\u573a\u60c5\u7eea\u53ef\u80fd\u8fc7\u4e8e\u60b2\u89c2\uff0c\u521b\u9020\u4e86\u4ef7\u503c\u673a\u4f1a",
+    "\u5f53\u524d\u4f30\u503c\u53ef\u80fd\u672a\u5b8c\u5168\u53cd\u6620\u589e\u957f\u6f5c\u529b"
+  ],
+  "reasoning": "\u57fa\u4e8e\u6280\u672f\u3001\u57fa\u672c\u9762\u3001\u60c5\u7eea\u548c\u4f30\u503c\u56e0\u7d20\u7684\u7efc\u5408\u5206\u6790\u5f97\u51fa\u770b\u591a\u89c2\u70b9"
+}
+2026-04-23 11:47:34 - agent_state - INFO - ✅ 看多研究员 分析完成
+2026-04-23 11:47:34 - risk_management_agent - INFO - ⚠️ [RISK_MANAGER] 开始风险管理分析
+2026-04-23 11:47:34 - risk_management_agent - INFO - ==================================================
+2026-04-23 11:47:35 - risk_management_agent - INFO - Risk manager received price frame: rows=243 columns=['date', 'open', 'close', 'high', 'low', 'amount', 'volume', 'amplitude', 'pct_change', 'change_amount', 'turnover', 'momentum_1m', 'momentum_3m', 'momentum_6m', 'volume_ma20', 'volume_momentum', 'historical_volatility', 'volatility_regime', 'volatility_z_score', 'atr', 'atr_ratio', 'hurst_exponent', 'skewness', 'kurtosis']
+2026-04-23 11:47:35 - agent_state - INFO - {
+  "\u6700\u5927\u6301\u4ed3\u89c4\u6a21": 18750.0,
+  "\u98ce\u9669\u8bc4\u5206": 3,
+  "\u4ea4\u6613\u884c\u52a8": "hold",
+  "\u98ce\u9669\u6307\u6807": {
+    "\u6ce2\u52a8\u7387": 0.32269908842142575,
+    "95%\u98ce\u9669\u4ef7\u503c": -0.028588747154332118,
+    "\u6700\u5927\u56de\u64a4": -0.2652329749103943,
+    "\u5e02\u573a\u98ce\u9669\u8bc4\u5206": 3,
+    "\u538b\u529b\u6d4b\u8bd5\u7ed3\u679c": {
+      "\u5e02\u573a\u5d29\u76d8": {
+        "\u6f5c\u5728\u635f\u5931": -3750.0,
+        "\u7ec4\u5408\u5f71\u54cd": -0.031578947368421054
+      },
+      "\u4e2d\u5ea6\u4e0b\u8dcc": {
+        "\u6f5c\u5728\u635f\u5931": -1875.0,
+        "\u7ec4\u5408\u5f71\u54cd": -0.015789473684210527
+      },
+      "\u8f7b\u5ea6\u4e0b\u8dcc": {
+        "\u6f5c\u5728\u635f\u5931": -937.5,
+        "\u7ec4\u5408\u5f71\u54cd": -0.007894736842105263
+      }
+    }
+  },
+  "\u8fa9\u8bba\u5206\u6790": {
+    "\u591a\u65b9\u7f6e\u4fe1\u5ea6": 0.3,
+    "\u7a7a\u65b9\u7f6e\u4fe1\u5ea6": 0.43,
+    "\u8fa9\u8bba\u7f6e\u4fe1\u5ea6": 0.43,
+    "\u8fa9\u8bba\u4fe1\u53f7": "bearish"
+  },
+  "\u63a8\u7406": "\u98ce\u9669\u8bc4\u5206 3/10: \u5e02\u573a\u98ce\u9669=3, \u6ce2\u52a8\u7387=32.27%, \u98ce\u9669\u4ef7\u503c=-2.86%, \u6700\u5927\u56de\u64a4=-26.52%, \u8fa9\u8bba\u4fe1\u53f7=bearish"
+}
+2026-04-23 11:47:35 - agent_state - INFO - ✅ 风险管理师 分析完成
+2026-04-23 11:47:35 - agent_state - INFO - 🔄 辩论室 正在分析...
+2026-04-23 11:47:35 - agent_state - INFO - 🔄 宏观分析师 正在分析...
+2026-04-23 11:47:35 - llm_clients - INFO - 🔄 自动选择 OpenAI Compatible API
+2026-04-23 11:47:35 - macro_analyst_agent - INFO - ==================================================
+2026-04-23 11:47:35 - macro_analyst_agent - INFO - 🌍 [MACRO_ANALYST] 开始宏观分析
+2026-04-23 11:47:35 - macro_analyst_agent - INFO - ==================================================
+2026-04-23 11:47:35 - macro_analyst_agent - INFO -   股票代码: 300059
+2026-04-23 11:47:35 - llm_clients - INFO - ✓ OpenAI Compatible 客户端初始化成功
+2026-04-23 11:47:35 - llm_clients - INFO - 🔄 使用 OpenAI Compatible 模型: deepseek-chat
+2026-04-23 11:47:35 - llm_clients - INFO - 🔄 正在调用 OpenAI Compatible API...
+2026-04-23 11:47:48 - llm_clients - INFO - ✓ API 调用成功
+2026-04-23 11:47:48 - llm_clients - INFO - ✓ 成功获取 OpenAI Compatible 响应
+2026-04-23 11:47:48 - agent_state - INFO - {
+  "signal": "bearish",
+  "confidence": 0.43,
+  "bull_confidence": 0.3,
+  "bear_confidence": 0.43,
+  "confidence_diff": -0.13,
+  "llm_score": -0.2,
+  "llm_analysis": "\u4f5c\u4e3a\u7b2c\u4e09\u65b9\u91d1\u878d\u5206\u6790\u5e08\uff0c\u6211\u5bf9\u53cc\u65b9\u89c2\u70b9\u8fdb\u884c\u5982\u4e0b\u8bc4\u4f30\uff1a\n\n\u770b\u7a7a\u89c2\u70b9\uff08\u7f6e\u4fe1\u5ea60.43\uff09\u7684\u4f18\u52bf\uff1a\n1. \u4f30\u503c\u62c5\u5fe7\u5177\u6709\u8f83\u9ad8\u8bf4\u670d\u529b\uff0871%\u7f6e\u4fe1\u5ea6\uff09\uff0c\u8fd9\u5728\u5f53\u524d\u5e02\u573a\u73af\u5883\u4e0b\u5c24\u4e3a\u5173\u952e\n2. \u5bf9\u57fa\u672c\u9762\u53ef\u6301\u7eed\u6027\u7684\u8d28\u7591\u7b26\u5408\u7ecf\u6d4e\u5468\u671f\u5206\u6790\u903b\u8f91\n3. \u5e02\u573a\u60c5\u7eea\u8fc7\u5ea6\u4e50\u89c2\u7684\u8b66\u544a\u5177\u6709\u524d\u77bb\u6027\n\n\u770b\u591a\u89c2\u70b9\uff08\u7f6e\u4fe1\u5ea60.3\uff09\u7684\u4f18\u52bf\uff1a\n1. \u5f3a\u8c03\u57fa\u672c\u9762\u6539\u5584\u6f5c\u529b\uff0c\u5173\u6ce8\u516c\u53f8\u5185\u5728\u4ef7\u503c\n2. \u9006\u5411\u601d\u7ef4\uff08\u5e02\u573a\u8fc7\u5ea6\u60b2\u89c2\u521b\u9020\u673a\u4f1a\uff09\u5728\u4ef7\u503c\u6295\u8d44\u4e2d\u5177\u6709\u5408\u7406\u6027\n3. \u6280\u672f\u6307\u6807\u4fdd\u5b88\u53ef\u80fd\u63d0\u4f9b\u4e70\u5165\u673a\u4f1a\u7684\u89c2\u70b9\u6709\u4e00\u5b9a\u6218\u672f\u4ef7\u503c\n\n\u7efc\u5408\u8bc4\u4f30\uff1a\n- \u770b\u7a7a\u89c2\u70b9\u7684\u4f30\u503c\u8bba\u636e\uff0871%\u7f6e\u4fe1\u5ea6\uff09\u6700\u4e3a\u5177\u4f53\u4e14\u91cf\u5316\uff0c\u8bf4\u670d\u529b\u6700\u5f3a\n- \u770b\u591a\u89c2\u70b9\u76f8\u5bf9\u7b3c\u7edf\uff0c\u7f3a\u4e4f\u5177\u4f53\u6570\u636e\u652f\u6491\n- \u6280\u672f\u6307\u6807\u5206\u6b67\uff0841%\u770b\u7a7a vs \u4fdd\u5b88\u53ef\u80fd\u63d0\u4f9b\u673a\u4f1a\uff09\u663e\u793a\u5e02\u573a\u5b58\u5728\u4e0d\u786e\u5b9a\u6027\n- \u53cc\u65b9\u5bf9\u5e02\u573a\u60c5\u7eea\u7684\u5224\u65ad\u5b8c\u5168\u76f8\u53cd\uff0c\u8fd9\u672c\u8eab\u8868\u660e\u5e02\u573a\u5206\u6b67\u8f83\u5927\n\n\u6700\u6709\u8bf4\u670d\u529b\u7684\u8bba\u70b9\u662f\u770b\u7a7a\u65b9\u7684\u4f30\u503c\u62c5\u5fe7\uff0c\u56e0\u4e3a\u4f30\u503c\u662f\u6295\u8d44\u51b3\u7b56\u7684\u6838\u5fc3\u951a\u70b9\uff0c\u4e14\u5176\u7f6e\u4fe1\u5ea6\u6700\u9ad8\u3002",
+  "llm_reasoning": "\u7ed9\u4e88\u8f7b\u5fae\u770b\u7a7a\u8bc4\u5206\uff08-0.2\uff09\u7684\u4e3b\u8981\u7406\u7531\uff1a1\uff09\u4f30\u503c\u62c5\u5fe7\u7684\u7f6e\u4fe1\u5ea6\uff0871%\uff09\u663e\u8457\u9ad8\u4e8e\u5176\u4ed6\u8bba\u70b9\uff1b2\uff09\u57fa\u672c\u9762\u53ef\u6301\u7eed\u6027\u7591\u95ee\u5728\u5b8f\u89c2\u7ecf\u6d4e\u4e0d\u786e\u5b9a\u6027\u589e\u52a0\u7684\u73af\u5883\u4e0b\u5177\u6709\u5408\u7406\u6027\uff1b3\uff09\u770b\u591a\u89c2\u70b9\u7f3a\u4e4f\u540c\u7b49\u529b\u5ea6\u7684\u6570\u636e\u652f\u6491\uff0c\u66f4\u591a\u4f9d\u8d56\u53ef\u80fd\u6027\u800c\u975e\u786e\u5b9a\u6027\u3002\u4f46\u8bc4\u5206\u63a5\u8fd1\u4e2d\u6027\uff0c\u56e0\u4e3a\u6280\u672f\u6307\u6807\u770b\u7a7a\u7f6e\u4fe1\u5ea6\u4ec541%\uff0c\u4e14\u5e02\u573a\u60c5\u7eea\u5b58\u5728\u5206\u6b67\uff0c\u8868\u660e\u4e0b\u884c\u98ce\u9669\u6709\u9650\u3002",
+  "mixed_confidence_diff": -0.151,
+  "debate_summary": [
+    "\u770b\u591a\u89c2\u70b9:",
+    "+ \u6280\u672f\u6307\u6807\u53ef\u80fd\u8f83\u4e3a\u4fdd\u5b88\uff0c\u63d0\u4f9b\u4e86\u4e70\u5165\u673a\u4f1a",
+    "+ \u516c\u53f8\u57fa\u672c\u9762\u6709\u6539\u5584\u6f5c\u529b",
+    "+ \u5e02\u573a\u60c5\u7eea\u53ef\u80fd\u8fc7\u4e8e\u60b2\u89c2\uff0c\u521b\u9020\u4e86\u4ef7\u503c\u673a\u4f1a",
+    "+ \u5f53\u524d\u4f30\u503c\u53ef\u80fd\u672a\u5b8c\u5168\u53cd\u6620\u589e\u957f\u6f5c\u529b",
+    "\n\u770b\u7a7a\u89c2\u70b9:",
+    "- \u6280\u672f\u6307\u6807\u663e\u793a\u770b\u7a7a\u52a8\u80fd\uff0c\u7f6e\u4fe1\u5ea6\u4e3a41%",
+    "- \u5f53\u524d\u57fa\u672c\u9762\u7684\u5f3a\u52b2\u53ef\u80fd\u4e0d\u53ef\u6301\u7eed",
+    "- \u5e02\u573a\u60c5\u7eea\u53ef\u80fd\u8fc7\u4e8e\u4e50\u89c2\uff0c\u8868\u660e\u5b58\u5728\u6f5c\u5728\u98ce\u9669",
+    "- \u80a1\u7968\u88ab\u9ad8\u4f30\uff0c\u7f6e\u4fe1\u5ea6\u4e3a71%"
+  ],
+  "reasoning": "\u770b\u7a7a\u89c2\u70b9\u66f4\u5177\u8bf4\u670d\u529b"
+}
+2026-04-23 11:47:48 - agent_state - INFO - ✅ 辩论室 分析完成
+2026-04-23 11:48:43 - macro_analyst_agent - INFO - 获取到 18 条七天内的新闻
+2026-04-23 11:48:43 - macro_analyst_agent - INFO - 使用缓存的宏观分析结果
+2026-04-23 11:48:43 - agent_state - INFO - {
+  "macro_environment": "neutral",
+  "impact_on_stock": "negative",
+  "key_factors": [
+    "\u4ea7\u4e1a\u653f\u7b56\uff08\u91d1\u878d\u79d1\u6280\u76d1\u7ba1\u8d8b\u4e25\uff09",
+    "\u5e02\u573a\u60c5\u7eea\uff08\u6295\u8d44\u8005\u5bf9\u5238\u5546\u53ca\u91d1\u878d\u79d1\u6280\u677f\u5757\u98ce\u9669\u504f\u597d\uff09",
+    "\u8d27\u5e01\u653f\u7b56\uff08\u5f71\u54cd\u5e02\u573a\u6d41\u52a8\u6027\u4e0e\u4ea4\u6613\u6d3b\u8dc3\u5ea6\uff09"
+  ],
+  "reasoning": "\u57fa\u4e8e\u63d0\u4f9b\u7684\u65b0\u95fb\u4fe1\u606f\uff0c\u5206\u6790\u5982\u4e0b\uff1a\n\n1.  **\u5b8f\u89c2\u73af\u5883\u8bc4\u4f30\uff08\u4e2d\u6027\uff09**\uff1a\n    *   \u65b0\u95fb\u4e2d\u672a\u63d0\u4f9b\u5173\u4e8e\u5229\u7387\u3001\u8d22\u653f\u652f\u51fa\u3001\u56fd\u9645\u8d38\u6613\u7b49\u660e\u786e\u7684\u5b8f\u89c2\u653f\u7b56\u53d8\u52a8\u4fe1\u606f\u3002\u56e0\u6b64\uff0c\u65e0\u6cd5\u5224\u65ad\u6574\u4f53\u5b8f\u89c2\u73af\u5883\u51fa\u73b0\u663e\u8457\u7684\u79ef\u6781\u6216\u6d88\u6781\u8f6c\u5411\u3002\u5f53\u524d\u8bc4\u4f30\u4e3a\u4e2d\u6027\uff0c\u610f\u5473\u7740\u5b8f\u89c2\u73af\u5883\u53ef\u80fd\u5904\u4e8e\u76f8\u5bf9\u7a33\u5b9a\u6216\u7f3a\u4e4f\u660e\u786e\u65b9\u5411\u7684\u72b6\u6001\u3002\n\n2.  **\u5bf9\u4e1c\u65b9\u8d22\u5bcc\uff08300059.SZ\uff09\u7684\u5f71\u54cd\uff08\u5229\u7a7a\uff09**\uff1a\n    *   \u6838\u5fc3\u5229\u7a7a\u56e0\u7d20\u76f4\u63a5\u6765\u6e90\u4e8e\u65b0\u95fb\u4e2d\u63d0\u53ca\u7684\u76d1\u7ba1\u4e8b\u4ef6\uff1a\"\u4e1c\u65b9\u8d22\u5bcc\u6295\u8d44\u54a8\u8be2\u516c\u53f8\u88ab\u8d23\u4ee4\u6539\u6b63\u5b58\u8425\u9500\u8bef\u5bfc\u7b493\u5b97\u8fdd\u89c4\"\u3002\u8fd9\u8868\u660e\u9488\u5bf9\u91d1\u878d\u79d1\u6280\u53ca\u8bc1\u5238\u54a8\u8be2\u9886\u57df\u7684**\u4ea7\u4e1a\u653f\u7b56\uff08\u76d1\u7ba1\u73af\u5883\uff09\u6b63\u5728\u8d8b\u4e25**\u3002\u76d1\u7ba1\u5904\u7f5a\u4f1a\u76f4\u63a5\u589e\u52a0\u516c\u53f8\u7684\u5408\u89c4\u6210\u672c\uff0c\u53ef\u80fd\u5f71\u54cd\u5176\u76f8\u5173\u4e1a\u52a1\u7684\u77ed\u671f\u62d3\u5c55\u548c\u6536\u5165\uff0c\u5e76\u5bf9\u516c\u53f8\u58f0\u8a89\u9020\u6210\u8d1f\u9762\u5f71\u54cd\u3002\n    *   \u4f5c\u4e3aA\u80a1\u4e92\u8054\u7f51\u5238\u5546\u548c\u91d1\u878d\u79d1\u6280\u9f99\u5934\uff0c\u4e1c\u65b9\u8d22\u5bcc\u7684\u4e1a\u7ee9\u4e0e**\u5e02\u573a\u60c5\u7eea**\u9ad8\u5ea6\u76f8\u5173\u3002\u76d1\u7ba1\u8d1f\u9762\u65b0\u95fb\u4f1a\u6253\u51fb\u6295\u8d44\u8005\u5bf9\u8be5\u677f\u5757\u7684\u4fe1\u5fc3\uff0c\u5f71\u54cd\u5176\u80a1\u4ef7\u8868\u73b0\u3002\u65b0\u95fb\u4e2d\u80a1\u4ef7\u7684\u5c0f\u5e45\u4e0b\u8dcc\uff08-0.55%\uff09\u548c\u4e34\u65f6\u505c\u724c\u53ef\u80fd\u53cd\u6620\u4e86\u5e02\u573a\u7684\u5373\u65f6\u53cd\u5e94\u3002\n    *   \u53e6\u4e00\u6761\u65b0\u95fb\u663e\u793a\u516c\u53f8\u4e3a\u5b50\u516c\u53f8\u5929\u5929\u57fa\u91d1\u63d0\u4f9b\u5de8\u989d\u62c5\u4fdd\uff0825\u4ebf\u5143\uff09\uff0c\u8fd9\u867d\u7136\u4f53\u73b0\u4e86\u5bf9\u6838\u5fc3\u5b50\u516c\u53f8\u7684\u652f\u6301\uff0c\u4f46\u4e5f**\u6f5c\u5728\u5730\u589e\u52a0\u4e86\u516c\u53f8\u7684\u8d22\u52a1\u98ce\u9669\u66b4\u9732**\uff0c\u5728\u76d1\u7ba1\u8d8b\u4e25\u7684\u80cc\u666f\u4e0b\uff0c\u53ef\u80fd\u5f15\u53d1\u6295\u8d44\u8005\u5bf9\u6574\u4f53\u4e1a\u52a1\u7a33\u5065\u6027\u7684\u5173\u6ce8\u3002\n\n3.  **\u5173\u952e\u5f71\u54cd\u56e0\u7d20\u5206\u6790**\uff1a\n    *   **\u4ea7\u4e1a\u653f\u7b56\uff08\u91d1\u878d\u79d1\u6280\u76d1\u7ba1\u8d8b\u4e25\uff09**\uff1a\u8fd9\u662f\u5f53\u524d\u6700\u76f4\u63a5\u3001\u6700\u91cd\u8981\u7684\u5f71\u54cd\u56e0\u7d20\u3002\u4e2d\u56fd\u91d1\u878d\u76d1\u7ba1\u673a\u6784\u6301\u7eed\u52a0\u5f3a\u5bf9\u91d1\u878d\u79d1\u6280\u3001\u8d22\u5bcc\u7ba1\u7406\u3001\u8bc1\u5238\u6295\u8d44\u54a8\u8be2\u7b49\u9886\u57df\u7684\u89c4\u8303\u548c\u6574\u987f\uff0c\u65e8\u5728\u9632\u8303\u98ce\u9669\u3001\u4fdd\u62a4\u6295\u8d44\u8005\u3002\u4efb\u4f55\u8fdd\u89c4\u5904\u7f5a\u90fd\u4f1a\u5bf9\u76f8\u5173\u516c\u53f8\u7684\u8fd0\u8425\u548c\u4f30\u503c\u4ea7\u751f\u538b\u529b\u3002\n    *   **\u5e02\u573a\u60c5\u7eea\uff08\u6295\u8d44\u8005\u5bf9\u5238\u5546\u53ca\u91d1\u878d\u79d1\u6280\u677f\u5757\u98ce\u9669\u504f\u597d\uff09**\uff1a\u76d1\u7ba1\u4e8b\u4ef6\u4f1a\u76f4\u63a5\u5f71\u54cd\u5e02\u573a\u60c5\u7eea\u3002\u6295\u8d44\u8005\u5bf9\u653f\u7b56\u98ce\u9669\u654f\u611f\u7684\u677f\u5757\u4f1a\u91cd\u65b0\u8bc4\u4f30\u5176\u98ce\u9669\u6ea2\u4ef7\uff0c\u53ef\u80fd\u5bfc\u81f4\u8d44\u91d1\u6682\u65f6\u6d41\u51fa\u6216\u6301\u89c2\u671b\u6001\u5ea6\uff0c\u538b\u5236\u80a1\u4ef7\u3002\n    *   **\u8d27\u5e01\u653f\u7b56\uff08\u5f71\u54cd\u5e02\u573a\u6d41\u52a8\u6027\u4e0e\u4ea4\u6613\u6d3b\u8dc3\u5ea6\uff09**\uff1a\u867d\u7136\u65b0\u95fb\u672a\u76f4\u63a5\u63d0\u53ca\uff0c\u4f46\u8d27\u5e01\u653f\u7b56\u662f\u5f71\u54cd\u4e1c\u65b9\u8d22\u5bcc\u8fd9\u7c7b\u516c\u53f8\u7684\u6839\u672c\u5b8f\u89c2\u53d8\u91cf\u3002\u5bbd\u677e\u7684\u8d27\u5e01\u653f\u7b56\uff08\u4f4e\u5229\u7387\u3001\u5145\u88d5\u6d41\u52a8\u6027\uff09\u901a\u5e38\u5229\u597d\u8d44\u672c\u5e02\u573a\uff0c\u63d0\u5347\u5e02\u573a\u4ea4\u6613\u6d3b\u8dc3\u5ea6\uff0c\u4ece\u800c\u589e\u52a0\u516c\u53f8\u7684\u7ecf\u7eaa\u3001\u4e24\u878d\u3001\u57fa\u91d1\u9500\u552e\u7b49\u4e1a\u52a1\u6536\u5165\u3002\u53cd\u4e4b\uff0c\u7d27\u7f29\u7684\u8d27\u5e01\u653f\u7b56\u5219\u6784\u6210\u5229\u7a7a\u3002\u5728\u7f3a\u4e4f\u660e\u786e\u4fe1\u53f7\u65f6\uff0c\u6b64\u56e0\u7d20\u6682\u6309\u4e2d\u6027\u6216\u539f\u6709\u8d8b\u52bf\u8003\u8651\uff0c\u4f46\u5176\u957f\u671f\u91cd\u8981\u6027\u6781\u9ad8\u3002\n\n4.  **\u4e2d\u957f\u671f\u89c6\u89d2**\uff1a\n    *   \u76d1\u7ba1\u8d8b\u4e25\u662f\u884c\u4e1a\u89c4\u8303\u5316\u3001\u957f\u671f\u5065\u5eb7\u53d1\u5c55\u7684\u5fc5\u7ecf\u8fc7\u7a0b\u3002\u867d\u7136\u77ed\u671f\u6784\u6210\u5229\u7a7a\uff0c\u4f46\u6709\u5229\u4e8e\u884c\u4e1a\u51fa\u6e05\u548c\u9f99\u5934\u516c\u53f8\u5e02\u573a\u4efd\u989d\u7684\u5de9\u56fa\uff08\u5982\u679c\u516c\u53f8\u80fd\u6709\u6548\u6574\u6539\uff09\u3002\n    *   \u4e1c\u65b9\u8d22\u5bcc\u7684\u6838\u5fc3\u7ade\u4e89\u529b\u5728\u4e8e\u5176\u4e92\u8054\u7f51\u5e73\u53f0\u3001\u5e9e\u5927\u7684\u7528\u6237\u7fa4\uff08\u4e1c\u65b9\u8d22\u5bcc\u7f51\u3001\u80a1\u5427\u3001\u5929\u5929\u57fa\u91d1\uff09\u548c\u4e00\u7ad9\u5f0f\u91d1\u878d\u670d\u52a1\u751f\u6001\u3002\u957f\u671f\u6765\u770b\uff0c\u5176\u589e\u957f\u4ecd\u4f9d\u8d56\u4e8e**\u8d44\u672c\u5e02\u573a\u6df1\u5316\u6539\u9769\uff08\u5982\u5168\u9762\u6ce8\u518c\u5236\uff09\u3001\u5c45\u6c11\u8d22\u5bcc\u5411\u91d1\u878d\u8d44\u4ea7\u8f6c\u79fb\u7684\u5927\u8d8b\u52bf\u3001\u4ee5\u53ca\u516c\u53f8\u81ea\u8eab\u7684\u4ea7\u54c1\u521b\u65b0\u548c\u5408\u89c4\u7ecf\u8425\u80fd\u529b**\u3002\n    *   \u5f53\u524d\u7684\u76d1\u7ba1\u4e8b\u4ef6\u662f\u4e00\u4e2a\u8b66\u793a\uff0c\u51f8\u663e\u4e86\u516c\u53f8\u5728\u5feb\u901f\u6269\u5f20\u4e2d\u52a0\u5f3a\u5185\u63a7\u548c\u5408\u89c4\u7ba1\u7406\u7684\u91cd\u8981\u6027\u3002\u5b8f\u89c2\u5c42\u9762\u7684\u8d27\u5e01\u653f\u7b56\u548c\u8d44\u672c\u5e02\u573a\u6539\u9769\u8fdb\u7a0b\uff0c\u5c06\u662f\u51b3\u5b9a\u5176\u4e2d\u957f\u671f\u4e1a\u7ee9\u7684\u66f4\u5173\u952e\u53d8\u91cf\u3002"
+}
+2026-04-23 11:48:43 - agent_state - INFO - ✅ 宏观分析师 分析完成
+2026-04-23 11:48:43 - agent_state - INFO - 🔄 风险管理师 正在分析...
+2026-04-23 11:48:43 - risk_management_agent - INFO - ==================================================
+2026-04-23 11:48:43 - portfolio_management_agent - INFO - ============================================================
+2026-04-23 11:48:43 - risk_management_agent - INFO - ⚠️ [RISK_MANAGER] 开始风险管理分析
+2026-04-23 11:48:43 - risk_management_agent - INFO - ==================================================
+2026-04-23 11:48:43 - portfolio_management_agent - INFO - 🎯 [PORTFOLIO_MANAGER] 开始执行投资组合管理
+2026-04-23 11:48:43 - portfolio_management_agent - INFO - ============================================================
+2026-04-23 11:48:43 - portfolio_management_agent - INFO -   收集到 13 个 Agent 的分析结果:
+2026-04-23 11:48:43 - portfolio_management_agent - INFO -     - fundamentals_agent
+2026-04-23 11:48:43 - portfolio_management_agent - INFO -     - sentiment_agent
+2026-04-23 11:48:43 - portfolio_management_agent - INFO -     - technical_analyst_agent
+2026-04-23 11:48:43 - portfolio_management_agent - INFO -     - valuation_agent
+2026-04-23 11:48:43 - portfolio_management_agent - INFO -     - expectation_diff_agent
+2026-04-23 11:48:43 - portfolio_management_agent - INFO -     - industry_cycle_agent
+2026-04-23 11:48:43 - portfolio_management_agent - INFO -     - institutional_agent
+2026-04-23 11:48:43 - portfolio_management_agent - INFO -     - macro_news_agent
+2026-04-23 11:48:43 - portfolio_management_agent - INFO -     - researcher_bear_agent
+2026-04-23 11:48:43 - portfolio_management_agent - INFO -     - researcher_bull_agent
+2026-04-23 11:48:43 - portfolio_management_agent - INFO -     - debate_room_agent
+2026-04-23 11:48:43 - portfolio_management_agent - INFO -     - risk_management_agent
+2026-04-23 11:48:43 - portfolio_management_agent - INFO -     - macro_analyst_agent
+2026-04-23 11:48:43 - agent_state - INFO - 🔄 portfolio_management_agent: --- 正在执行投资组合管理 --- 正在分析...
+2026-04-23 11:48:43 - portfolio_management_agent - INFO -   当前投资组合: 现金=100000.00元, 持仓=0股
+2026-04-23 11:48:43 - agent_state - INFO - portfolio_management_agent
+2026-04-23 11:48:43 - risk_management_agent - INFO - Risk manager received price frame: rows=243 columns=['date', 'open', 'close', 'high', 'low', 'amount', 'volume', 'amplitude', 'pct_change', 'change_amount', 'turnover', 'momentum_1m', 'momentum_3m', 'momentum_6m', 'volume_ma20', 'volume_momentum', 'historical_volatility', 'volatility_regime', 'volatility_z_score', 'atr', 'atr_ratio', 'hurst_exponent', 'skewness', 'kurtosis']
+2026-04-23 11:48:43 - agent_state - INFO - {
+  "\u6700\u5927\u6301\u4ed3\u89c4\u6a21": 18750.0,
+  "\u98ce\u9669\u8bc4\u5206": 3,
+  "\u4ea4\u6613\u884c\u52a8": "hold",
+  "\u98ce\u9669\u6307\u6807": {
+    "\u6ce2\u52a8\u7387": 0.32269908842142575,
+    "95%\u98ce\u9669\u4ef7\u503c": -0.028588747154332118,
+    "\u6700\u5927\u56de\u64a4": -0.2652329749103943,
+    "\u5e02\u573a\u98ce\u9669\u8bc4\u5206": 3,
+    "\u538b\u529b\u6d4b\u8bd5\u7ed3\u679c": {
+      "\u5e02\u573a\u5d29\u76d8": {
+        "\u6f5c\u5728\u635f\u5931": -3750.0,
+        "\u7ec4\u5408\u5f71\u54cd": -0.031578947368421054
+      },
+      "\u4e2d\u5ea6\u4e0b\u8dcc": {
+        "\u6f5c\u5728\u635f\u5931": -1875.0,
+        "\u7ec4\u5408\u5f71\u54cd": -0.015789473684210527
+      },
+      "\u8f7b\u5ea6\u4e0b\u8dcc": {
+        "\u6f5c\u5728\u635f\u5931": -937.5,
+        "\u7ec4\u5408\u5f71\u54cd": -0.007894736842105263
+      }
+    }
+  },
+  "\u8fa9\u8bba\u5206\u6790": {
+    "\u591a\u65b9\u7f6e\u4fe1\u5ea6": 0.3,
+    "\u7a7a\u65b9\u7f6e\u4fe1\u5ea6": 0.43,
+    "\u8fa9\u8bba\u7f6e\u4fe1\u5ea6": 0.43,
+    "\u8fa9\u8bba\u4fe1\u53f7": "bearish"
+  },
+  "\u63a8\u7406": "\u98ce\u9669\u8bc4\u5206 3/10: \u5e02\u573a\u98ce\u9669=3, \u6ce2\u52a8\u7387=32.27%, \u98ce\u9669\u4ef7\u503c=-2.86%, \u6700\u5927\u56de\u64a4=-26.52%, \u8fa9\u8bba\u4fe1\u53f7=bearish"
+}
+2026-04-23 11:48:43 - portfolio_management_agent - INFO - 🎯 启用DecisionEngine规则化决策
+2026-04-23 11:48:43 - agent_state - INFO - ✅ 风险管理师 分析完成
+2026-04-23 11:48:43 - decision_engine - INFO - DecisionEngine: 开始决策, signals=['technical', 'fundamentals', 'sentiment', 'valuation', 'macro', 'risk', 'industry_cycle', 'institutional', 'expectation_diff'], risk_score=3.0, risk_action=hold, macro_factor=1.0
+2026-04-23 11:48:43 - decision_engine - INFO - 决策规则: total_score=-0.167, bullish=1, bearish=2, neutral=3
+2026-04-23 11:48:43 - decision_engine - INFO - 决策: 规则4触发 -> hold (信号均衡)
+2026-04-23 11:48:43 - portfolio_management_agent - INFO - 🎯 DecisionEngine决策: {'action': 'hold', 'quantity': 0, 'confidence': 0.3, 'reason': '看多1个、看空2个、中性3个; 加权总分: -0.167; 正向因素:;   - institutional(bullish): 0.072(置信度72%); 负向因素:;   - valuation(bearish): -0.177(置信度71%);   - technical(bearish): -0.061(置信度41%); 风险评分: 3/10; 触发规则: 信号均衡或不符合买入条件，观望'}
+2026-04-23 11:48:43 - agent_state - INFO - portfolio_management_agent
+2026-04-23 11:48:43 - agent_state - INFO - portfolio_management_agent
+2026-04-23 11:48:43 - portfolio_management_agent - INFO - ============================================================
+2026-04-23 11:48:43 - portfolio_management_agent - INFO - 🎯 [PORTFOLIO_MANAGER] 最终决策
+2026-04-23 11:48:43 - portfolio_management_agent - INFO - ============================================================
+2026-04-23 11:48:43 - portfolio_management_agent - INFO -   📊 风险评分: 3.0/10
+2026-04-23 11:48:43 - portfolio_management_agent - INFO -   📊 风控建议: hold
+2026-04-23 11:48:43 - portfolio_management_agent - INFO -   📊 最大持仓: 18750.0 股
+2026-04-23 11:48:43 - portfolio_management_agent - INFO -   📊 当前价格: 20.18 元
+2026-04-23 11:48:43 - portfolio_management_agent - INFO -   ━━━━━━━━━━━━━━━━━━━━━━━
+2026-04-23 11:48:43 - portfolio_management_agent - INFO -   ✅ 最终行动: HOLD
+2026-04-23 11:48:43 - portfolio_management_agent - INFO -   ✅ 交易数量: 0 股
+2026-04-23 11:48:43 - portfolio_management_agent - INFO -   ✅ 置信度: 30%
+2026-04-23 11:48:43 - portfolio_management_agent - INFO - ============================================================
+2026-04-23 11:48:43 - agent_state - INFO - 🔄 portfolio_management_agent: --- 投资组合管理完成 --- 正在分析...
+2026-04-23 11:48:43 - agent_state - INFO - 🔄 宏观分析师 正在分析...
+2026-04-23 11:48:43 - macro_analyst_agent - INFO - ==================================================
+2026-04-23 11:48:43 - macro_analyst_agent - INFO - 🌍 [MACRO_ANALYST] 开始宏观分析
+2026-04-23 11:48:43 - macro_analyst_agent - INFO - ==================================================
+2026-04-23 11:48:43 - macro_analyst_agent - INFO -   股票代码: 300059
+2026-04-23 11:49:44 - macro_analyst_agent - INFO - 获取到 18 条七天内的新闻
+2026-04-23 11:49:44 - macro_analyst_agent - INFO - 使用缓存的宏观分析结果
+2026-04-23 11:49:44 - agent_state - INFO - {
+  "macro_environment": "neutral",
+  "impact_on_stock": "negative",
+  "key_factors": [
+    "\u4ea7\u4e1a\u653f\u7b56\uff08\u91d1\u878d\u79d1\u6280\u76d1\u7ba1\u8d8b\u4e25\uff09",
+    "\u5e02\u573a\u60c5\u7eea\uff08\u6295\u8d44\u8005\u5bf9\u5238\u5546\u53ca\u91d1\u878d\u79d1\u6280\u677f\u5757\u98ce\u9669\u504f\u597d\uff09",
+    "\u8d27\u5e01\u653f\u7b56\uff08\u5f71\u54cd\u5e02\u573a\u6d41\u52a8\u6027\u4e0e\u4ea4\u6613\u6d3b\u8dc3\u5ea6\uff09"
+  ],
+  "reasoning": "\u57fa\u4e8e\u63d0\u4f9b\u7684\u65b0\u95fb\u4fe1\u606f\uff0c\u5206\u6790\u5982\u4e0b\uff1a\n\n1.  **\u5b8f\u89c2\u73af\u5883\u8bc4\u4f30\uff08\u4e2d\u6027\uff09**\uff1a\n    *   \u65b0\u95fb\u4e2d\u672a\u63d0\u4f9b\u5173\u4e8e\u5229\u7387\u3001\u8d22\u653f\u652f\u51fa\u3001\u56fd\u9645\u8d38\u6613\u7b49\u660e\u786e\u7684\u5b8f\u89c2\u653f\u7b56\u53d8\u52a8\u4fe1\u606f\u3002\u56e0\u6b64\uff0c\u65e0\u6cd5\u5224\u65ad\u6574\u4f53\u5b8f\u89c2\u73af\u5883\u51fa\u73b0\u663e\u8457\u7684\u79ef\u6781\u6216\u6d88\u6781\u8f6c\u5411\u3002\u5f53\u524d\u8bc4\u4f30\u4e3a\u4e2d\u6027\uff0c\u610f\u5473\u7740\u5b8f\u89c2\u73af\u5883\u53ef\u80fd\u5904\u4e8e\u76f8\u5bf9\u7a33\u5b9a\u6216\u7f3a\u4e4f\u660e\u786e\u65b9\u5411\u7684\u72b6\u6001\u3002\n\n2.  **\u5bf9\u4e1c\u65b9\u8d22\u5bcc\uff08300059.SZ\uff09\u7684\u5f71\u54cd\uff08\u5229\u7a7a\uff09**\uff1a\n    *   \u6838\u5fc3\u5229\u7a7a\u56e0\u7d20\u76f4\u63a5\u6765\u6e90\u4e8e\u65b0\u95fb\u4e2d\u63d0\u53ca\u7684\u76d1\u7ba1\u4e8b\u4ef6\uff1a\"\u4e1c\u65b9\u8d22\u5bcc\u6295\u8d44\u54a8\u8be2\u516c\u53f8\u88ab\u8d23\u4ee4\u6539\u6b63\u5b58\u8425\u9500\u8bef\u5bfc\u7b493\u5b97\u8fdd\u89c4\"\u3002\u8fd9\u8868\u660e\u9488\u5bf9\u91d1\u878d\u79d1\u6280\u53ca\u8bc1\u5238\u54a8\u8be2\u9886\u57df\u7684**\u4ea7\u4e1a\u653f\u7b56\uff08\u76d1\u7ba1\u73af\u5883\uff09\u6b63\u5728\u8d8b\u4e25**\u3002\u76d1\u7ba1\u5904\u7f5a\u4f1a\u76f4\u63a5\u589e\u52a0\u516c\u53f8\u7684\u5408\u89c4\u6210\u672c\uff0c\u53ef\u80fd\u5f71\u54cd\u5176\u76f8\u5173\u4e1a\u52a1\u7684\u77ed\u671f\u62d3\u5c55\u548c\u6536\u5165\uff0c\u5e76\u5bf9\u516c\u53f8\u58f0\u8a89\u9020\u6210\u8d1f\u9762\u5f71\u54cd\u3002\n    *   \u4f5c\u4e3aA\u80a1\u4e92\u8054\u7f51\u5238\u5546\u548c\u91d1\u878d\u79d1\u6280\u9f99\u5934\uff0c\u4e1c\u65b9\u8d22\u5bcc\u7684\u4e1a\u7ee9\u4e0e**\u5e02\u573a\u60c5\u7eea**\u9ad8\u5ea6\u76f8\u5173\u3002\u76d1\u7ba1\u8d1f\u9762\u65b0\u95fb\u4f1a\u6253\u51fb\u6295\u8d44\u8005\u5bf9\u8be5\u677f\u5757\u7684\u4fe1\u5fc3\uff0c\u5f71\u54cd\u5176\u80a1\u4ef7\u8868\u73b0\u3002\u65b0\u95fb\u4e2d\u80a1\u4ef7\u7684\u5c0f\u5e45\u4e0b\u8dcc\uff08-0.55%\uff09\u548c\u4e34\u65f6\u505c\u724c\u53ef\u80fd\u53cd\u6620\u4e86\u5e02\u573a\u7684\u5373\u65f6\u53cd\u5e94\u3002\n    *   \u53e6\u4e00\u6761\u65b0\u95fb\u663e\u793a\u516c\u53f8\u4e3a\u5b50\u516c\u53f8\u5929\u5929\u57fa\u91d1\u63d0\u4f9b\u5de8\u989d\u62c5\u4fdd\uff0825\u4ebf\u5143\uff09\uff0c\u8fd9\u867d\u7136\u4f53\u73b0\u4e86\u5bf9\u6838\u5fc3\u5b50\u516c\u53f8\u7684\u652f\u6301\uff0c\u4f46\u4e5f**\u6f5c\u5728\u5730\u589e\u52a0\u4e86\u516c\u53f8\u7684\u8d22\u52a1\u98ce\u9669\u66b4\u9732**\uff0c\u5728\u76d1\u7ba1\u8d8b\u4e25\u7684\u80cc\u666f\u4e0b\uff0c\u53ef\u80fd\u5f15\u53d1\u6295\u8d44\u8005\u5bf9\u6574\u4f53\u4e1a\u52a1\u7a33\u5065\u6027\u7684\u5173\u6ce8\u3002\n\n3.  **\u5173\u952e\u5f71\u54cd\u56e0\u7d20\u5206\u6790**\uff1a\n    *   **\u4ea7\u4e1a\u653f\u7b56\uff08\u91d1\u878d\u79d1\u6280\u76d1\u7ba1\u8d8b\u4e25\uff09**\uff1a\u8fd9\u662f\u5f53\u524d\u6700\u76f4\u63a5\u3001\u6700\u91cd\u8981\u7684\u5f71\u54cd\u56e0\u7d20\u3002\u4e2d\u56fd\u91d1\u878d\u76d1\u7ba1\u673a\u6784\u6301\u7eed\u52a0\u5f3a\u5bf9\u91d1\u878d\u79d1\u6280\u3001\u8d22\u5bcc\u7ba1\u7406\u3001\u8bc1\u5238\u6295\u8d44\u54a8\u8be2\u7b49\u9886\u57df\u7684\u89c4\u8303\u548c\u6574\u987f\uff0c\u65e8\u5728\u9632\u8303\u98ce\u9669\u3001\u4fdd\u62a4\u6295\u8d44\u8005\u3002\u4efb\u4f55\u8fdd\u89c4\u5904\u7f5a\u90fd\u4f1a\u5bf9\u76f8\u5173\u516c\u53f8\u7684\u8fd0\u8425\u548c\u4f30\u503c\u4ea7\u751f\u538b\u529b\u3002\n    *   **\u5e02\u573a\u60c5\u7eea\uff08\u6295\u8d44\u8005\u5bf9\u5238\u5546\u53ca\u91d1\u878d\u79d1\u6280\u677f\u5757\u98ce\u9669\u504f\u597d\uff09**\uff1a\u76d1\u7ba1\u4e8b\u4ef6\u4f1a\u76f4\u63a5\u5f71\u54cd\u5e02\u573a\u60c5\u7eea\u3002\u6295\u8d44\u8005\u5bf9\u653f\u7b56\u98ce\u9669\u654f\u611f\u7684\u677f\u5757\u4f1a\u91cd\u65b0\u8bc4\u4f30\u5176\u98ce\u9669\u6ea2\u4ef7\uff0c\u53ef\u80fd\u5bfc\u81f4\u8d44\u91d1\u6682\u65f6\u6d41\u51fa\u6216\u6301\u89c2\u671b\u6001\u5ea6\uff0c\u538b\u5236\u80a1\u4ef7\u3002\n    *   **\u8d27\u5e01\u653f\u7b56\uff08\u5f71\u54cd\u5e02\u573a\u6d41\u52a8\u6027\u4e0e\u4ea4\u6613\u6d3b\u8dc3\u5ea6\uff09**\uff1a\u867d\u7136\u65b0\u95fb\u672a\u76f4\u63a5\u63d0\u53ca\uff0c\u4f46\u8d27\u5e01\u653f\u7b56\u662f\u5f71\u54cd\u4e1c\u65b9\u8d22\u5bcc\u8fd9\u7c7b\u516c\u53f8\u7684\u6839\u672c\u5b8f\u89c2\u53d8\u91cf\u3002\u5bbd\u677e\u7684\u8d27\u5e01\u653f\u7b56\uff08\u4f4e\u5229\u7387\u3001\u5145\u88d5\u6d41\u52a8\u6027\uff09\u901a\u5e38\u5229\u597d\u8d44\u672c\u5e02\u573a\uff0c\u63d0\u5347\u5e02\u573a\u4ea4\u6613\u6d3b\u8dc3\u5ea6\uff0c\u4ece\u800c\u589e\u52a0\u516c\u53f8\u7684\u7ecf\u7eaa\u3001\u4e24\u878d\u3001\u57fa\u91d1\u9500\u552e\u7b49\u4e1a\u52a1\u6536\u5165\u3002\u53cd\u4e4b\uff0c\u7d27\u7f29\u7684\u8d27\u5e01\u653f\u7b56\u5219\u6784\u6210\u5229\u7a7a\u3002\u5728\u7f3a\u4e4f\u660e\u786e\u4fe1\u53f7\u65f6\uff0c\u6b64\u56e0\u7d20\u6682\u6309\u4e2d\u6027\u6216\u539f\u6709\u8d8b\u52bf\u8003\u8651\uff0c\u4f46\u5176\u957f\u671f\u91cd\u8981\u6027\u6781\u9ad8\u3002\n\n4.  **\u4e2d\u957f\u671f\u89c6\u89d2**\uff1a\n    *   \u76d1\u7ba1\u8d8b\u4e25\u662f\u884c\u4e1a\u89c4\u8303\u5316\u3001\u957f\u671f\u5065\u5eb7\u53d1\u5c55\u7684\u5fc5\u7ecf\u8fc7\u7a0b\u3002\u867d\u7136\u77ed\u671f\u6784\u6210\u5229\u7a7a\uff0c\u4f46\u6709\u5229\u4e8e\u884c\u4e1a\u51fa\u6e05\u548c\u9f99\u5934\u516c\u53f8\u5e02\u573a\u4efd\u989d\u7684\u5de9\u56fa\uff08\u5982\u679c\u516c\u53f8\u80fd\u6709\u6548\u6574\u6539\uff09\u3002\n    *   \u4e1c\u65b9\u8d22\u5bcc\u7684\u6838\u5fc3\u7ade\u4e89\u529b\u5728\u4e8e\u5176\u4e92\u8054\u7f51\u5e73\u53f0\u3001\u5e9e\u5927\u7684\u7528\u6237\u7fa4\uff08\u4e1c\u65b9\u8d22\u5bcc\u7f51\u3001\u80a1\u5427\u3001\u5929\u5929\u57fa\u91d1\uff09\u548c\u4e00\u7ad9\u5f0f\u91d1\u878d\u670d\u52a1\u751f\u6001\u3002\u957f\u671f\u6765\u770b\uff0c\u5176\u589e\u957f\u4ecd\u4f9d\u8d56\u4e8e**\u8d44\u672c\u5e02\u573a\u6df1\u5316\u6539\u9769\uff08\u5982\u5168\u9762\u6ce8\u518c\u5236\uff09\u3001\u5c45\u6c11\u8d22\u5bcc\u5411\u91d1\u878d\u8d44\u4ea7\u8f6c\u79fb\u7684\u5927\u8d8b\u52bf\u3001\u4ee5\u53ca\u516c\u53f8\u81ea\u8eab\u7684\u4ea7\u54c1\u521b\u65b0\u548c\u5408\u89c4\u7ecf\u8425\u80fd\u529b**\u3002\n    *   \u5f53\u524d\u7684\u76d1\u7ba1\u4e8b\u4ef6\u662f\u4e00\u4e2a\u8b66\u793a\uff0c\u51f8\u663e\u4e86\u516c\u53f8\u5728\u5feb\u901f\u6269\u5f20\u4e2d\u52a0\u5f3a\u5185\u63a7\u548c\u5408\u89c4\u7ba1\u7406\u7684\u91cd\u8981\u6027\u3002\u5b8f\u89c2\u5c42\u9762\u7684\u8d27\u5e01\u653f\u7b56\u548c\u8d44\u672c\u5e02\u573a\u6539\u9769\u8fdb\u7a0b\uff0c\u5c06\u662f\u51b3\u5b9a\u5176\u4e2d\u957f\u671f\u4e1a\u7ee9\u7684\u66f4\u5173\u952e\u53d8\u91cf\u3002"
+}
+2026-04-23 11:49:44 - agent_state - INFO - ✅ 宏观分析师 分析完成
+2026-04-23 11:49:44 - portfolio_management_agent - INFO - ============================================================
+2026-04-23 11:49:44 - portfolio_management_agent - INFO - 🎯 [PORTFOLIO_MANAGER] 开始执行投资组合管理
+2026-04-23 11:49:44 - portfolio_management_agent - INFO - ============================================================
+2026-04-23 11:49:44 - portfolio_management_agent - INFO -   收集到 14 个 Agent 的分析结果:
+2026-04-23 11:49:44 - portfolio_management_agent - INFO -     - fundamentals_agent
+2026-04-23 11:49:44 - portfolio_management_agent - INFO -     - sentiment_agent
+2026-04-23 11:49:44 - portfolio_management_agent - INFO -     - technical_analyst_agent
+2026-04-23 11:49:44 - portfolio_management_agent - INFO -     - valuation_agent
+2026-04-23 11:49:44 - portfolio_management_agent - INFO -     - expectation_diff_agent
+2026-04-23 11:49:44 - portfolio_management_agent - INFO -     - industry_cycle_agent
+2026-04-23 11:49:44 - portfolio_management_agent - INFO -     - institutional_agent
+2026-04-23 11:49:44 - portfolio_management_agent - INFO -     - macro_news_agent
+2026-04-23 11:49:44 - portfolio_management_agent - INFO -     - researcher_bear_agent
+2026-04-23 11:49:44 - portfolio_management_agent - INFO -     - researcher_bull_agent
+2026-04-23 11:49:44 - portfolio_management_agent - INFO -     - debate_room_agent
+2026-04-23 11:49:44 - portfolio_management_agent - INFO -     - risk_management_agent
+2026-04-23 11:49:44 - portfolio_management_agent - INFO -     - macro_analyst_agent
+2026-04-23 11:49:44 - portfolio_management_agent - INFO -     - portfolio_management_agent
+2026-04-23 11:49:44 - agent_state - INFO - 🔄 portfolio_management_agent: --- 正在执行投资组合管理 --- 正在分析...
+2026-04-23 11:49:44 - portfolio_management_agent - INFO -   当前投资组合: 现金=100000.00元, 持仓=0股
+2026-04-23 11:49:44 - agent_state - INFO - portfolio_management_agent
+2026-04-23 11:49:44 - portfolio_management_agent - INFO - 🎯 启用DecisionEngine规则化决策
+2026-04-23 11:49:44 - decision_engine - INFO - DecisionEngine: 开始决策, signals=['technical', 'fundamentals', 'sentiment', 'valuation', 'macro', 'risk', 'industry_cycle', 'institutional', 'expectation_diff'], risk_score=3.0, risk_action=hold, macro_factor=1.0
+2026-04-23 11:49:44 - decision_engine - INFO - 决策规则: total_score=-0.167, bullish=1, bearish=2, neutral=3
+2026-04-23 11:49:44 - decision_engine - INFO - 决策: 规则4触发 -> hold (信号均衡)
+2026-04-23 11:49:44 - portfolio_management_agent - INFO - 🎯 DecisionEngine决策: {'action': 'hold', 'quantity': 0, 'confidence': 0.3, 'reason': '看多1个、看空2个、中性3个; 加权总分: -0.167; 正向因素:;   - institutional(bullish): 0.072(置信度72%); 负向因素:;   - valuation(bearish): -0.177(置信度71%);   - technical(bearish): -0.061(置信度41%); 风险评分: 3/10; 触发规则: 信号均衡或不符合买入条件，观望'}
+2026-04-23 11:49:44 - agent_state - INFO - portfolio_management_agent
+2026-04-23 11:49:44 - agent_state - INFO - portfolio_management_agent
+2026-04-23 11:49:44 - portfolio_management_agent - INFO - ============================================================
+2026-04-23 11:49:44 - portfolio_management_agent - INFO - 🎯 [PORTFOLIO_MANAGER] 最终决策
+2026-04-23 11:49:44 - portfolio_management_agent - INFO - ============================================================
+2026-04-23 11:49:44 - portfolio_management_agent - INFO -   📊 风险评分: 3.0/10
+2026-04-23 11:49:44 - portfolio_management_agent - INFO -   📊 风控建议: hold
+2026-04-23 11:49:44 - portfolio_management_agent - INFO -   📊 最大持仓: 18750.0 股
+2026-04-23 11:49:44 - portfolio_management_agent - INFO -   📊 当前价格: 20.18 元
+2026-04-23 11:49:44 - portfolio_management_agent - INFO -   ━━━━━━━━━━━━━━━━━━━━━━━
+2026-04-23 11:49:44 - portfolio_management_agent - INFO -   ✅ 最终行动: HOLD
+2026-04-23 11:49:44 - portfolio_management_agent - INFO -   ✅ 交易数量: 0 股
+2026-04-23 11:49:44 - portfolio_management_agent - INFO -   ✅ 置信度: 30%
+2026-04-23 11:49:44 - portfolio_management_agent - INFO - ============================================================
+2026-04-23 11:49:44 - agent_state - INFO - 🔄 portfolio_management_agent: --- 投资组合管理完成 --- 正在分析...
+2026-04-23 11:49:44 - main_workflow - INFO - Workflow graph completed for run_id=cd233701-bb6a-496e-aba3-8ea73cfb1fcb with 2778 messages
+2026-04-23 11:49:44 - structured_terminal - INFO -
 ════════════════════════════════════════════════════════════════════════════════
-                               股票代码 002714 投资分析报告
+                               股票代码 300059 投资分析报告
 ════════════════════════════════════════════════════════════════════════════════
-                         分析区间: 2025-04-21 至 2026-04-21
+                         分析区间: 2025-04-22 至 2026-04-22
 
 ╔════════════════════════════════════ 📈 技术分析 ════════════════════════════════════╗
-║ 信号: ◽ 中性
-║ 置信度: 11%
-║ ├─ 信号: 中性
-║ ├─ 置信度: 11%
+║ 信号: 📉 看空
+║ 置信度: 41%
+║ ├─ 信号: 看空
+║ ├─ 置信度: 41%
 ║ └─ 策略信号:
 ║   ├─ 趋势跟踪:
 ║     ├─ 信号: 中性
 ║     ├─ 置信度: 50%
 ║     └─ 指标:
-║       ├─ ADX: 25.484922623062737
-║       ├─ 趋势强度: 25.48%
+║       ├─ ADX: 39.43895737680944
+║       ├─ 趋势强度: 39.44%
 ║       ├─ volume_confirmation: 0.00%
 ║       └─ ma_alignment: 中性
 ║   ├─ 均值回归:
 ║     ├─ 信号: 中性
 ║     ├─ 置信度: 50%
 ║     └─ 指标:
-║       ├─ Z分数: -0.26
-║       ├─ 价格vs布林带: 74.19%
-║       ├─ RSI(14): 68.5349065880039
-║       └─ RSI(28): 42.92574806058367
+║       ├─ Z分数: -0.49
+║       ├─ 价格vs布林带: 79.61%
+║       ├─ RSI(14): 60.73752711496747
+║       └─ RSI(28): 43.48785871964679
 ║   ├─ 动量:
+║     ├─ 信号: 看空
+║     ├─ 置信度: 80%
+║     └─ 指标:
+║       ├─ 1月动量: 3.33%
+║       ├─ 3月动量: -19.33%
+║       ├─ 6月动量: -21.72%
+║       └─ 成交量动量: 1.1943447754742003
+║   ├─ 波动性:
 ║     ├─ 信号: 中性
 ║     ├─ 置信度: 50%
 ║     └─ 指标:
-║       ├─ 1月动量: -7.41%
-║       ├─ 3月动量: -4.20%
-║       ├─ 6月动量: -14.23%
-║       └─ 成交量动量: 64.72%
-║   ├─ 波动性:
-║     ├─ 信号: 看空
-║     ├─ 置信度: 34%
-║     └─ 指标:
-║       ├─ 历史波动率: 48.09%
-║       ├─ 波动率区间: 1.278187719398451
-║       ├─ 波动率Z分数: 1.03
-║       └─ ATR比率: 3.05%
+║       ├─ 历史波动率: 34.31%
+║       ├─ 波动率区间: 1.2787069671144107
+║       ├─ 波动率Z分数: 0.89
+║       └─ ATR比率: 2.85%
 ║   └─ 统计套利:
 ║     ├─ 信号: 中性
 ║     ├─ 置信度: 50%
 ║     └─ 指标:
 ║       ├─ 赫斯特指数: N/A
-║       ├─ 偏度: -0.72
-║       └─ 峰度: 2.0912890981195233
+║       ├─ 偏度: 0.28
+║       └─ 峰度: 1.6352712081178822
 ╚══════════════════════════════════════════════════════════════════════════════╝
 
 ╔═══════════════════════════════════ 📝 基本面分析 ═══════════════════════════════════╗
-║ 信号: 📉 看空
-║ 置信度: 50%
-║ ├─ 信号: 看空
-║ ├─ 置信度: 50%
+║ 信号: ◽ 中性
+║ 置信度: 33%
+║ ├─ 信号: 中性
+║ ├─ 置信度: 33%
 ║ └─ 推理:
 ║   ├─ 盈利能力信号:
-║     ├─ 信号: 看空
-║     └─ 详情: 净资产收益率(ROE): -1.39%, 净利率(Net Margin): -4.09%, 营业利润率(Op Margin): -3.19%
+║     ├─ 信号: 看多
+║     └─ 详情: 净资产收益率(ROE): 13.15%, 净利率(Net Margin): 342.12%, 营业利润率(Op Margin): 397.35%
 ║   ├─ 增长信号:
-║     ├─ 信号: 看空
-║     └─ 详情: 营收增长率(Revenue Growth): -17.10%, 盈利增长率(Earnings Growth): -126.46%
+║     ├─ 信号: 看多
+║     └─ 详情: 营收增长率(Revenue Growth): 13.55%, 盈利增长率(Earnings Growth): 25.75%
 ║   ├─ 财务健康信号:
-║     ├─ 信号: 中性
-║     └─ 详情: 流动比率(Current Ratio): 0.91, 负债权益比(D/E): 0.51
+║     ├─ 信号: 看空
+║     └─ 详情: 流动比率(Current Ratio): 1.36, 负债权益比(D/E): 0.77
 ║   ├─ 价格比率信号:
 ║     ├─ 信号: 看空
-║     └─ 详情: 市盈率(P/E): N/A, 市净率(P/B): 3.01, 市销率(P/S): 8.70
+║     └─ 详情: 市盈率(P/E): 26.39, 市净率(P/B): 3.47, 市销率(P/S): 19.61
 ║   ├─ pb_roe_analysis:
 ║     ├─ 信号: 中性
 ║     ├─ 置信度: 50%
-║     ├─ 推理: PB(3.0), ROE(-0.0%)处于合理区间
+║     ├─ 推理: PB(3.5), ROE(0.1%)处于合理区间
 ║     ├─ pb_percentile:
 ║       ├─ level: medium
-║       └─ value: 3.01
+║       └─ value: 3.47
 ║     └─ roe_percentile:
-║       ├─ level: low
-║       └─ value: -1.39%
+║       ├─ level: medium
+║       └─ value: 13.15%
 ║   ├─ cyclical_analysis:
 ║     ├─ is_cyclical: ❌
-║     ├─ industry:
-║     └─ 推理: 无法确定行业，默认非周期股
+║     ├─ industry: 证券Ⅱ
+║     └─ 推理: 非周期行业
 ║   └─ revenue_quality_analysis:
 ║     ├─ 信号: 中性
 ║     ├─ 置信度: 30%
@@ -869,10 +999,10 @@ Getting price history for 002714...
 
 ╔════════════════════════════════════ 🔍 情感分析 ════════════════════════════════════╗
 ║ 信号: ◽ 中性
-║ 置信度: 95%
+║ 置信度: 93%
 ║ ├─ 信号: 中性
-║ ├─ 置信度: 95%
-║ ├─ 推理: 综合情绪分数: 0.07 → 信号: neutral (置信度: 95%)
+║ ├─ 置信度: 93%
+║ ├─ 推理: 综合情绪分数: -0.09 → 信号: neutral (置信度: 93%)
 
 【数据源权重分配】
   • news: 35%
@@ -881,37 +1011,37 @@ Getting price history for 002714...
   • north: 15%
 
 【各数据源分析】
-  新闻情绪: 分数=0.10, 权重=35%, 贡献=0.04, 新闻数=13
-  股吧情绪: 分数=-0.40, 反向信号=-0.20, 调整后=-0.20, 权重=15%, 贡献=-0.03
-    (帖子数=30, 看多=25%, 看空=40%, 热度=4.6)
-  量化指标: 分数=0.18, 权重=35%, 贡献=0.06
-    (评分=70.2 趋势=down, 机构参与度=39.1, 关注度=93.2)
-║ ├─ combined_score: 6.70%
+  新闻情绪: 分数=-0.60, 权重=35%, 贡献=-0.21, 新闻数=17
+  股吧情绪: 分数=0.30, 反向信号=0.15, 调整后=0.15, 权重=15%, 贡献=0.02
+    (帖子数=30, 看多=40%, 看空=5%, 热度=8.9)
+  量化指标: 分数=0.27, 权重=35%, 贡献=0.10
+    (评分=71.3 趋势=平稳, 机构参与度=52.9, 关注度=94.0)
+║ ├─ combined_score: -9.20%
 ║ ├─ components:
 ║   ├─ news:
-║     ├─ score: 10.00%
+║     ├─ score: -60.00%
 ║     ├─ weight: 35.00%
-║     ├─ count: 13
-║     └─ contribution: 3.50%
+║     ├─ count: 17
+║     └─ contribution: -21.00%
 ║   ├─ guba:
-║     ├─ score: -40.00%
-║     ├─ reverse_signal: -20.00%
-║     ├─ adjusted_score: -20.00%
+║     ├─ score: 30.00%
+║     ├─ reverse_signal: 15.00%
+║     ├─ adjusted_score: 15.00%
 ║     ├─ weight: 15.00%
 ║     ├─ post_count: 30
-║     ├─ bull_ratio: 25.00%
-║     ├─ bear_ratio: 40.00%
-║     ├─ heat: 4.63
-║     ├─ contribution: -3.00%
+║     ├─ bull_ratio: 40.00%
+║     ├─ bear_ratio: 5.00%
+║     ├─ heat: 8.88
+║     ├─ contribution: 2.20%
 ║     └─ reverse_reason: 股吧情绪处于中性区间
 ║   ├─ quant:
-║     ├─ score: 17.80%
+║     ├─ score: 27.30%
 ║     ├─ weight: 35.00%
-║     ├─ rating: 70.23
-║     ├─ rating_trend: down
-║     ├─ institution: 39.13
-║     ├─ focus: 93.2
-║     └─ contribution: 6.20%
+║     ├─ rating: 71.3
+║     ├─ rating_trend: stable
+║     ├─ institution: 52.93
+║     ├─ focus: 94.0
+║     └─ contribution: 9.60%
 ║   └─ north_money:
 ║     ├─ 信号: 中性
 ║     ├─ score: 50.00%
@@ -929,19 +1059,16 @@ Getting price history for 002714...
 
 ╔════════════════════════════════════ 💰 估值分析 ════════════════════════════════════╗
 ║ 信号: 📉 看空
-║ 置信度: 79%
+║ 置信度: 71%
 ║ ├─ 信号: 看空
-║ ├─ 置信度: 79%
+║ ├─ 置信度: 71%
 ║ └─ 推理:
 ║   ├─ DCF分析:
-║     ├─ 信号: 中性
-║     └─ 详情: DCF计算无效（自由现金流: $-1,222,150,012.25），已跳过
-║   ├─ 所有者收益分析:
-║     ├─ 信号: 中性
-║     └─ 详情: 所有者收益计算无效，已跳过
-║   └─ revenue_analysis:
 ║     ├─ 信号: 看空
-║     └─ 详情: 营收: 298.94亿, 同比增速: -79.3%
+║     └─ 详情: DCF内在价值: 1208.5亿, 市值: 3151.3亿, 差距: -61.7%
+║   └─ 所有者收益分析:
+║     ├─ 信号: 看空
+║     └─ 详情: 所有者收益: 399.2亿
 ╚══════════════════════════════════════════════════════════════════════════════╝
 
 ╔═══════════════════════════════════ 🐂 多方研究分析 ═══════════════════════════════════╗
@@ -957,29 +1084,48 @@ Getting price history for 002714...
 ╚══════════════════════════════════════════════════════════════════════════════╝
 
 ╔═══════════════════════════════════ 🐻 空方研究分析 ═══════════════════════════════════╗
-║ 置信度: 47%
+║ 置信度: 43%
 ║ ├─ 观点: 看空
-║ ├─ 置信度: 47%
+║ ├─ 置信度: 43%
 ║ ├─ 论点:
-║   ├─ 技术反弹可能是暂时的，暗示潜在反转
-║   ├─ 基本面令人担忧，置信度为50%
+║   ├─ 技术指标显示看空动能，置信度为41%
+║   ├─ 当前基本面的强劲可能不可持续
 ║   ├─ 市场情绪可能过于乐观，表明存在潜在风险
-║   └─ 股票被高估，置信度为79%
+║   └─ 股票被高估，置信度为71%
 ║ └─ 推理: 基于技术、基本面、情绪和估值因素的综合分析得出看空观点
 ╚══════════════════════════════════════════════════════════════════════════════╝
 
 ╔═══════════════════════════════════ 🗣️ 辩论室分析 ═══════════════════════════════════╗
 ║ 信号: 📉 看空
-║ 置信度: 47%
+║ 置信度: 43%
 ║ ├─ 信号: 看空
-║ ├─ 置信度: 47%
+║ ├─ 置信度: 43%
 ║ ├─ 多方置信度: 30.00%
-║ ├─ 空方置信度: 47.25%
-║ ├─ 置信度差异: -17.25%
-║ ├─ LLM评分: -30.00%
-║ ├─ LLM分析: 从提供的观点来看，BEARISH观点的置信度（0.4725）高于BULLISH观点（0.3），且前者在多个维度上给出了具体的数据支持，例如基本面担忧和估值过高的置信度（分别为50%和79%），显示出较强的逻辑依据。BEARISH观点强调技术反弹可能是暂时的，并指出市场情绪过于乐观，这与历史中常见的“过度乐观后回调”现象一致，尤其在高估值背景下。BULLISH观点虽然指出技术指标保守和基本面改善潜力，但置信度较低，且“市场情绪过于悲观”的论点在当前高估值环境下缺乏直接证据，可能过于依赖假设。综合来看，BEARISH观点的具体数据和更高的置信度更具说服力，但BULLISH观点中的“增长潜力未被完全反映”有一定道理，因此整体偏向谨慎看空。
-║ ├─ LLM推理: 高估值（79%置信度）和基本面担忧（50%置信度）是主要风险，且BEARISH观点置信度更高，但BULLISH观点中的改善潜力为市场提供了一定支撑，因此评分设为轻度看空。
-║ ├─ 混合置信度差异: -21.08%
+║ ├─ 空方置信度: 43.00%
+║ ├─ 置信度差异: -13.00%
+║ ├─ LLM评分: -20.00%
+║ ├─ LLM分析: 作为第三方金融分析师，我对双方观点进行如下评估：
+
+看空观点（置信度0.43）的优势：
+1. 估值过高论点（71%置信度）具有较强说服力，估值是投资决策的核心考量
+2. 对基本面可持续性的质疑符合周期分析逻辑
+3. 指出市场情绪过于乐观是合理的风险提示
+
+看多观点（置信度0.3）的优势：
+1. 强调基本面改善潜力，关注公司内在价值变化
+2. 市场情绪过度悲观可能创造机会的观点符合逆向投资思维
+3. 技术指标保守提供买入机会的论点有一定合理性
+
+双方观点的局限性：
+- 看空方：技术指标看空动能置信度仅41%，说服力较弱；未提供具体估值过高的量化依据
+- 看多方：观点较为笼统，缺乏具体的基本面改善证据和估值测算
+
+最有说服力的论点：
+看空方的"股票被高估（置信度71%）"论点最具说服力，因为估值是决定长期投资回报的关键因素，且该论点置信度最高。
+
+综合评估：双方观点均有一定合理性但证据都不够充分。看空方在估值风险方面提出更具体的担忧，而看多方更多是基于潜在可能性的推测。
+║ ├─ LLM推理: 评分-0.2（略微看空）的理由：1) 看空观点整体置信度（0.43）高于看多观点（0.3）；2) 估值过高论点的71%置信度是双方所有论点中置信度最高的；3) 当前市场情绪可能过于乐观的警示值得重视；4) 但技术指标看空动能置信度较低（41%），且基本面可能仍有支撑，因此不看极度看空。
+║ ├─ 混合置信度差异: -15.10%
 ║ ├─ 辩论摘要:
 ║   ├─ 看多观点:
 ║   ├─ + 技术指标可能较为保守，提供了买入机会
@@ -988,22 +1134,22 @@ Getting price history for 002714...
 ║   ├─ + 当前估值可能未完全反映增长潜力
 ║   ├─
 看空观点:
-║   ├─ - 技术反弹可能是暂时的，暗示潜在反转
-║   ├─ - 基本面令人担忧，置信度为50%
+║   ├─ - 技术指标显示看空动能，置信度为41%
+║   ├─ - 当前基本面的强劲可能不可持续
 ║   ├─ - 市场情绪可能过于乐观，表明存在潜在风险
-║   └─ - 股票被高估，置信度为79%
+║   └─ - 股票被高估，置信度为71%
 ║ └─ 推理: 看空观点更具说服力
 ╚══════════════════════════════════════════════════════════════════════════════╝
 
 ╔══════════════════════════════════ ⚠️ 风险管理分析 ══════════════════════════════════╗
 ║ ├─ 最大持仓规模: 18750.0
-║ ├─ 风险评分: 2
+║ ├─ 风险评分: 3
 ║ ├─ 交易行动: 持有
 ║ ├─ 风险指标:
-║   ├─ 波动率: 29.18%
-║   ├─ 95%风险价值: -2.27%
-║   ├─ 最大回撤: -19.45%
-║   ├─ 市场风险评分: 2
+║   ├─ 波动率: 32.27%
+║   ├─ 95%风险价值: -2.86%
+║   ├─ 最大回撤: -26.52%
+║   ├─ 市场风险评分: 3
 ║   └─ 压力测试结果:
 ║     ├─ 市场崩盘:
 ║       ├─ 潜在损失: -3750.0
@@ -1016,52 +1162,61 @@ Getting price history for 002714...
 ║       └─ 组合影响: -0.79%
 ║ ├─ 辩论分析:
 ║   ├─ 多方置信度: 30.00%
-║   ├─ 空方置信度: 47.25%
-║   ├─ 辩论置信度: 47.25%
+║   ├─ 空方置信度: 43.00%
+║   ├─ 辩论置信度: 43.00%
 ║   └─ 辩论信号: 看空
-║ └─ 推理: 风险评分 2/10: 市场风险=2, 波动率=29.18%, 风险价值=-2.27%, 最大回撤=-19.45%, 辩论信号=bearish
+║ └─ 推理: 风险评分 3/10: 市场风险=3, 波动率=32.27%, 风险价值=-2.86%, 最大回撤=-26.52%, 辩论信号=bearish
 ╚══════════════════════════════════════════════════════════════════════════════╝
 
 ╔═════════════════════════════════ 🌍 针对所选股宏观分析 ═════════════════════════════════╗
 ║ ├─ 宏观环境: 中性
-║ ├─ 对股票影响: 中性
+║ ├─ 对股票影响: 消极
 ║ ├─ 关键因素:
-║   ├─ 产业政策：生猪行业产能调控政策存在不确定性，网传要求缩减出栏量需关注官方动态
-║   ├─ 货币政策：公司连续发行中期票据和超短期融资券，反映融资环境相对宽松，但利率水平影响财务成本
-║   ├─ 市场情绪：猪企竞争格局变化（牧原与温氏对比），市场对行业龙头规模扩张的预期分化
-║   ├─ 国际环境：全球饲料原料（如大豆、玉米）价格受地缘政治和贸易关系影响，间接传导至养殖成本
-║   └─ 财政政策：乡村振兴主题债券发行获得支持，显示政策对农业的倾斜，但具体补贴力度未明
-║ └─ 推理: 1. 宏观环境评估为中性：当前宏观经济呈现结构性分化，货币政策保持适度宽松，公司通过发行中期票据和超短期融资券（含乡村振兴主题）顺利融资，表明流动性尚可。但产业政策层面，网传缩减出栏量的消息带来不确定性，虽公司未确认，但若政策落地将直接影响行业供给和盈利预期。同时，全球饲料原料价格波动和地缘政治风险（如俄乌冲突对粮食贸易的影响）构成成本端压力。整体看，宏观环境无明显系统性风险，但行业特定政策风险中和了正面因素。
+║   ├─ 产业政策（金融科技监管趋严）
+║   ├─ 市场情绪（投资者对券商及金融科技板块风险偏好）
+║   └─ 货币政策（影响市场流动性与交易活跃度）
+║ └─ 推理: 基于提供的新闻信息，分析如下：
 
-2. 对牧原股份影响评估为中性：公司预计2026年销售商品猪7500万头，显示产能扩张计划明确，规模效应有助于摊薄成本。但若遭遇产能调控政策，实际出栏量可能不及预期，压制业绩增长空间。融资活动（中票、超短融）表明公司有能力获取资金支持扩张，但付息压力会随债务规模上升。市场竞争方面，温氏股份等对手的转型动态可能分流市场关注度， 短期股价波动反映投资者分歧。综合看，公司基本面稳健，但宏观和政策风险限制了超额收益空间。
+1.  **宏观环境评估（中性）**：
+    *   新闻中未提供关于利率、财政支出、国际贸易等明确的宏观政策变动信息。因此，无法判断整体宏观环境出现显著的积极或消极转向。当前评估为中性，意味着宏观环境可能处于相对稳定或缺乏明确方向的状态。
 
-3. 关键因素分析：
-   - 产业政策是核心变量，需密切跟踪农业农村部对生猪产能调控的具体措施，尤其是出栏量限制是否属实及执行力度。
-   - 融资环境宽松为扩产提供支持，但需关注未来利率走势对财务费用的影响。
-   - 国际农产品价格波动影响养殖成本，若中美贸易摩擦升级或全球粮食减产，将增加成本压力。
-   - 乡村振兴政策导向利好头部企业，但实际补贴和税收优惠规模有限，难以扭转行业周期。
-   - 市场情绪受行业竞争和股价技术面影响，短期可能延续震荡，中长期取决于政策落地效果和猪价走势。
+2.  **对东方财富（300059.SZ）的影响（利空）**：
+    *   核心利空因素直接来源于新闻中提及的监管事件："东方财富投资咨询公司被责令改正存营销误导等3宗违规"。这表明针对金融科技及证券咨询领域的**产业政策（监管环境）正在趋严**。监管处罚会直接增加公司的合规成本，可能影响其相关业务的短期拓展和收入，并对公司声誉造成负面影响。
+    *   作为A股互联网券商和金融科技龙头，东方财富的业绩与**市场情绪**高度相关。监管负面新闻会打击投资者对该板块的信心，影响其股价表现。新闻中股价的小幅下跌（-0.55%）和临时停牌可能反映了市场的即时反应。
+    *   另一条新闻显示公司为子公司天天基金提供巨额担保（25亿元），这虽然体现了对核心子公司的支持，但也**潜在地增加了公司的财务风险暴露**，在监管趋严的背景下，可能引发投资者对整体业务稳健性的关注。
+
+3.  **关键影响因素分析**：
+    *   **产业政策（金融科技监管趋严）**：这是当前最直接、最重要的影响因素。中国金融监管机构持续加强对金融科技、财富管理、证券投资咨询等领域的规范和整顿，旨在防范风险、保护投资者。任何违规处罚都会对相关公司的运营和估值产生压力。
+    *   **市场情绪（投资者对券商及金融科技板块风险偏好）**：监管事件会直接影响市场情绪。投资者对政策风险敏感的板块会重新评估其风险溢价，可能导致资金暂时流出或持观望态度，压制股价。
+    *   **货币政策（影响市场流动性与交易活跃度）**：虽然新闻未直接提及，但货币政策是影响东方财富这类公司的根本宏观变量。宽松的货币政策（低利率、充裕流动性）通常利好资本市场，提升市场交易活跃度，从而增加公司的经纪、两融、基金销售等业务收入。反之，紧缩的货币政策则构成利空。在缺乏明确信号时，此因素暂按中性或 原有趋势考虑，但其长期重要性极高。
+
+4.  **中长期视角**：
+    *   监管趋严是行业规范化、长期健康发展的必经过程。虽然短期构成利空，但有利于行业出清和龙头公司市场份额的巩固（如果公司能有效整改）。
+    *   东方财富的核心竞争力在于其互联网平台、庞大的用户群（东方财富网、股吧、天天基金）和一站式金融服务生态。长期来看，其增长仍依赖于**资本市场深化改革（如全面注册制）、居民财富向金融资产转移的大趋势、以及公司自身的产品创新和合规经营能力**。
+    *   当前的监管事件是一个警示，凸显了公司在快速扩张中加强内控和合规管理的重要性。宏观层面的货币政策和资本市场改革进程，将是决定其中长期业绩的更关键变量。
 ╚══════════════════════════════════════════════════════════════════════════════╝
 
 ╔═══════════════════════════════════ 📰 宏观新闻分析 ═══════════════════════════════════╗
-║ 宏观新闻Agent分析 2026-04-21 (是否从缓存加载=True):\n### **沪深300指数（000300）宏观分析报告**
-**报告日期：** 2026年4月21日
+║ 宏观新闻Agent分析 2026-04-22 (是否从缓存加载=True):\n### **沪深300指数（000300）宏观分析报告**
+**报告日期：2026年4月23日**
 
-**1. 市场情绪解读：偏向谨慎，资金面存压**
-当前市场情绪整体偏向**谨慎**。核心判断依据在于资金流向数据：作为跟踪沪深300指数的核心工具之一，沪深300ETF工银（510350）在4月17日录得**净赎回444.25万元**。尽管单日净赎回绝对金额不大，但这一现象表明，在市场当前点位，部分资金选择了获利了结或暂时离场，而非持续流入。这反映出投资者对后市短期走势存在分歧，风险偏好有所降低，观望情绪较浓。
+---
 
-**2. 热点板块识别：无明显热点驱动**
-基于所提供的单一新闻数据，**未能识别出明确的热点板块或主题**。该新闻焦点集中于宽基指数的资金流动情况，属于市场整体层面的资金面观测，并未涉及任何具体的行业、板块或主题性驱动信息。这从侧面说明，当日市场可能缺乏引领性的结构性行情，整体处于震荡或观望格局。
+#### **1. 市场情绪解读：谨慎偏悲观**
+当前市场情绪整体呈现**谨慎偏悲观**态势。核心判断依据在于，当日提供的全部新闻数据均指向一个共同现象：**主要沪深300ETF产品遭遇普遍性、持续性的资金净赎回**。例如，华夏沪深300ETF已连续5日净赎回，广发、工银、国联安等多家机构旗下产品亦同步出现资金流出。ETF作为机构及大额资金配置A股核心资产的重要工具，其持续的净赎回通常反映“聪明资金”对后市持谨慎态度，正在阶段性撤出或降低风险敞口。这暗示市场缺乏增量资金支持，且存在一定的获利了结或避险需求，情绪偏向负面。
 
-**3. 潜在风险提示：资金流出压力与市场流动性分层**
-*   **资金流出压力**：ETF的持续或扩大化净赎回，可能形成负反馈循环，对指数权重股构成抛压，从而压制沪深300指数的整体表现。这是当前最直接的市场层面风险。
-*   **市场流动性分层风险**：新闻提及该ETF管理费率和托管费率极低（合计0.20%/年），这通常是大型、流动性好的产品的特征。若此类低成本核心工具都出现资金流出，需警惕市场流动性可能向少数头部产品进一步集中，而其他中小盘或主题型资产的流动性可能面临挑战，加剧市场内部的结构性分化。
+#### **2. 热点板块识别**
+基于现有新闻数据，**未能识别出明确的热点板块或主题**。所有新闻均聚焦于宽基指数ETF的资金流向，并未涉及任何具体的行业、板块或主题性信息。这本身传递出一个信号：当前市场可能缺乏具有强大共识和持续性的结构性行情，资金更倾向于从代表市场整体的蓝筹指数中流出，市场活跃度可能集中于个别题材或板块，而非沪深300所代表的 大盘蓝筹风格。
 
-**4. 政策影响分析：无直接政策信息**
-本次提供的新闻数据中**未提及任何重要的新政策变动**，因此无法进行相关政策影响分析。市场短期波动主要受资金面和技术面因素主导。
+#### **3. 潜在风险提示**
+- **流动性收缩风险**：多只核心ETF同步遭遇净赎回，表明市场正面临一定的流动性收缩压力。若此趋势延续，可能削弱对大盘蓝筹股的支撑力，导致指数承压，并可能引发负反馈效应（即指数下跌→ETF净值下跌→赎回增加→抛压加大）。
+- **机构信心不足风险**：ETF的主要参与者为机构投资者和长期资金。其集体赎回行为可能暗示，部分机构对短期宏观经济前景、企业盈利修复力度或市场估值水平存在担忧，机构信心有待修复。这构成了市场层面的潜在风险。
 
-**5. 综合展望：短期或维持震荡整固格局**
-综合来看，市场情绪谨慎，缺乏明确的上行催化，且面临一定的资金流出压力。在无重大利好政策或宏观数据刺激的情况下，预计沪深300指数短期将维持**震荡整固格局**，上行空间可能受限。市场需要新的催化剂（如经济数据超预期、实质性利好政策出台或外部环境改善）来扭转当前谨慎的资金面情绪，并选择突破方向。投资者应密切关注后续ETF资金流向的持续性变化以及市场成交量的配合情况。
+#### **4. 政策影响分析**
+当日新闻数据中**未提及任何新的重要政策变动**。因此，暂无直接的政策影响需要分析。当前市场情绪和资金流向更多地反映了市场参与者基于现有政策环境和经济基本面的自发行为。
+
+#### **5. 综合展望**
+综合来看，沪深300指数短期内面临**下行压力大于上行动力**的格局。持续的资金净流出是市场最直接的负面信号，反映出投资者风险偏好下降。在没有突发性重大利好政策或宏观数据刺激的情况下，市场需要时间消化当前的抛压并重建信心。预计短期市场（未来数个交易日至一周）将维持**震荡偏弱**的走势，需密切关注ETF资金流向是否出现 逆转信号，以及是否有新的增量资金入场承接。建议投资者保持谨慎，控制仓位，等待市场企稳和更明确的基本面或政策信号。
 ╚══════════════════════════════════════════════════════════════════════════════╝
 
 ╔══════════════════════════════════ 📂 投资组合管理分析 ══════════════════════════════════╗
@@ -1069,69 +1224,70 @@ Getting price history for 002714...
 ║ 交易数量: 0
 ║ 决策信心: 30%
 ║ ● 各分析师意见:
-║   • 技术分析: ◽ 中性 (置信度: 11%)
-║   • 基本面分析: 📉 看空 (置信度: 50%)
-║   • 情绪分析: ◽ 中性 (置信度: 95%)
-║   • 估值分析: 📉 看空 (置信度: 79%)
+║   • 技术分析: 📉 看空 (置信度: 41%)
+║   • 基本面分析: ◽ 中性 (置信度: 33%)
+║   • 情绪分析: ◽ 中性 (置信度: 93%)
+║   • 估值分析: 📉 看空 (置信度: 71%)
 ║   • 风险管理: ⏸️ 持有 (置信度: 100%)
-║   • 宏观分析: ◽ 中性 (置信度: 50%)
+║   • 宏观分析:  消极 (置信度: 50%)
 ║   • 宏观新闻分析: ◽ 中性 (置信度: 10%)
-║   • debate_room: 📉 看空 (置信度: 47%)
-║   • industry_cycle: ◽ 中性 (置信度: 30%)
-║   • institutional: ◽ 中性 (置信度: 40%)
-║   • expectation_diff: ◽ 中性 (置信度: 30%)
+║   • 辩论室: 📉 看空 (置信度: 43%)
+║   • 行业周期: ◽ 中性 (置信度: 30%)
+║   • 机构持仓: 📈 看多 (置信度: 72%)
+║   • 预期差: 📈 看多 (置信度: 75%)
 ║ ● 决策理由:
-║   [DecisionEngine] 负向因素: valuation; 总分: -0.297
+║   [DecisionEngine] 看多1个、看空2个、中性3个; 加权总分: -0.167; 正向因素:;   - institutional(bull
+║   ish): 0.072(置信度72%); 负向因素:;   - valuation(bearish): -0.177(置信度71%);   - tech
+║   nical(bearish): -0.061(置信度41%); 风险评分: 3/10; 触发规则: 信号均衡或不符合买入条件，观望
 ║ ├─ 行动: 持有
 ║ ├─ 数量: 0
 ║ ├─ 置信度: 30%
 ║ ├─ 各分析师信号:
 ║   ├─ Agent 1:
 ║       ├─ 分析师名称: 技术分析
-║       ├─ 信号: 中性
-║       └─ 置信度: 11%
+║       ├─ 信号: 看空
+║       └─ 置信度: 41%
 ║   ├─ Agent 2:
 ║       ├─ 分析师名称: 基本面分析
-║       ├─ 信号: 看空
-║       └─ 置信度: 50%
+║       ├─ 信号: 中性
+║       └─ 置信度: 33%
 ║   ├─ Agent 3:
 ║       ├─ 分析师名称: 情绪分析
 ║       ├─ 信号: 中性
-║       └─ 置信度: 95%
+║       └─ 置信度: 93%
 ║   ├─ Agent 4:
 ║       ├─ 分析师名称: 估值分析
 ║       ├─ 信号: 看空
-║       └─ 置信度: 79%
+║       └─ 置信度: 71%
 ║   ├─ Agent 5:
 ║       ├─ 分析师名称: 风险管理
 ║       ├─ 信号: 持有
 ║       └─ 置信度: 100%
 ║   ├─ Agent 6:
 ║       ├─ 分析师名称: 宏观分析
-║       ├─ 信号: 中性
+║       ├─ 信号: 消极
 ║       └─ 置信度: 50%
 ║   ├─ Agent 7:
 ║       ├─ 分析师名称: 宏观新闻分析
 ║       ├─ 信号: 中性
 ║       └─ 置信度: 10%
 ║   ├─ Agent 8:
-║       ├─ 分析师名称: debate_room
+║       ├─ 分析师名称: 辩论室
 ║       ├─ 信号: 看空
-║       └─ 置信度: 47%
+║       └─ 置信度: 43%
 ║   ├─ Agent 9:
-║       ├─ 分析师名称: industry_cycle
+║       ├─ 分析师名称: 行业周期
 ║       ├─ 信号: 中性
 ║       └─ 置信度: 30%
 ║   ├─ Agent 10:
-║       ├─ 分析师名称: institutional
-║       ├─ 信号: 中性
-║       └─ 置信度: 40%
+║       ├─ 分析师名称: 机构持仓
+║       ├─ 信号: 看多
+║       └─ 置信度: 72%
 ║   └─ Agent 11:
-║       ├─ 分析师名称: expectation_diff
-║       ├─ 信号: 中性
-║       └─ 置信度: 30%
-║ └─ 推理: [DecisionEngine] 负向因素: valuation; 总分: -0.297
+║       ├─ 分析师名称: 预期差
+║       ├─ 信号: 看多
+║       └─ 置信度: 75%
+║ └─ 推理: [DecisionEngine] 看多1个、看空2个、中性3个; 加权总分: -0.167; 正向因素:;   - institutional(bullish): 0.072(置信度72%); 负向因素:;   - valuation(bearish): -0.177(置信度71%);   - technical(bearish): -0.061(置信度41%); 风险评分: 3/10; 触发规则: 信号均衡或不符合买入条件，观望
 ╚══════════════════════════════════════════════════════════════════════════════╝
 
 ════════════════════════════════════════════════════════════════════════════════
-admin@admindeMacBook-Pro-101 A_Share_investment_Agent %

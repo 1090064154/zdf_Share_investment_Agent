@@ -416,13 +416,16 @@ def _format_reasoning(result: dict, news_count: int) -> str:
     # 量化指标
     quant_comp = components['quant']
     if quant_comp['score'] != 0:
+        # 将英文趋势转换为中文
+        trend_map = {'up': '上升', 'down': '下降', 'stable': '平稳'}
+        trend_cn = trend_map.get(quant_comp['rating_trend'], quant_comp['rating_trend'])
         reasoning_parts.append(
             f"  量化指标: 分数={quant_comp['score']:.2f}, "
             f"权重={quant_comp['weight']*100:.0f}%, "
             f"贡献={quant_comp['contribution']:.2f}"
         )
         reasoning_parts.append(
-            f"    (评分={quant_comp['rating']:.1f} 趋势={quant_comp['rating_trend']}, "
+            f"    (评分={quant_comp['rating']:.1f} 趋势={trend_cn}, "
             f"机构参与度={quant_comp['institution']:.1f}, "
             f"关注度={quant_comp['focus']:.1f})"
         )

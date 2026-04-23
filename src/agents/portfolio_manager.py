@@ -133,13 +133,48 @@ def _has_usable_macro_news_summary(summary: str) -> bool:
 
 @agent_endpoint("portfolio_management", "负责投资组合管理和最终交易决策")
 def portfolio_management_agent(state: AgentState):
-    """Responsible for portfolio management"""
+    """
+    投资组合管理Agent - 最终交易决策者
+    
+    【整体功能】
+    综合所有分析师的意见，结合风险管理约束，做出最终的交易决策（买入/卖出/持有）
+    
+    【工作流程】
+    1. 收集所有上游Agent的分析结果
+    2. 提取各Agent的信号和置信度
+    3. 构建决策上下文
+    4. 使用DecisionEngine规则引擎或LLM进行决策
+    5. 应用风险管理强制规则
+    6. 输出最终交易决策
+    
+    【输入依赖】
+    - technical_analyst_agent: 技术分析结果
+    - fundamentals_agent: 基本面分析结果
+    - sentiment_agent: 情绪分析结果
+    - valuation_agent: 估值分析结果
+    - risk_management_agent: 风险评估结果
+    - macro_analyst_agent: 宏观分析结果
+    - debate_room_agent: 辩论室结论
+    - industry_cycle_agent: 行业周期分析
+    - institutional_agent: 机构持仓分析
+    - expectation_diff_agent: 预期差分析
+    - macro_news_agent: 宏观新闻摘要
+    
+    【输出】
+    - action: 交易行动 (buy/sell/hold)
+    - quantity: 交易数量
+    - confidence: 决策置信度
+    - reasoning: 决策理由
+    - agent_signals: 各分析师信号汇总
+    """
     agent_name = "portfolio_management_agent"
     logger.info("="*60)
     logger.info("🎯 [PORTFOLIO_MANAGER] 开始执行投资组合管理")
     logger.info("="*60)
 
-    # Clean and unique messages by agent name, taking the latest if duplicates exist
+    # ==================== 步骤1: 消息去重与整理 ====================
+    # 目的: 避免重复的Agent消息影响决策
+    # 策略: 对每个Agent只保留最新的消息
     unique_incoming_messages = {}
     for msg in state["messages"]:
         unique_incoming_messages[msg.name] = msg
@@ -155,7 +190,10 @@ def portfolio_management_agent(state: AgentState):
     portfolio = state["data"]["portfolio"]
     logger.info(f"  当前投资组合: 现金={portfolio.get('cash', 0):.2f}元, 持仓={portfolio.get('stock', 0)}股")
 
-    # Get messages from other agents using the cleaned list
+    # ==================== 步骤2: 提取各Agent的分析结果 ====================
+    # 从消息列表中提取每个Agent的最新分析结果
+    # 如果某个Agent的消息不存在，返回错误占位符
+    # 提取基础分析Agent的结果
     technical_message = get_latest_message_by_name(
         cleaned_messages_for_processing, "technical_analyst_agent")
     fundamentals_message = get_latest_message_by_name(
@@ -164,12 +202,18 @@ def portfolio_management_agent(state: AgentState):
         cleaned_messages_for_processing, "sentiment_agent")
     valuation_message = get_latest_message_by_name(
         cleaned_messages_for_processing, "valuation_agent")
+    
+    # 提取风险管理和辩论结果
     risk_message = get_latest_message_by_name(
         cleaned_messages_for_processing, "risk_management_agent")
-    tool_based_macro_message = get_latest_message_by_name(
-        cleaned_messages_for_processing, "macro_analyst_agent")
     debate_message = get_latest_message_by_name(
         cleaned_messages_for_processing, "debate_room_agent")
+    
+    # 提取宏观分析结果
+    tool_based_macro_message = get_latest_message_by_name(
+        cleaned_messages_for_processing, "macro_analyst_agent")
+    
+    # 提取新增的三个Agent结果
     industry_cycle_message = get_latest_message_by_name(
         cleaned_messages_for_processing, "industry_cycle_agent")
     institutional_message = get_latest_message_by_name(
@@ -177,7 +221,9 @@ def portfolio_management_agent(state: AgentState):
     expectation_diff_message = get_latest_message_by_name(
         cleaned_messages_for_processing, "expectation_diff_agent")
 
-    # Extract content, handling potential None if message not found by get_latest_message_by_name
+    # ==================== 步骤3: 解析JSON内容 ====================
+    # 将各Agent的消息内容从JSON字符串解析为字典对象
+    # 如果解析失败，使用错误占位符
     technical_content = technical_message.content if technical_message else json.dumps(
         {"signal": "error", "details": "Technical message missing"})
     fundamentals_content = fundamentals_message.content if fundamentals_message else json.dumps(
@@ -215,34 +261,39 @@ def portfolio_management_agent(state: AgentState):
     macro_payload = _parse_message_json(tool_based_macro_content) or {}
     debate_payload = _parse_message_json(debate_content) or {}
 
-    # 构建信号列表供强制规则使用
+    # ==================== 步骤4: 构建信号列表 ====================
+    # 将所有Agent的信号标准化为统一格式，便于后续决策引擎处理
+    # 注意: agent_name字段必须使用中文名称，以便终端输出显示
     risk_entry = {
-        "agent_name": "risk_management",
+        "agent_name": "风险管理",
         "signal": (risk_payload or {}).get("交易行动", "hold"),
         "confidence": 1.0 if risk_payload else 0.0,
     }
     agent_signals = [
-        _extract_signal_entry("technical_analysis", technical_payload),
-        _extract_signal_entry("fundamental_analysis", fundamentals_payload),
-        _extract_signal_entry("sentiment_analysis", sentiment_payload),
-        _extract_signal_entry("valuation_analysis", valuation_payload),
+        _extract_signal_entry("技术分析", technical_payload),
+        _extract_signal_entry("基本面分析", fundamentals_payload),
+        _extract_signal_entry("情绪分析", sentiment_payload),
+        _extract_signal_entry("估值分析", valuation_payload),
         risk_entry,
         {
-            "agent_name": "macro_analysis",
+            "agent_name": "宏观分析",
             "signal": macro_payload.get("impact_on_stock", "neutral") if isinstance(macro_payload, dict) else "neutral",
             "confidence": 0.5 if macro_payload and isinstance(macro_payload, dict) and macro_payload.get("key_factors") else 0.3,
         },
         {
-            "agent_name": "macro_news_analysis",
+            "agent_name": "宏观新闻分析",
             "signal": "neutral",
             "confidence": 0.1,
         },
-        _extract_signal_entry("debate_room", debate_payload),
-        _extract_signal_entry("industry_cycle", _parse_message_json(industry_cycle_content) or {}),
-        _extract_signal_entry("institutional", _parse_message_json(institutional_content) or {}),
-        _extract_signal_entry("expectation_diff", _parse_message_json(expectation_diff_content) or {}),
+        _extract_signal_entry("辩论室", debate_payload),
+        _extract_signal_entry("行业周期", _parse_message_json(industry_cycle_content) or {}),
+        _extract_signal_entry("机构持仓", _parse_message_json(institutional_content) or {}),
+        _extract_signal_entry("预期差", _parse_message_json(expectation_diff_content) or {}),
     ]
 
+    # ==================== 步骤5: 构建LLM决策上下文 ====================
+    # 如果DecisionEngine不可用，则使用LLM进行决策
+    # 构建system prompt和user message，提供完整的决策背景信息
     system_message_content = """你是一位专业的投资组合经理，负责做出最终的交易决策。
             你的任务是在严格遵守风险管理约束的前提下，根据团队的分析做出交易决策。
 
@@ -278,13 +329,17 @@ def portfolio_management_agent(state: AgentState):
             - "confidence": <0到1之间的浮点数，表示你对最终决策的置信度>
             - "agent_signals": <包含各Agent信号的列表，每个信号是一个对象>
               你的 'agent_signals' 列表必须包含以下Agent的条目：
-                - "technical_analysis"（技术分析）
-                - "fundamental_analysis"（基本面分析）
-                - "sentiment_analysis"（情绪分析）
-                - "valuation_analysis"（估值分析）
-                - "risk_management"（风险管理）
-                - "macro_analysis"（宏观分析）
-                - "debate_room"（辩论室多空平衡）
+                - "技术分析"
+                - "基本面分析"
+                - "情绪分析"
+                - "估值分析"
+                - "风险管理"
+                - "宏观分析"
+                - "宏观新闻分析"
+                - "辩论室"
+                - "行业周期"
+                - "机构持仓"
+                - "预期差"
             - "reasoning": <简洁解释你的决策过程>
 
             ========== 交易规则（强制校验）==========
@@ -298,7 +353,8 @@ def portfolio_management_agent(state: AgentState):
         "content": system_message_content
     }
 
-    # Get current stock price from market data
+    # ==================== 步骤6: 获取当前股价 ====================
+    # 从市场数据中提取最新收盘价，用于计算交易数量和验证资金充足性
     current_price = 0.0
     prices = state["data"].get("prices", [])
     if prices and len(prices) > 0:
@@ -308,6 +364,7 @@ def portfolio_management_agent(state: AgentState):
         elif isinstance(latest_price, dict) and "收盘" in latest_price:
             current_price = float(latest_price.get("收盘", 0))
 
+    # 构建用户消息，包含所有Agent的分析结果和投资组合状态
     user_message_content = f"""根据团队的分析结果，做出您的交易决策。
 
             技术分析信号: {technical_content}
@@ -334,7 +391,8 @@ def portfolio_management_agent(state: AgentState):
     show_agent_reasoning(
         agent_name, f"准备LLM调用，包含: 技术分析、基本面、情绪、估值、风险管理、宏观、新闻")
 
-    # [NEW] 尝试使用DecisionEngine决策
+    # ==================== 步骤7: 尝试使用DecisionEngine决策 ====================
+    # DecisionEngine是规则化决策引擎，可以替代LLM进行更快速、更稳定的决策
     config = get_config()
     use_decision_engine = config.enable_decision_engine if config._config else False
 
@@ -351,7 +409,9 @@ def portfolio_management_agent(state: AgentState):
     if use_decision_engine:
         logger.info("🎯 启用DecisionEngine规则化决策")
         try:
-            # 构建信号字典
+            # ==================== 步骤7.1: 构建信号字典 ====================
+            # 将所有Agent的信号整理为DecisionEngine需要的格式
+            # 每个信号包含: signal (bullish/bearish/neutral) 和 confidence (0-1)
             signals = {
                 'technical': {
                     'signal': technical_payload.get('signal', 'neutral'),
@@ -379,7 +439,7 @@ def portfolio_management_agent(state: AgentState):
                 }
             }
 
-            # 添加新增模块的信号
+            # 添加新增模块的信号（行业周期、机构持仓、预期差）
             industry_cycle_message = get_latest_message_by_name(cleaned_messages_for_processing, "industry_cycle_agent")
             if industry_cycle_message:
                 ic_payload = _parse_message_json(industry_cycle_message.content)
@@ -407,7 +467,9 @@ def portfolio_management_agent(state: AgentState):
                         'confidence': _normalize_confidence(exp_payload.get('confidence', 0.3))
                     }
 
-            # 获取macro_factor
+            # ==================== 步骤7.2: 获取宏观因子 ====================
+            # macro_factor用于调整仓位大小，值域[0, 1]
+            # < 0.7表示宏观环境较差，应该降低仓位
             macro_factor = 1.0
             if isinstance(macro_payload, dict):
                 position_factor = macro_payload.get('position_factor')
@@ -417,7 +479,8 @@ def portfolio_management_agent(state: AgentState):
                     except (ValueError, TypeError):
                         macro_factor = 1.0
 
-            # 创建DecisionEngine并决策
+            # ==================== 步骤7.3: 执行DecisionEngine决策 ====================
+            # DecisionEngine根据预定义规则进行决策，比LLM更快更稳定
             engine = create_decision_engine(config.get_agent_weights())
             engine_decision = engine.make_decision(
                 signals=signals,
@@ -429,7 +492,7 @@ def portfolio_management_agent(state: AgentState):
 
             logger.info(f"🎯 DecisionEngine决策: {engine_decision}")
 
-            # 使用DecisionEngine的决策结果
+            # 使用DecisionEngine的决策结果构造JSON响应
             final_action = engine_decision.get('action', 'hold')
             final_quantity = engine_decision.get('quantity', 0)
             engine_reason = engine_decision.get('reason', '')
@@ -449,6 +512,7 @@ def portfolio_management_agent(state: AgentState):
             logger.warning(f"DecisionEngine决策失败，回退到LLM: {e}")
             use_decision_engine = False
 
+    # ==================== 步骤8: LLM决策（如果DecisionEngine不可用） ====================
     if not use_decision_engine or llm_response_content is None:
         llm_interaction_messages = [system_message, user_message]
         llm_response_content = get_chat_completion(
@@ -464,6 +528,8 @@ def portfolio_management_agent(state: AgentState):
         return llm_response_content
     log_llm_interaction(state)(get_llm_result_for_logging_wrapper)()
 
+    # ==================== 步骤9: 处理LLM失败情况 ====================
+    # 如果LLM调用失败，使用保守的fallback策略
     if llm_response_content is None:
         show_agent_reasoning(
             agent_name, "LLM call failed. Using default conservative decision.")
@@ -478,6 +544,7 @@ def portfolio_management_agent(state: AgentState):
             has_macro_news_summary=_has_usable_macro_news_summary(market_wide_news_summary_content),
         )
 
+    # ==================== 步骤10: 构造最终决策消息 ====================
     final_decision_message = HumanMessage(
         content=llm_response_content,
         name=agent_name,
@@ -487,6 +554,7 @@ def portfolio_management_agent(state: AgentState):
         show_agent_reasoning(
             agent_name, f"Final LLM decision JSON: {llm_response_content}")
 
+    # 解析决策JSON
     agent_decision_details_value = {}
     decision_json = {}
     try:
@@ -503,7 +571,10 @@ def portfolio_management_agent(state: AgentState):
             "raw_response_snippet": llm_response_content[:200] + "..."
         }
 
-    # ===== 强制风险校验 =====
+    # ==================== 步骤11: 强制风险校验 ====================
+    # 这是最后的安全检查，确保所有交易决策都符合风险管理要求
+    # 即使LLM或DecisionEngine给出了建议，也必须通过这里的校验
+    
     # 保存从 LLM 响应中解析的 agent_signals，如果没有则使用前面构建的信号
     parsed_agent_signals = decision_json.get("agent_signals", None)
     final_action = decision_json.get("action", "hold")
@@ -526,6 +597,7 @@ def portfolio_management_agent(state: AgentState):
         trading_action = risk_payload.get("交易行动", "hold")
 
     # 规则1: 风险评分 >= 7，强制 hold
+    # 当市场风险过高时，无论其他信号如何，都必须保持观望
     if risk_score >= 7:
         logger.warning(f"风险评分 {risk_score} >= 7，强制执行 hold")
         final_action = "hold"
@@ -539,7 +611,9 @@ def portfolio_management_agent(state: AgentState):
             "reasoning": f"风险评分{risk_score:.0f}/10 >= 7，强制执行持有。风险管理约束优先。"
         }, ensure_ascii=False)
         final_decision_message = HumanMessage(content=llm_response_content, name=agent_name)
+    
     # 规则2: 风险管理建议 - 一票否决或强制执行
+    # 如果风险管理Agent建议卖出或减仓，必须执行
     elif trading_action in ["sell", "reduce", "减仓", "清仓"]:
         config = get_config()
         current_position = portfolio.get("stock", 0)
@@ -596,6 +670,7 @@ def portfolio_management_agent(state: AgentState):
             final_decision_message = HumanMessage(content=llm_response_content, name=agent_name)
 
     # 规则3: 资金校验 - 买入时检查现金是否充足
+    # 确保不会超出可用资金进行交易
     if final_action == "buy" and current_price > 0:
         required_cash = final_quantity * current_price
         available_cash = portfolio.get("cash", 0)
@@ -615,6 +690,7 @@ def portfolio_management_agent(state: AgentState):
             final_decision_message = HumanMessage(content=llm_response_content, name=agent_name)
 
     # 规则4: 持仓校验 - 卖出时检查持仓是否充足
+    # 确保不会卖出超过实际持有的股票数量
     if final_action == "sell":
         available_stock = portfolio.get("stock", 0)
         if final_quantity > available_stock:
@@ -633,6 +709,7 @@ def portfolio_management_agent(state: AgentState):
             final_decision_message = HumanMessage(content=llm_response_content, name=agent_name)
 
     # 规则5: 最大持仓校验
+    # 确保总持仓不超过风险管理Agent设定的上限
     if max_position > 0 and final_action == "buy":
         current_position = portfolio.get("stock", 0)
         potential_position = current_position + final_quantity
@@ -653,6 +730,7 @@ def portfolio_management_agent(state: AgentState):
             }, ensure_ascii=False)
             final_decision_message = HumanMessage(content=llm_response_content, name=agent_name)
 
+    # ==================== 步骤12: 输出最终决策日志 ====================
     logger.info("="*60)
     logger.info("🎯 [PORTFOLIO_MANAGER] 最终决策")
     logger.info("="*60)
@@ -668,23 +746,10 @@ def portfolio_management_agent(state: AgentState):
 
     show_workflow_status(f"{agent_name}: --- 投资组合管理完成 ---")
 
-    # The portfolio_management_agent is a terminal or near-terminal node in terms of new message generation for the main state.
-    # It should return its own decision, and an updated state["messages"] that includes its decision.
-    # As it's a汇聚点, it should ideally start with a cleaned list of messages from its inputs.
-    # The cleaned_messages_for_processing already did this. We append its new message to this cleaned list.
-
-    # If we strictly want to follow the pattern of `state["messages"] + [new_message]` for all non-leaf nodes,
-    # then the `cleaned_messages_for_processing` should become the new `state["messages"]` for this node's context.
-    # However, for simplicity and robustness, let's assume its output `messages` should just be its own message added to the cleaned input it processed.
-
+    # ==================== 步骤13: 构造返回结果 ====================
+    # 将最终决策消息添加到清理后的消息列表中
+    # 这样可以避免重复消息，同时保留完整的决策链路
     final_messages_output = cleaned_messages_for_processing + [final_decision_message]
-    # Alternative if we want to be super strict about adding to the raw incoming state["messages"]:
-    # final_messages_output = state["messages"] + [final_decision_message]
-    # But this ^ is prone to the duplication we are trying to solve if not careful.
-    # The most robust is that portfolio_manager provides its clear output, and the graph handles accumulation if needed for further steps (none in this case as it's END).
-
-    # logger.info(
-    # f"--- DEBUG: {agent_name} RETURN messages: {[msg.name for msg in final_messages_output]} ---")
 
     return {
         "messages": final_messages_output,

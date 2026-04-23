@@ -13,48 +13,55 @@ logger = setup_logger('expectation_diff_agent')
 
 def _get_earnings_forecast(ticker: str) -> dict:
     """
-    获取业绩预告数据
+    获取业绩预告/盈利预测数据
     """
     try:
         import akshare as ak
         try:
-            # 获取业绩预告
-            forecast_df = ak.stock_earnings_forecast(stock=ticker)
+            # 获取盈利预测数据
+            forecast_df = ak.stock_profit_forecast_em(symbol='')
             if forecast_df is not None and len(forecast_df) > 0:
-                latest = forecast_df.iloc[0]
-                # 尝试获取预告增长率
-                if '预告净利润增长率' in latest:
-                    growth = str(latest['预告净利润增长率']).replace('%', '').replace('+', '')
-                    try:
-                        growth = float(growth)
-                        if growth > 20:
-                            signal = 'bullish'
-                            confidence = 0.7
-                            reason = f"业绩预增{growth:.1f}%"
-                        elif growth > 0:
-                            signal = 'bullish'
-                            confidence = 0.5
-                            reason = f"业绩预增{growth:.1f}%"
-                        elif growth > -20:
-                            signal = 'neutral'
-                            confidence = 0.4
-                            reason = f"业绩预降{growth:.1f}%"
-                        else:
-                            signal = 'bearish'
-                            confidence = 0.7
-                            reason = f"业绩大幅预降{growth:.1f}%"
-
-                        return {
-                            'signal': signal,
-                            'confidence': confidence,
-                            'growth': growth,
-                            'reason': reason,
-                            'source': 'earnings_forecast'
-                        }
-                    except:
-                        pass
+                match = forecast_df[forecast_df['代码'] == ticker]
+                if len(match) > 0:
+                    latest = match.iloc[0]
+                    # 获取2025年预测每股收益
+                    eps_2025 = latest.get('2025预测每股收益')
+                    eps_2026 = latest.get('2026预测每股收益')
+                    if eps_2025 and str(eps_2025) not in ['nan', 'None']:
+                        # 计算增长
+                        if eps_2026 and str(eps_2026) not in ['nan', 'None']:
+                            try:
+                                growth = ((float(eps_2026) - float(eps_2025)) / float(eps_2025)) * 100
+                                if growth > 20:
+                                    signal = 'bullish'
+                                    confidence = 0.7
+                                    reason = f"盈利预测增长{growth:.1f}%"
+                                elif growth > 0:
+                                    signal = 'bullish'
+                                    confidence = 0.5
+                                    reason = f"盈利预测增长{growth:.1f}%"
+                                elif growth > -20:
+                                    signal = 'neutral'
+                                    confidence = 0.4
+                                    reason = f"盈利预测下降{growth:.1f}%"
+                                else:
+                                    signal = 'bearish'
+                                    confidence = 0.7
+                                    reason = f"盈利预测大幅下降{growth:.1f}%"
+                                
+                                return {
+                                    'signal': signal,
+                                    'confidence': float(confidence),
+                                    'growth': float(growth),
+                                    'eps_2025': float(eps_2025),
+                                    'eps_2026': float(eps_2026),
+                                    'reason': reason,
+                                    'source': 'earnings_forecast'
+                                }
+                            except:
+                                pass
         except Exception as e:
-            logger.debug(f"业绩预告数据获取失败: {e}")
+            logger.debug(f"盈利预测数据获取失败: {e}")
     except ImportError:
         pass
 
@@ -74,15 +81,27 @@ def _get_research_rating(ticker: str) -> dict:
     try:
         import akshare as ak
         try:
-            # 获取券商评级
-            rating_df = ak.stock_research_report(stock=ticker)
+            # 获取券商评级 - 使用 stock_research_report_em
+            rating_df = ak.stock_research_report_em(symbol=ticker)
             if rating_df is not None and len(rating_df) > 0:
                 # 统计评级分布
-                ratings = rating_df['评级'].value_counts() if '评级' in rating_df.columns else {}
+                if '东财评级' in rating_df.columns:
+                    ratings = rating_df['东财评级'].value_counts()
+                elif '评级' in rating_df.columns:
+                    ratings = rating_df['评级'].value_counts()
+                else:
+                    return {
+                        'signal': 'neutral',
+                        'confidence': 0,
+                        'buy_ratio': 0,
+                        'total_reports': 0,
+                        'reason': '研报数据无评级信息',
+                        'source': 'research_rating'
+                    }
 
-                buy_count = ratings.get('买入', 0) + ratings.get('强烈推荐', 0) + ratings.get('增持', 0)
-                hold_count = ratings.get('持有', 0) + ratings.get('中性', 0)
-                sell_count = ratings.get('卖出', 0) + ratings.get('减持', 0)
+                buy_count = int(ratings.get('买入', 0)) + int(ratings.get('强烈推荐', 0)) + int(ratings.get('增持', 0)) + int(ratings.get('推荐', 0))
+                hold_count = int(ratings.get('持有', 0)) + int(ratings.get('中性', 0)) + int(ratings.get('观望', 0))
+                sell_count = int(ratings.get('卖出', 0)) + int(ratings.get('减持', 0)) + int(ratings.get('回避', 0))
 
                 total = buy_count + hold_count + sell_count
                 if total > 0:
@@ -103,9 +122,9 @@ def _get_research_rating(ticker: str) -> dict:
 
                     return {
                         'signal': signal,
-                        'confidence': confidence,
-                        'buy_ratio': buy_ratio,
-                        'total_reports': total,
+                        'confidence': float(confidence),
+                        'buy_ratio': float(buy_ratio),
+                        'total_reports': int(total),
                         'reason': reason,
                         'source': 'research_rating'
                     }
