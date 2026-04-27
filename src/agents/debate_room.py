@@ -40,7 +40,7 @@ def debate_room_agent(state: AgentState):
         raise ValueError(
             "Missing required researcher_bull_agent or researcher_bear_agent messages")
 
-    # 处理研究员数据
+# 处理研究员数据
     researcher_data = {}
     for name, msg in researcher_messages.items():
         # 添加防御性检查，确保 msg.content 不为 None
@@ -60,7 +60,10 @@ def debate_room_agent(state: AgentState):
                 continue
         researcher_data[name] = data
 
-    # 获取看多和看空研究员数据（为了兼容原有逻辑）
+    # ============================================================
+    # Step 2: 获取研究员论点
+    # ============================================================
+    logger.info("📥 Step 2: 获取研究员论点...")
     if "researcher_bull_agent" not in researcher_data or "researcher_bear_agent" not in researcher_data:
         logger.error("无法解析必要的研究员数据")
         raise ValueError(
@@ -68,12 +71,16 @@ def debate_room_agent(state: AgentState):
 
     bull_thesis = researcher_data["researcher_bull_agent"]
     bear_thesis = researcher_data["researcher_bear_agent"]
-    logger.info(
-        f"已获取看多观点(置信度: {bull_thesis.get('confidence', 0)})和看空观点(置信度: {bear_thesis.get('confidence', 0)})")
-
-    # 比较置信度级别
     bull_confidence = bull_thesis.get("confidence", 0)
     bear_confidence = bear_thesis.get("confidence", 0)
+
+    logger.info("────────────────────────────────────────────────────────")
+    logger.info("📊 研究员论点汇总:")
+    logger.info(f"  🐂 看多研究员: confidence={bull_confidence}")
+    logger.info(f"     论点数: {len(bull_thesis.get('thesis_points', []))}")
+    logger.info(f"  🐻 看空研究员: confidence={bear_confidence}")
+    logger.info(f"     风险点数: {len(bear_thesis.get('risk_points', []))}")
+    logger.info("────────────────────────────────────────────────────────")
 
     # 分析辩论观点
     debate_summary = []
@@ -85,17 +92,18 @@ def debate_room_agent(state: AgentState):
     for point in bear_thesis.get("thesis_points", []):
         debate_summary.append(f"- {point}")
 
-    # 收集所有研究员的论点，准备发给 LLM
+# ============================================================
+    # Step 3: 构建prompt并调用LLM进行辩论
+    # ============================================================
+    logger.info("🔧 Step 3: 构建prompt并调用LLM...")
     all_perspectives = {}
     for name, data in researcher_data.items():
         perspective = data.get("perspective", name.replace(
             "researcher_", "").replace("_agent", ""))
         all_perspectives[perspective] = {
             "confidence": data.get("confidence", 0),
-            "thesis_points": data.get("thesis_points", [])
+            "thesis_points": data.get("thesis_points", data.get("risk_points", []))
         }
-
-    logger.info(f"准备让 LLM 分析 {len(all_perspectives)} 个研究员的观点")
 
     # 构建发送给 LLM 的提示
     llm_prompt = """
@@ -104,7 +112,7 @@ def debate_room_agent(state: AgentState):
 """
     for perspective, data in all_perspectives.items():
         llm_prompt += f"\n{perspective.upper()} 观点 (置信度: {data['confidence']}):\n"
-        for point in data["thesis_points"]:
+        for point in data['thesis_points']:
             llm_prompt += f"- {point}\n"
 
     llm_prompt += """
@@ -123,7 +131,7 @@ def debate_room_agent(state: AgentState):
     llm_analysis = None
     llm_score = 0  # 默认为中性
     try:
-        logger.info("开始调用 LLM 获取第三方分析...")
+        logger.info("🤖 调用LLM进行第三方辩论分析...")
         messages = [
             {"role": "system", "content": "你是一位专业的金融分析师。请用中文提供你的分析。"},
             {"role": "user", "content": llm_prompt}
@@ -138,7 +146,7 @@ def debate_room_agent(state: AgentState):
             )
         )()
 
-        logger.info("LLM 返回响应完成")
+        logger.info("✅ LLM辩论分析完成")
 
         # 解析 LLM 返回的 JSON
         if llm_response:
@@ -165,44 +173,47 @@ def debate_room_agent(state: AgentState):
         llm_analysis = {"analysis": "LLM API call failed",
                         "score": 0, "reasoning": "API error"}
 
-    # [OPTIMIZED] 计算混合置信度差异 - 改进版
+    # ============================================================
+    # Step 4: 计算混合置信度
+    # ============================================================
+    logger.info("🔢 Step 4: 计算混合置信度...")
     confidence_diff = bull_confidence - bear_confidence
-
-    # [OPTIMIZED] 动态LLM权重：根据LLM自身的不确定性调整
-    llm_weight = 0.3 * (llm_score if llm_analysis else 0.5)  # 范围[0, 0.3]
-
-    # [OPTIMIZED] 一致性检查：研究员和LLM方向一致时加分
+    llm_weight = 0.3 * (llm_score if llm_analysis else 0.5)
     researcher_direction = 1 if confidence_diff > 0 else -1
     llm_direction = 1 if llm_score > 0 else -1 if llm_analysis else 0
     consistency_bonus = 0.1 if (researcher_direction == llm_direction and llm_direction != 0) else -0.1
-
-    # 计算混合置信度差异
     mixed_confidence_diff = (
-        (1 - llm_weight) * confidence_diff + 
-        llm_weight * llm_score + 
+        (1 - llm_weight) * confidence_diff +
+        llm_weight * llm_score +
         consistency_bonus
     )
 
-    logger.info(
-        f"计算混合置信度差异: 原始差异={confidence_diff:.4f}, LLM评分={llm_score:.4f}, "
-        f"LLM权重={llm_weight:.2f}, 一致性={'aligned' if consistency_bonus > 0 else 'conflicted'}, "
-        f"混合差异={mixed_confidence_diff:.4f}")
+    logger.info("────────────────────────────────────────────────────────")
+    logger.info("📊 置信度计算:")
+    logger.info(f"  看多置信度: {bull_confidence:.4f}")
+    logger.info(f"  看空置信度: {bear_confidence:.4f}")
+    logger.info(f"  原始差异:  {confidence_diff:.4f}")
+    logger.info(f"  LLM评分:   {llm_score:.4f}")
+    logger.info(f"  LLM权重:   {llm_weight:.2f}")
+    logger.info(f"  一致性:    {'✅ 一致' if consistency_bonus > 0 else '❌ 不一致'}")
+    logger.info(f"  混合差异:  {mixed_confidence_diff:.4f}")
+    logger.info("────────────────────────────────────────────────────────")
 
-    # 基于混合置信度差异确定最终建议
-    if abs(mixed_confidence_diff) < 0.1:  # 接近争论
+    # 确定最终信号
+    if abs(mixed_confidence_diff) < 0.1:
         final_signal = "neutral"
-        reasoning = "多空双方论点均衡，难分胜负"
+        reasoning = "多空双方论点均衡"
         confidence = max(bull_confidence, bear_confidence)
-    elif mixed_confidence_diff > 0:  # 看多胜出
+    elif mixed_confidence_diff > 0:
         final_signal = "bullish"
         reasoning = "看多观点更具说服力"
         confidence = bull_confidence
-    else:  # 看空胜出
+    else:
         final_signal = "bearish"
         reasoning = "看空观点更具说服力"
         confidence = bear_confidence
 
-    logger.info(f"最终投资信号: {final_signal}, 置信度: {confidence}")
+    logger.info(f"🎯 最终信号: {final_signal}, 置信度: {confidence}")
 
     # 构建返回消息，包含 LLM 分析
     message_content = {

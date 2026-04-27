@@ -27,7 +27,7 @@ def get_latest_message_by_name(messages: list, name: str):
         f"Message from agent '{name}' not found in portfolio_management_agent.")
     # Return a dummy message object or raise an error, depending on desired handling
     # For now, returning a dummy message to avoid crashing, but content will be None.
-    return HumanMessage(content=json.dumps({"signal": "error", "details": f"Message from {name} not found"}), name=name)
+    return HumanMessage(content=json.dumps({"signal": "error", "details": f"Message from {name} not found"}, ensure_ascii=False), name=name)
 
 
 def _parse_message_json(message_content: str):
@@ -123,7 +123,7 @@ def _build_fallback_portfolio_decision(
         "confidence": 0.35,
         "agent_signals": agent_signals,
         "reasoning": reasoning,
-    })
+    }, ensure_ascii=False)
 
 
 def _has_usable_macro_news_summary(summary: str) -> bool:
@@ -402,12 +402,31 @@ def portfolio_management_agent(state: AgentState):
     # 提取risk_score和trading_action（在LLM决策之前）
     risk_score = 0.0
     trading_action = "hold"
+    dynamic_threshold = 5.0  # 默认阈值
+    current_price = 0.0
+
     if risk_payload:
         try:
             risk_score = float(risk_payload.get("风险评分", 0))
         except (TypeError, ValueError):
             risk_score = 0.0
         trading_action = risk_payload.get("交易行动", "hold")
+        dynamic_threshold = float(risk_payload.get("动态阈值", 5.0))
+
+        # 从风险分析中获取当前价格
+        risk_indicators = risk_payload.get("风险指标", {})
+        if risk_indicators:
+            # 尝试从持仓规模推算价格
+            max_position = risk_payload.get("最大持仓规模", 0)
+            total_value = portfolio.get('cash', 0) + portfolio.get('stock', 0) * 100  # 估算
+            if max_position > 0 and total_value > 0:
+                # 持仓规模 = 总资产 * 0.25，反推价格
+                current_price = max_position / (0.25 * total_value / 100) if total_value > 0 else 0.0
+
+    # 更新portfolio中的current_price
+    portfolio_with_price = dict(portfolio)
+    if current_price > 0:
+        portfolio_with_price['current_price'] = current_price
 
     if use_decision_engine:
         logger.info("🎯 启用DecisionEngine规则化决策")
@@ -470,27 +489,17 @@ def portfolio_management_agent(state: AgentState):
                         'confidence': _normalize_confidence(exp_payload.get('confidence', 0.3))
                     }
 
-            # ==================== 步骤7.2: 获取宏观因子 ====================
-            # macro_factor用于调整仓位大小，值域[0, 1]
-            # < 0.7表示宏观环境较差，应该降低仓位
-            macro_factor = 1.0
-            if isinstance(macro_payload, dict):
-                position_factor = macro_payload.get('position_factor')
-                if position_factor:
-                    try:
-                        macro_factor = float(position_factor)
-                    except (ValueError, TypeError):
-                        macro_factor = 1.0
-
-            # ==================== 步骤7.3: 执行DecisionEngine决策 ====================
+            # ==================== 步骤7.2: 执行DecisionEngine决策 ====================
             # DecisionEngine根据预定义规则进行决策，比LLM更快更稳定
-            engine = create_decision_engine(config.get_agent_weights())
+            # 注意：macro因子已通过9维度信号中的macro信号加权计算，不再单独检查
+            investment_horizon = data.get('investment_horizon', 'medium')
+            engine = create_decision_engine(config.get_agent_weights(), investment_horizon)
             engine_decision = engine.make_decision(
                 signals=signals,
                 risk_score=risk_score,
                 risk_action=trading_action,
-                macro_factor=macro_factor,
-                portfolio=portfolio
+                portfolio=portfolio_with_price,
+                dynamic_threshold=dynamic_threshold
             )
 
             logger.info(f"🎯 DecisionEngine决策: {engine_decision}")

@@ -240,7 +240,13 @@ def expectation_diff_agent(state: AgentState):
         state["metadata"]["agent_reasoning"] = message_content
 
     show_workflow_status("预期差分析师", "completed")
-    logger.info(f"[EXPECTATION_DIFF] 分析完成: {combined.get('signal')}")
+    logger.info("────────────────────────────────────────────────────────")
+    logger.info("✅ 预期差分析完成:")
+    logger.info(f"  📊 最终信号: {combined.get('signal')}")
+    logger.info(f"  📈 置信度: {combined.get('confidence')}")
+    logger.info(f"  📈 盈利预测: {message_content.get('earnings_forecast', {}).get('signal', 'N/A')}")
+    logger.info(f"  📊 预期差: {message_content.get('expectation_diff', {}).get('signal', 'N/A')}")
+    logger.info("────────────────────────────────────────────────────────")
 
     return {
         "messages": [message],

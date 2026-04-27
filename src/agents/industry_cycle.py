@@ -208,7 +208,12 @@ def industry_cycle_agent(state: AgentState):
         state["metadata"]["agent_reasoning"] = message_content
 
     show_workflow_status("行业周期分析师", "completed")
-    logger.info(f"[INDUSTRY_CYCLE] 分析完成: {cycle_signal.get('signal')}, {cycle_signal.get('reason')}")
+    logger.info("────────────────────────────────────────────────────────")
+    logger.info("✅ 行业周期分析完成:")
+    logger.info(f"  📊 最终信号: {cycle_signal.get('signal')}")
+    logger.info(f"  📈 置信度: {cycle_signal.get('confidence')}")
+    logger.info(f"  📈 周期阶段: {cycle_signal.get('stage', 'N/A')}")
+    logger.info("────────────────────────────────────────────────────────")
 
     return {
         "messages": [message],

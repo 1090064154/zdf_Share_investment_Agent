@@ -131,6 +131,14 @@ def market_data_agent(state: AgentState):
         "summary": f"为{ticker}收集了从{start_date}到{end_date}的市场数据，包括价格历史、财务指标和市场信息"
     }
 
+    logger.info("────────────────────────────────────────────────────────")
+    logger.info("✅ 市场数据收集完成:")
+    logger.info(f"  📈 价格记录: {len(prices_dict)} 条")
+    logger.info(f"  💰 财务指标: {'✅' if _has_meaningful_records(financial_metrics) else '❌'}")
+    logger.info(f"  📊 财务报表: {'✅' if _has_meaningful_records(financial_line_items) else '❌'}")
+    logger.info(f"  🏢 行业: {industry}")
+    logger.info("────────────────────────────────────────────────────────")
+
     if show_reasoning:
         show_agent_reasoning(market_data_summary, "Market Data Agent")
         state["metadata"]["agent_reasoning"] = market_data_summary

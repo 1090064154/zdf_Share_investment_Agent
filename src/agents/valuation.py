@@ -249,7 +249,7 @@ def valuation_agent(state: AgentState):
             }
         }
         message = HumanMessage(
-            content=json.dumps(message_content),
+            content=json.dumps(message_content, ensure_ascii=False),
             name="valuation_agent",
         )
         if show_reasoning:
@@ -279,7 +279,7 @@ def valuation_agent(state: AgentState):
             }
         }
         message = HumanMessage(
-            content=json.dumps(message_content),
+            content=json.dumps(message_content, ensure_ascii=False),
             name="valuation_agent",
         )
         if show_reasoning:
@@ -459,7 +459,7 @@ def valuation_agent(state: AgentState):
             }
         }
         message = HumanMessage(
-            content=json.dumps(message_content),
+            content=json.dumps(message_content, ensure_ascii=False),
             name="valuation_agent",
         )
         if show_reasoning:
@@ -509,7 +509,7 @@ def valuation_agent(state: AgentState):
     }
 
     message = HumanMessage(
-        content=json.dumps(message_content),
+        content=json.dumps(message_content, ensure_ascii=False),
         name="valuation_agent",
     )
 
@@ -519,8 +519,19 @@ def valuation_agent(state: AgentState):
         state["metadata"]["agent_reasoning"] = message_content
 
     show_workflow_status("估值Agent", "completed")
-    # logger.info(
-    # f"--- DEBUG: valuation_agent RETURN messages: {[msg.name for msg in [message]]} ---")
+
+    # 打印最终分析结果
+    logger.info("────────────────────────────────────────────────────────")
+    logger.info("✅ 估值分析完成:")
+    logger.info(f"  📊 最终信号: {message_content.get('signal')}")
+    logger.info(f"  📈 置信度: {message_content.get('confidence')}")
+    logger.info(f"  💰 估值方法: {message_content.get('valuation_method', 'N/A')}")
+    if 'pe_ratio' in message_content:
+        logger.info(f"  📊 P/E: {message_content.get('pe_ratio'):.2f}")
+    if 'pb_ratio' in message_content:
+        logger.info(f"  🏢 P/B: {message_content.get('pb_ratio'):.2f}")
+    logger.info("────────────────────────────────────────────────────────")
+
     return {
         "messages": [message],
         "data": {

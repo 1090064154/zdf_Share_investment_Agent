@@ -92,14 +92,18 @@ def macro_analyst_agent(state: AgentState):
 
     # 创建消息
     message = HumanMessage(
-        content=json.dumps(message_content),
+        content=json.dumps(message_content, ensure_ascii=False),
         name="macro_analyst_agent",
     )
 
     show_workflow_status("宏观分析师", "completed")
-    # logger.info(f"--- DEBUG: macro_analyst_agent COMPLETED ---")
-    # logger.info(
-    # f"--- DEBUG: macro_analyst_agent RETURN messages: {[msg.name for msg in (state['messages'] + [message])]} ---")
+    logger.info("────────────────────────────────────────────────────────")
+    logger.info("✅ 宏观分析完成:")
+    logger.info(f"  🌍 宏观环境: {message_content.get('macro_environment')}")
+    logger.info(f"  📊 对个股影响: {message_content.get('impact_on_stock')}")
+    logger.info(f"  🔑 关键因素: {len(message_content.get('key_factors', []))} 个")
+    logger.info("────────────────────────────────────────────────────────")
+
     return {
         "messages": state["messages"] + [message],
         "data": {

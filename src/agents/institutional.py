@@ -19,37 +19,42 @@ def _get_north_money_data(ticker: str) -> dict:
     try:
         import akshare as ak
         try:
-            # 获取北向资金持股数据
             north_df = ak.stock_hsgt_individual_em(symbol=ticker)
             if north_df is not None and len(north_df) > 0:
-                # 获取最新数据
                 latest = north_df.iloc[0]
-
-                # 尝试获取持股变化
-                hold_change = 0
-                if '持股变化' in latest:
-                    hold_change = float(str(latest['持股变化']).replace('%', '').replace(',', '').replace('+', ''))
-                elif '持股比例变化' in latest:
-                    hold_change = float(str(latest['持股比例变化']).replace('%', '').replace(',', '').replace('+', ''))
-
-                # 判断方向
-                if hold_change > 0.5:
+                
+                # 今日增持股数（可能为负数表示减持）
+                change_shares = latest.get('今日增持股数', 0) or 0
+                # 持股数量占A股百分比
+                holding_pct = latest.get('持股数量占A股百分比', 0) or 0
+                
+                # 计算持股比例变化（与前一天对比）
+                if len(north_df) >= 2:
+                    prev = north_df.iloc[1]
+                    prev_pct = prev.get('持股数量占A股百分比', 0) or 0
+                    pct_change = (holding_pct or 0) - (prev_pct or 0)
+                else:
+                    pct_change = 0
+                
+                # 使用持股比例变化判断
+                if pct_change > 0.01:  # 增持超过0.01%
                     signal = 'bullish'
-                    confidence = min(0.3 + abs(hold_change) * 0.1, 0.8)
-                    reason = f"北向资金增持{hold_change:.2f}%"
-                elif hold_change < -0.5:
+                    confidence = min(0.4 + pct_change * 10, 0.8)
+                    reason = f"北向资金增持{holding_pct:.2f}%，变化+{pct_change:.3f}%"
+                elif pct_change < -0.01:  # 减持超过0.01%
                     signal = 'bearish'
-                    confidence = min(0.3 + abs(hold_change) * 0.1, 0.8)
-                    reason = f"北向资金减持{abs(hold_change):.2f}%"
+                    confidence = min(0.4 + abs(pct_change) * 10, 0.8)
+                    reason = f"北向资金持股{holding_pct:.2f}%，变化{pct_change:.3f}%"
                 else:
                     signal = 'neutral'
                     confidence = 0.4
-                    reason = "北向资金持股变化不大"
-
+                    reason = f"北向资金持股{holding_pct:.2f}%，变化不明显"
+                
                 return {
                     'signal': signal,
                     'confidence': confidence,
-                    'hold_change': hold_change,
+                    'hold_change': pct_change,
+                    'holding_pct': holding_pct,
                     'reason': reason,
                     'source': 'north_money'
                 }
@@ -119,9 +124,158 @@ def _get_fund_holding_data(ticker: str) -> dict:
     }
 
 
-def _analyze_institutional_signals(north_result: dict, fund_result: dict) -> dict:
+def _get_money_flow_data(ticker: str) -> dict:
     """
-    综合分析机构持仓信号
+    获取资金流数据（大单净流入、散户资金流向）
+
+    A股特色指标：
+    - 超大单净流入：机构行为
+    - 大单净流入：主力行为
+    - 中单净流入：大户行为
+    - 小单净流入：散户行为
+    """
+    try:
+        import akshare as ak
+        try:
+            # 判断市场
+            market = "sz" if ticker.startswith("00") or ticker.startswith("30") else "sh"
+            # 获取资金流向数据
+            money_df = ak.stock_individual_money_flow(stock=ticker, market=market)
+            if money_df is not None and len(money_df) > 0:
+                latest = money_df.iloc[0]
+
+                # 超大单净流入（大单机构）
+                super_large_inflow = float(latest.get('超大单净流入净额', 0) or 0)
+                super_large_ratio = float(latest.get('超大单净流入净占比', 0) or 0)
+
+                # 大单净流入（主力）
+                large_inflow = float(latest.get('大单净流入净额', 0) or 0)
+                large_ratio = float(latest.get('大单净流入净占比', 0) or 0)
+
+                # 小单净流入（散户）
+                small_inflow = float(latest.get('小单净流入净额', 0) or 0)
+                small_ratio = float(latest.get('小单净流入净占比', 0) or 0)
+
+                # 综合主力资金净流入
+                main_net_inflow = super_large_inflow + large_inflow
+                main_net_ratio = super_large_ratio + large_ratio
+
+                # 判断信号：主力净流入为正，散户净流入为负 → 利好
+                # 主力净流出，散户净流入 → 利空
+                if main_net_inflow > 0 and small_inflow < 0:
+                    signal = 'bullish'
+                    confidence = min(0.4 + abs(main_net_ratio) * 0.03, 0.85)
+                    reason = f"主力净流入{main_net_inflow/10000:.1f}万(占比{main_net_ratio:.1f}%)，散户净流出"
+                elif main_net_inflow < 0 and small_inflow > 0:
+                    signal = 'bearish'
+                    confidence = min(0.4 + abs(main_net_ratio) * 0.03, 0.85)
+                    reason = f"主力净流出{abs(main_net_inflow)/10000:.1f}万(占比{abs(main_net_ratio):.1f}%)，散户净流入"
+                elif abs(main_net_ratio) < 2:
+                    signal = 'neutral'
+                    confidence = 0.5
+                    reason = "资金流向不明显，多空平衡"
+                else:
+                    signal = 'neutral'
+                    confidence = 0.4
+                    reason = f"资金流分歧，主力{'净流入' if main_net_inflow > 0 else '净流出'}，散户{'净流入' if small_inflow > 0 else '净流出'}"
+
+                return {
+                    'signal': signal,
+                    'confidence': float(confidence),
+                    'main_net_inflow': float(main_net_inflow),
+                    'main_net_ratio': float(main_net_ratio),
+                    'super_large_inflow': float(super_large_inflow),
+                    'large_inflow': float(large_inflow),
+                    'small_inflow': float(small_inflow),
+                    'reason': reason,
+                    'source': 'money_flow'
+                }
+        except Exception as e:
+            logger.debug(f"资金流数据获取失败: {e}")
+    except ImportError:
+        pass
+
+    return {
+        'signal': 'neutral',
+        'confidence': 0,
+        'main_net_inflow': 0,
+        'reason': '无法获取资金流数据',
+        'source': 'money_flow'
+    }
+
+
+def _get_margin_financing_data(ticker: str) -> dict:
+    """
+    获取融资融券数据
+
+    融资余额增加 → 市场乐观
+    融券余额增加 → 市场看空
+    """
+    try:
+        import akshare as ak
+        try:
+            margin_df = ak.stock_margin_detail_szse(symbol=ticker)
+            if margin_df is not None and len(margin_df) >= 2:
+                # 获取最近两天数据
+                latest = margin_df.iloc[0]
+                previous = margin_df.iloc[1]
+
+                # 融资余额
+                rzye_latest = float(latest.get('融资余额', 0) or 0)
+                rzye_previous = float(previous.get('融资余额', 0) or 0)
+
+                # 融券余额
+                rqye_latest = float(latest.get('融券余额', 0) or 0)
+                rqye_previous = float(previous.get('融券余额', 0) or 0)
+
+                # 计算变化
+                rz_change = (rzye_latest - rzye_previous) / rzye_previous if rzye_previous > 0 else 0
+                rq_change = (rqye_latest - rqye_previous) / rqye_previous if rqye_previous > 0 else 0
+
+                # 融资余额增加代表杠杆资金做多
+                if rz_change > 0.05:  # 融资余额增长超5%
+                    signal = 'bullish'
+                    confidence = min(0.5 + rz_change * 2, 0.8)
+                    reason = f"融资余额增长{rz_change:.1%}，杠杆资金做多"
+                elif rz_change < -0.05:  # 融资余额下降超5%
+                    signal = 'bearish'
+                    confidence = min(0.5 + abs(rz_change) * 2, 0.8)
+                    reason = f"融资余额下降{abs(rz_change):.1%}，杠杆资金减仓"
+                elif rq_change > 0.1:  # 融券余额大幅增长
+                    signal = 'bearish'
+                    confidence = min(0.4 + rq_change, 0.7)
+                    reason = f"融券余额增长{rq_change:.1%}，看空情绪增强"
+                else:
+                    signal = 'neutral'
+                    confidence = 0.5
+                    reason = "融资融券变化不大"
+
+                return {
+                    'signal': signal,
+                    'confidence': float(confidence),
+                    'rz_balance': rzye_latest,
+                    'rz_change': float(rz_change),
+                    'rq_balance': rqye_latest,
+                    'rq_change': float(rq_change),
+                    'reason': reason,
+                    'source': 'margin'
+                }
+        except Exception as e:
+            logger.debug(f"融资融券数据获取失败: {e}")
+    except ImportError:
+        pass
+
+    return {
+        'signal': 'neutral',
+        'confidence': 0,
+        'reason': '无法获取融资融券数据',
+        'source': 'margin'
+    }
+
+
+def _analyze_institutional_signals(north_result: dict, fund_result: dict, money_flow_result: dict = None, margin_result: dict = None) -> dict:
+    """
+    综合分析机构持仓信号（含资金流分析）
     """
     signals = []
     confidences = []
@@ -131,10 +285,20 @@ def _analyze_institutional_signals(north_result: dict, fund_result: dict) -> dic
         signals.append(north_result['signal'])
         confidences.append(north_result['confidence'])
 
-    # 基金持仓
+    # 基金持仓/主力资金
     if fund_result.get('confidence', 0) > 0:
         signals.append(fund_result['signal'])
         confidences.append(fund_result['confidence'])
+
+    # 资金流（大单净流入、散户资金）
+    if money_flow_result and money_flow_result.get('confidence', 0) > 0:
+        signals.append(money_flow_result['signal'])
+        confidences.append(money_flow_result['confidence'])
+
+    # 融资融券（杠杆资金情绪）
+    if margin_result and margin_result.get('confidence', 0) > 0:
+        signals.append(margin_result['signal'])
+        confidences.append(margin_result['confidence'])
 
     if not signals:
         return {
@@ -157,14 +321,16 @@ def _analyze_institutional_signals(north_result: dict, fund_result: dict) -> dic
         signal = 'neutral'
         confidence = 0.4
 
-    reason = f"机构持仓信号: 北向{north_result.get('reason', 'N/A')}, 基金{fund_result.get('reason', 'N/A')}"
+    reason = f"机构持仓信号: 北向{north_result.get('reason', 'N/A')}, 主力{fund_result.get('reason', 'N/A')}, 资金流{money_flow_result.get('reason', 'N/A') if money_flow_result else 'N/A'}"
 
     return {
         'signal': signal,
         'confidence': confidence,
         'reason': reason,
         'north_analysis': north_result,
-        'fund_analysis': fund_result
+        'fund_analysis': fund_result,
+        'money_flow_analysis': money_flow_result,
+        'margin_analysis': margin_result
     }
 
 
@@ -188,13 +354,23 @@ def institutional_agent(state: AgentState):
     north_result = _get_north_money_data(ticker)
     logger.info(f"  北向资金: {north_result.get('reason', 'N/A')}")
 
-    # 2. 获取基金持仓数据
-    logger.info("  获取基金持仓数据...")
+    # 2. 获取基金/主力资金数据
+    logger.info("  获取基金/主力资金数据...")
     fund_result = _get_fund_holding_data(ticker)
-    logger.info(f"  基金持仓: {fund_result.get('reason', 'N/A')}")
+    logger.info(f"  基金/主力: {fund_result.get('reason', 'N/A')}")
 
-    # 3. 综合分析
-    combined = _analyze_institutional_signals(north_result, fund_result)
+    # 3. 获取资金流数据（大单净流入、散户流向）
+    logger.info("  获取资金流数据...")
+    money_flow_result = _get_money_flow_data(ticker)
+    logger.info(f"  资金流: {money_flow_result.get('reason', 'N/A')}")
+
+    # 4. 获取融资融券数据
+    logger.info("  获取融资融券数据...")
+    margin_result = _get_margin_financing_data(ticker)
+    logger.info(f"  融资融券: {margin_result.get('reason', 'N/A')}")
+
+    # 5. 综合分析（含资金流和融资融券）
+    combined = _analyze_institutional_signals(north_result, fund_result, money_flow_result, margin_result)
 
     message_content = {
         "signal": combined['signal'],
@@ -202,6 +378,8 @@ def institutional_agent(state: AgentState):
         "reason": combined.get('reason', ''),
         "north_money": north_result,
         "fund_holding": fund_result,
+        "money_flow": money_flow_result,
+        "margin": margin_result,
         "combined_analysis": combined
     }
 
@@ -215,7 +393,13 @@ def institutional_agent(state: AgentState):
         state["metadata"]["agent_reasoning"] = message_content
 
     show_workflow_status("机构持仓分析师", "completed")
-    logger.info(f"[INSTITUTIONAL] 分析完成: {combined.get('signal')}")
+    logger.info("────────────────────────────────────────────────────────")
+    logger.info("✅ 机构持仓分析完成:")
+    logger.info(f"  📊 最终信号: {combined.get('signal')}")
+    logger.info(f"  📈 置信度: {combined.get('confidence')}")
+    logger.info(f"  📈 基金持仓: {message_content.get('fund_holding', {}).get('signal', 'N/A')}")
+    logger.info(f"  📊 北向资金: {message_content.get('north_money', {}).get('signal', 'N/A')}")
+    logger.info("────────────────────────────────────────────────────────")
 
     return {
         "messages": [message],

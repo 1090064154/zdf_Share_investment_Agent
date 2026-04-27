@@ -67,17 +67,18 @@ logger = setup_logger('main_workflow')
 # --- Run the Hedge Fund Workflow ---
 
 
-def run_hedge_fund(run_id: str, ticker: str, start_date: str, end_date: str, portfolio: dict, show_reasoning: bool = False, num_of_news: int = 5, show_summary: bool = False):
+def run_hedge_fund(run_id: str, ticker: str, start_date: str, end_date: str, portfolio: dict, show_reasoning: bool = False, num_of_news: int = 5, show_summary: bool = False, investment_horizon: str = 'medium'):
     print(f"\n{'='*60}")
     print(f"🚀 开始执行工作流")
     print(f"  Run ID: {run_id}")
     print(f"  股票: {ticker}")
     print(f"  区间: {start_date} ~ {end_date}")
+    print(f"  持仓周期: {investment_horizon}")
     print(f"  现金: {portfolio.get('cash', 0):.2f} 元")
     print(f"  持仓: {portfolio.get('stock', 0)} 股")
     print(f"{'='*60}\n")
     logger.info("STEP 3: 启动 LangGraph 工作流")
-    logger.info(f"  run_id={run_id}, ticker={ticker}, period={start_date}~{end_date}")
+    logger.info(f"  run_id={run_id}, ticker={ticker}, period={start_date}~{end_date}, horizon={investment_horizon}")
     try:
         from backend.state import api_state
         api_state.current_run_id = run_id
@@ -93,11 +94,13 @@ def run_hedge_fund(run_id: str, ticker: str, start_date: str, end_date: str, por
             "start_date": start_date,
             "end_date": end_date,
             "num_of_news": num_of_news,
+            "investment_horizon": investment_horizon,
         },
         "metadata": {
             "show_reasoning": show_reasoning,
             "run_id": run_id,
             "show_summary": show_summary,
+            "investment_horizon": investment_horizon,
         }
     }
 
@@ -192,48 +195,38 @@ workflow.add_node("portfolio_management_agent", portfolio_management_agent)
 # Set entry point
 workflow.set_entry_point("market_data_agent")
 
-# Level 1: market_data -> 4个基础分析Agent (并行)
+# Level 1: market_data -> 9个基础分析Agent (并行)
+# technical, fundamentals, sentiment, valuation, industry_cycle, institutional, expectation_diff, macro_news, macro_analyst
 workflow.add_edge("market_data_agent", "technical_analyst_agent")
 workflow.add_edge("market_data_agent", "fundamentals_agent")
 workflow.add_edge("market_data_agent", "sentiment_agent")
 workflow.add_edge("market_data_agent", "valuation_agent")
+workflow.add_edge("market_data_agent", "industry_cycle_agent")
+workflow.add_edge("market_data_agent", "institutional_agent")
+workflow.add_edge("market_data_agent", "expectation_diff_agent")
+workflow.add_edge("market_data_agent", "macro_news_agent")
+workflow.add_edge("market_data_agent", "macro_analyst_agent")
 
-# Level 2: 4个基础分析 -> 3个新增Agent (并行)
-# 按照计划: 技术/基本面/估值 -> industry_cycle/institutional/expectation_diff
-# 这里简化为4个基础分析都完成后进入新增Agent
+# Level 2: 9个Agent -> researcher_bull/researcher_bear (综合研判)
 workflow.add_edge(
-    ["technical_analyst_agent", "fundamentals_agent", "sentiment_agent", "valuation_agent"],
-    "industry_cycle_agent",
+    ["technical_analyst_agent", "fundamentals_agent", "sentiment_agent",
+     "valuation_agent", "industry_cycle_agent", "institutional_agent",
+     "expectation_diff_agent", "macro_news_agent", "macro_analyst_agent"],
+    "researcher_bull_agent"
 )
 workflow.add_edge(
-    ["technical_analyst_agent", "fundamentals_agent", "sentiment_agent", "valuation_agent"],
-    "institutional_agent",
-)
-workflow.add_edge(
-    ["technical_analyst_agent", "fundamentals_agent", "sentiment_agent", "valuation_agent"],
-    "expectation_diff_agent",
+    ["technical_analyst_agent", "fundamentals_agent", "sentiment_agent",
+     "valuation_agent", "industry_cycle_agent", "institutional_agent",
+     "expectation_diff_agent", "macro_news_agent", "macro_analyst_agent"],
+    "researcher_bear_agent"
 )
 
-# Level 3: 新增Agent + sentiment -> macro_analyst (汇合后分析宏观)
-# 按照计划: industry_cycle/institutional/expectation_diff -> sentiment -> macro
-# 实际简化: 3个新增Agent完成后进入sentiment
-workflow.add_edge(["industry_cycle_agent", "institutional_agent", "expectation_diff_agent"], "sentiment_agent")
-
-# sentiment -> macro_news (并行)
-workflow.add_edge("sentiment_agent", "macro_news_agent")
-
-# Level 4: macro_news -> researchers (并行)
-workflow.add_edge("macro_news_agent", "researcher_bull_agent")
-workflow.add_edge("macro_news_agent", "researcher_bear_agent")
-
-# Level 5: researchers -> debate_room
+# Level 3: researchers -> debate_room
 workflow.add_edge(["researcher_bull_agent", "researcher_bear_agent"], "debate_room_agent")
 
-# Level 6: debate -> risk -> macro_analyst
+# Level 4: debate -> risk -> macro_analyst -> portfolio (最终决策)
 workflow.add_edge("debate_room_agent", "risk_management_agent")
 workflow.add_edge("risk_management_agent", "macro_analyst_agent")
-
-# Level 7: macro_analyst -> portfolio_manager (最终决策)
 workflow.add_edge("macro_analyst_agent", "portfolio_management_agent")
 
 # Final node
@@ -258,28 +251,34 @@ if __name__ == "__main__":
         description='Run the hedge fund trading system')
     parser.add_argument('--ticker', type=str, required=True,
                         help='Stock ticker symbol')
-    parser.add_argument('--start-date', type=str,
+    parser.add_argument('--start', type=str,
                         help='Start date (YYYY-MM-DD). Defaults to 1 year before end date')
-    parser.add_argument('--end-date', type=str,
+    parser.add_argument('--end', type=str,
                         help='End date (YYYY-MM-DD). Defaults to yesterday')
     parser.add_argument('--show-reasoning', action='store_true',
                         help='Show reasoning from each agent')
     parser.add_argument('--num-of-news', type=int, default=20,
                         help='Number of news articles to analyze for sentiment (default: 20)')
-    parser.add_argument('--initial-capital', type=float, default=100000.0,
+    parser.add_argument('--cash', '--initial-capital', type=float, default=100000.0,
+                        dest='initial_capital',
                         help='Initial cash amount (default: 100,000)')
-    parser.add_argument('--initial-position', type=int,
-                        default=0, help='Initial stock position (default: 0)')
+    parser.add_argument('--position', '--initial-position', type=int,
+                        default=0, dest='initial_position',
+                        help='Initial stock position (default: 0)')
     parser.add_argument('--summary', action='store_true',
                         help='Show beautiful summary report at the end')
     parser.add_argument('--start-backend', action='store_true',
                         help='Start the FastAPI backend server in the background')
+    parser.add_argument('--horizon', type=str, default='medium',
+                        choices=['short', 'medium', 'long'],
+                        help='Investment horizon: short(1-5天), medium(1-3月), long(6月+)')
     args = parser.parse_args()
     logger.info("="*60)
     logger.info("STEP 0: 命令行参数解析完成")
     logger.info(f"  股票代码: {args.ticker}")
-    logger.info(f"  开始日期: {args.start_date or '默认一年前'}")
-    logger.info(f"  结束日期: {args.end_date or '昨天'}")
+    logger.info(f"  开始日期: {args.start or '默认一年前'}")
+    logger.info(f"  结束日期: {args.end or '昨天'}")
+    logger.info(f"  持仓周期: {args.horizon}")
     logger.info(f"  初始资金: {args.initial_capital}")
     logger.info(f"  初始持仓: {args.initial_position}")
     logger.info(f"  新闻数量: {args.num_of_news}")
@@ -331,12 +330,12 @@ if __name__ == "__main__":
         fastapi_thread.start()
     current_date = datetime.now()
     yesterday = current_date - timedelta(days=1)
-    end_date = yesterday if not args.end_date else min(
-        datetime.strptime(args.end_date, '%Y-%m-%d'), yesterday)
-    if not args.start_date:
+    end_date = yesterday if not args.end else min(
+        datetime.strptime(args.end, '%Y-%m-%d'), yesterday)
+    if not args.start:
         start_date = end_date - timedelta(days=365)
     else:
-        start_date = datetime.strptime(args.start_date, '%Y-%m-%d')
+        start_date = datetime.strptime(args.start, '%Y-%m-%d')
     if start_date > end_date:
         raise ValueError("Start date cannot be after end date")
     if args.num_of_news < 1:
@@ -367,7 +366,8 @@ if __name__ == "__main__":
         portfolio=portfolio,
         show_reasoning=args.show_reasoning,
         num_of_news=args.num_of_news,
-        show_summary=args.summary
+        show_summary=args.summary,
+        investment_horizon=args.horizon
     )
 
     # 解析并打印最终决策

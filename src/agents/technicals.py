@@ -18,6 +18,16 @@ from src.tools.api import prices_to_df
 logger = setup_logger('technical_analyst_agent')
 
 
+# 策略名称中英文映射
+STRATEGY_NAME_CN = {
+    "trend_following": "趋势跟踪",
+    "mean_reversion": "均值回归",
+    "momentum": "动量策略",
+    "volatility": "波动率分析",
+    "statistical_arbitrage": "统计套利"
+}
+
+
 def _build_fallback_analysis(reason: str) -> dict:
     return {
         "signal": "neutral",
@@ -72,7 +82,7 @@ def technical_analyst_agent(state: AgentState):
         logger.warning(reason)
         analysis_report = _build_fallback_analysis(reason)
         message = HumanMessage(
-            content=json.dumps(analysis_report),
+            content=json.dumps(analysis_report, ensure_ascii=False),
             name="technical_analyst_agent",
         )
         if show_reasoning:
@@ -265,7 +275,7 @@ def technical_analyst_agent(state: AgentState):
 
     # Create the technical analyst message
     message = HumanMessage(
-        content=json.dumps(analysis_report),
+        content=json.dumps(analysis_report, ensure_ascii=False),
         name="technical_analyst_agent",
     )
 
@@ -276,9 +286,16 @@ def technical_analyst_agent(state: AgentState):
 
     show_workflow_status("技术分析师", "completed")
 
-    # 添加调试信息，打印将要返回的消息名称
-    # logger.info(
-    # f"--- DEBUG: technical_analyst_agent RETURN messages: {[msg.name for msg in [message]]} ---")
+    # 打印最终分析结果
+    logger.info("────────────────────────────────────────────────────────")
+    logger.info("✅ 技术分析完成:")
+    logger.info(f"  📊 最终信号: {analysis_report.get('signal')}")
+    logger.info(f"  📈 置信度: {analysis_report.get('confidence')}")
+    logger.info(f"  📉 子策略信号:")
+    for strategy, result in analysis_report.get('strategy_signals', {}).items():
+        cn_name = STRATEGY_NAME_CN.get(strategy, strategy)
+        logger.info(f"     - {cn_name}: {result.get('signal')} ({result.get('confidence')})")
+    logger.info("────────────────────────────────────────────────────────")
 
     return {
         "messages": [message],

@@ -196,14 +196,25 @@ def fundamentals_agent(state: AgentState):
             }
         }
         message = HumanMessage(
-            content=json.dumps(message_content),
+            content=json.dumps(message_content, ensure_ascii=False),
             name="fundamentals_agent",
         )
         if show_reasoning:
             show_agent_reasoning(message_content, "基本面分析师")
             state["metadata"]["agent_reasoning"] = message_content
         show_workflow_status("基本面分析师", "completed")
-        return {
+
+    # 打印最终分析结果
+    logger.info("────────────────────────────────────────────────────────")
+    logger.info("✅ 基本面分析完成:")
+    logger.info(f"  📊 最终信号: {message_content.get('signal')}")
+    logger.info(f"  📈 置信度: {message_content.get('confidence')}")
+    logger.info(f"  📈 盈利信号: {message_content.get('profitability_signal', {}).get('signal', 'N/A')}")
+    logger.info(f"  📈 成长信号: {message_content.get('growth_signal', {}).get('signal', 'N/A')}")
+    logger.info(f"  📊 财务健康: {message_content.get('financial_health_signal', {}).get('signal', 'N/A')}")
+    logger.info("────────────────────────────────────────────────────────")
+
+    return {
             "messages": [message],
             "data": {
                 **data,
@@ -376,7 +387,7 @@ def fundamentals_agent(state: AgentState):
 
     # Create the fundamental analysis message
     message = HumanMessage(
-        content=json.dumps(message_content),
+        content=json.dumps(message_content, ensure_ascii=False),
         name="fundamentals_agent",
     )
 

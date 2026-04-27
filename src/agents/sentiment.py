@@ -587,7 +587,7 @@ def sentiment_agent(state: AgentState):
 
     # 创建消息
     message = HumanMessage(
-        content=json.dumps(message_content),
+        content=json.dumps(message_content, ensure_ascii=False),
         name="sentiment_agent",
     )
 

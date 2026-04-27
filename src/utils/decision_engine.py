@@ -7,16 +7,40 @@ from src.utils.logging_config import setup_logger
 
 logger = setup_logger('decision_engine')
 
-DEFAULT_WEIGHTS = {
-    'valuation': 0.25,
-    'fundamentals': 0.20,
-    'technical': 0.15,
-    'industry_cycle': 0.10,
-    'institutional': 0.10,
-    'sentiment': 0.05,
-    'macro': 0.05,
-    'risk': 0.10
+INVESTMENT_HORIZON_WEIGHTS = {
+    'short': {  # 1-5天：短线交易
+        'technical': 0.30,
+        'sentiment': 0.25,
+        'fundamentals': 0.10,
+        'valuation': 0.10,
+        'institutional': 0.10,
+        'industry_cycle': 0.05,
+        'macro': 0.05,
+        'risk': 0.05
+    },
+    'medium': {  # 1-3个月：中线投资
+        'technical': 0.20,
+        'sentiment': 0.15,
+        'fundamentals': 0.20,
+        'valuation': 0.15,
+        'institutional': 0.10,
+        'industry_cycle': 0.10,
+        'macro': 0.05,
+        'risk': 0.05
+    },
+    'long': {  # 6个月+：长线投资
+        'fundamentals': 0.25,
+        'valuation': 0.20,
+        'industry_cycle': 0.15,
+        'macro': 0.15,
+        'technical': 0.05,
+        'sentiment': 0.05,
+        'institutional': 0.10,
+        'risk': 0.05
+    }
 }
+
+DEFAULT_WEIGHTS = INVESTMENT_HORIZON_WEIGHTS['medium']
 
 
 class DecisionEngine:
@@ -24,52 +48,74 @@ class DecisionEngine:
     规则化决策引擎
     """
 
-    def __init__(self, config=None):
+    def __init__(self, config=None, investment_horizon: str = 'medium'):
+        """
+        初始化决策引擎
+        
+        Args:
+            config: 配置对象（包含agent_weights）
+            investment_horizon: 持仓周期 ('short'|'medium'|'long')，默认'medium'
+        """
+        self.investment_horizon = investment_horizon
+        
         if config is not None:
-            # Handle OptimizationConfig object
             if hasattr(config, 'get_agent_weights'):
                 self.weights = config.get_agent_weights()
             else:
-                # Handle dictionary
-                self.weights = config.get('agent_weights', DEFAULT_WEIGHTS)
+                self.weights = config.get('agent_weights', 
+                    INVESTMENT_HORIZON_WEIGHTS.get(investment_horizon, DEFAULT_WEIGHTS))
         else:
-            self.weights = DEFAULT_WEIGHTS
+            self.weights = INVESTMENT_HORIZON_WEIGHTS.get(investment_horizon, DEFAULT_WEIGHTS)
+        
+        logger.info(f"决策引擎初始化: 持仓周期={investment_horizon}, 权重={self.weights}")
 
-    def make_decision(self, signals: Dict, risk_score: float, risk_action: str, macro_factor: float, portfolio: Dict) -> Dict:
+    def make_decision(self, signals: Dict, risk_score: float, risk_action: str, portfolio: Dict, dynamic_threshold: float = 7.0) -> Dict:
         """
         决策入口
+
+        Args:
+            risk_score: 风险评分 0-10
+            risk_action: 风险管理建议的交易行动
+            portfolio: 投资组合
+            dynamic_threshold: 动态风险阈值（替代固定的7分）
+
+        Note: macro因子已通过9维度信号中的macro信号加权计算，不再单独检查
         """
-        logger.info(f"DecisionEngine: 开始决策, signals={list(signals.keys())}, risk_score={risk_score}, risk_action={risk_action}, macro_factor={macro_factor}")
+        logger.info(f"DecisionEngine: risk_score={risk_score}, threshold={dynamic_threshold}, risk_action={risk_action}")
 
-        # Step 1: 风险过滤
-        if risk_score >= 7:
-            return self._risk_filter_decision(risk_score, portfolio)
+        # Step 1: 风险过滤（使用动态阈值）
+        if risk_score >= 9:
+            return self._risk_filter_decision(risk_score, portfolio, "极端风险")
 
-        if risk_action in ['sell', 'reduce', '减仓', '清仓']:
+        if risk_score >= dynamic_threshold:
+            return self._risk_filter_decision(risk_score, portfolio, f"高风险(>{dynamic_threshold})")
+
+        # Step 2: 风控强制行动
+        if risk_action in ['sell', '清仓']:
             return self._risk_action_decision(risk_action, portfolio)
+        elif risk_action in ['reduce', '减仓']:
+            return self._risk_action_decision(risk_action, portfolio, risk_score)
 
-        if macro_factor < 0.7:
-            return self._macro_decision(macro_factor, portfolio)
-
-        # Step 2: 信号加权
+        # Step 3: 信号加权
         weighted_signals = self._calculate_weighted_signals(signals)
 
-        # Step 3: 决策规则
-        return self._apply_decision_rules(weighted_signals, risk_score, macro_factor, portfolio)
+        # Step 4: 决策规则
+        return self._apply_decision_rules(weighted_signals, risk_score, portfolio)
 
-    def _risk_filter_decision(self, risk_score: float, portfolio: Dict) -> Dict:
+    def _risk_filter_decision(self, risk_score: float, portfolio: Dict, reason: str = "") -> Dict:
         """
         风险过滤决策
         """
-        logger.warning(f"风险过滤: risk_score={risk_score} >= 7, 强制持有")
+        reason_str = reason if reason else "高风险"
+        logger.warning(f"风险过滤: {reason_str}, 强制持有")
         return {
             'action': 'hold',
             'quantity': portfolio.get('stock', 0),
             'confidence': 0.3,
-            'reason': f'风险评分{risk_score:.0f} >= 7，强制持有'
+            'reason': f'风险评分{risk_score:.0f}，{reason_str}，强制持有'
         }
 
-    def _risk_action_decision(self, risk_action: str, portfolio: Dict) -> Dict:
+    def _risk_action_decision(self, risk_action: str, portfolio: Dict, risk_score: float = 5.0) -> Dict:
         """
         风险行动决策
         """
@@ -77,7 +123,7 @@ class DecisionEngine:
 
         if risk_action in ['sell', '清仓']:
             if current_position > 0:
-                logger.warning(f"风险行动: 卖出, quantity={current_position}")
+                logger.warning(f"风险行动: 卖出全部, quantity={current_position}")
                 return {
                     'action': 'sell',
                     'quantity': current_position,
@@ -85,41 +131,36 @@ class DecisionEngine:
                     'reason': '风险管理建议卖出'
                 }
             else:
-                logger.warning(f"风险行动: 无持仓可卖，阻止买入")
+                logger.warning(f"风险行动: 无持仓可卖，观望")
                 return {
                     'action': 'hold',
                     'quantity': 0,
                     'confidence': 0.5,
-                    'reason': '风险管理建议卖出但无持仓，阻止买入'
+                    'reason': '风险管理建议卖出但无持仓，观望'
                 }
         elif risk_action in ['reduce', '减仓']:
             if current_position > 0:
-                reduce_quantity = int(current_position * 0.5)
-                logger.warning(f"风险行动: 减仓50%, quantity={reduce_quantity}")
+                # 动态减仓比例：风险越高，减仓越多
+                if risk_score >= 8:
+                    reduce_ratio = 0.3 + (risk_score - 8) * 0.4 / 2  # 50-70%
+                else:
+                    reduce_ratio = 0.3 + (risk_score - 7) * 0.2  # 30-50%
+
+                reduce_ratio = min(reduce_ratio, 0.7)
+                reduce_quantity = int(current_position * reduce_ratio)
+                logger.warning(f"风险行动: 减仓{reduce_ratio:.0%}, quantity={reduce_quantity}")
                 return {
                     'action': 'sell',
                     'quantity': reduce_quantity,
                     'confidence': 0.6,
-                    'reason': '风险管理建议减仓50%'
+                    'reason': f'风险管理建议减仓{reduce_ratio:.0%}'
                 }
 
         return {
             'action': 'hold',
             'quantity': 0,
             'confidence': 0.5,
-            'reason': '风险���理无明确建议'
-        }
-
-    def _macro_decision(self, macro_factor: float, portfolio: Dict) -> Dict:
-        """
-        宏观决策
-        """
-        logger.warning(f"宏观决策: macro_factor={macro_factor:.2f} < 0.7, 建议观望")
-        return {
-            'action': 'hold',
-            'quantity': portfolio.get('stock', 0),
-            'confidence': 0.4,
-            'reason': f'宏观环境较差(系数{macro_factor:.2f})，建议观望'
+            'reason': '风险管理无明确建议'
         }
 
     def _calculate_weighted_signals(self, signals: Dict) -> Dict:
@@ -143,7 +184,7 @@ class DecisionEngine:
         logger.debug(f"加权信号: {[(k, v['value'], v['raw_signal']) for k, v in weighted.items()]}")
         return weighted
 
-    def _apply_decision_rules(self, weighted_signals: Dict, risk_score: float, macro_factor: float, portfolio: Dict) -> Dict:
+    def _apply_decision_rules(self, weighted_signals: Dict, risk_score: float, portfolio: Dict) -> Dict:
         """
         应用决策规则
         """
@@ -169,16 +210,16 @@ class DecisionEngine:
         # 规则1：多数看多且总分>0.3
         if bullish_count >= 4 and total_score > 0.3 and risk_score < 5:
             action = 'buy'
-            quantity = self._calculate_buy_quantity(portfolio, risk_score, macro_factor)
+            quantity = self._calculate_buy_quantity(portfolio, risk_score)
             confidence = min(abs(total_score) + 0.3, 0.9)
             logger.info(f"决策: 规则1触发 -> buy, quantity={quantity}")
 
         # 规则2：多数看空或总分<-0.3
         elif bearish_count >= 3 or total_score < -0.3:
             action = 'sell'
-            quantity = portfolio.get('stock', 0)
+            quantity = int(portfolio.get('stock', 0) * 0.5)  # 分批卖出，先卖50%
             confidence = min(abs(total_score) + 0.3, 0.9)
-            logger.info(f"决策: 规则2触发 -> sell, quantity={quantity}")
+            logger.info(f"决策: 规则2触发 -> sell, quantity={quantity} (分批卖出)")
 
         # 规则3：看多但风险偏高
         elif bullish_count >= 3 and risk_score >= 5:
@@ -206,9 +247,11 @@ class DecisionEngine:
             )
         }
 
-    def _calculate_buy_quantity(self, portfolio: Dict, risk_score: float, macro_factor: float) -> int:
+    def _calculate_buy_quantity(self, portfolio: Dict, risk_score: float) -> int:
         """
         计算买入数量
+
+        Note: macro因子已通过9维度信号加权计算，不再单独调整
         """
         cash = portfolio.get('cash', 0)
         current_price = portfolio.get('current_price', 0)
@@ -216,11 +259,11 @@ class DecisionEngine:
         if current_price <= 0:
             return 0
 
+        # 根据风险评分调整仓位：风险越高，买入越少
         risk_adjustment = 1.0 - (risk_score / 20)
-        macro_adjustment = macro_factor
 
         base_quantity = cash / current_price
-        adjusted_quantity = base_quantity * risk_adjustment * macro_adjustment
+        adjusted_quantity = base_quantity * risk_adjustment
 
         return int(adjusted_quantity)
 
@@ -273,6 +316,11 @@ class DecisionEngine:
         return '; '.join(reasons)
 
 
-def create_decision_engine(config: Optional[Dict] = None) -> DecisionEngine:
-    """便捷工厂函数"""
-    return DecisionEngine(config)
+def create_decision_engine(config: Optional[Dict] = None, investment_horizon: str = 'medium') -> DecisionEngine:
+    """便捷工厂函数
+    
+    Args:
+        config: 配置对象
+        investment_horizon: 持仓周期 ('short'|'medium'|'long')
+    """
+    return DecisionEngine(config, investment_horizon)
