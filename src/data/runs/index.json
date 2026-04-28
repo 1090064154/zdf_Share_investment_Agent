@@ -1,0 +1,114 @@
+{
+  "runs": [
+    {
+      "run_id": "20260428-170444-684617",
+      "ticker": "002714",
+      "status": "completed",
+      "action": "hold",
+      "confidence": 0.5,
+      "created_at": "2026-04-28T17:04:44.362837",
+      "completed_at": "2026-04-28T17:06:32.988136",
+      "duration_seconds": null
+    },
+    {
+      "run_id": "20260428-170000-353eda",
+      "ticker": "002891",
+      "status": "completed",
+      "action": "hold",
+      "confidence": 0.3,
+      "created_at": "2026-04-28T17:00:00.015541",
+      "completed_at": "2026-04-28T17:02:04.186363",
+      "duration_seconds": null
+    },
+    {
+      "run_id": "20260428-165026-bb937e",
+      "ticker": "001696",
+      "status": "completed",
+      "action": "hold",
+      "confidence": 0.3,
+      "created_at": "2026-04-28T16:50:26.907086",
+      "completed_at": "2026-04-28T16:52:10.260130",
+      "duration_seconds": null
+    },
+    {
+      "run_id": "20260428-164141-563f66",
+      "ticker": "002714",
+      "status": "completed",
+      "action": "hold",
+      "confidence": 0.5,
+      "created_at": "2026-04-28T16:41:41.510026",
+      "completed_at": "2026-04-28T16:43:34.789443",
+      "duration_seconds": null
+    },
+    {
+      "run_id": "20260428-163236-b1d970",
+      "ticker": "002714",
+      "status": "completed",
+      "action": "buy",
+      "confidence": 0.88,
+      "created_at": "2026-04-28T16:32:36.939434",
+      "completed_at": "2026-04-28T16:32:39.665664",
+      "duration_seconds": null
+    },
+    {
+      "run_id": "20260428-162933-b227b0",
+      "ticker": "001696",
+      "status": "completed",
+      "action": "hold",
+      "confidence": 0.3,
+      "created_at": "2026-04-28T16:29:33.059780",
+      "completed_at": "2026-04-28T16:31:40.753344",
+      "duration_seconds": null
+    },
+    {
+      "run_id": "20260428-162101-e82ccc",
+      "ticker": "002714",
+      "status": "completed",
+      "action": "buy",
+      "confidence": 0.88,
+      "created_at": "2026-04-28T16:21:01.248086",
+      "completed_at": "2026-04-28T16:21:02.777067",
+      "duration_seconds": null
+    },
+    {
+      "run_id": "20260428-162037-d19fc4",
+      "ticker": "002714",
+      "status": "completed",
+      "action": "hold",
+      "confidence": 0.3,
+      "created_at": "2026-04-28T16:20:37.151936",
+      "completed_at": "2026-04-28T16:20:48.809635",
+      "duration_seconds": null
+    },
+    {
+      "run_id": "20260428-161916-11ecce",
+      "ticker": "002714",
+      "status": "completed",
+      "action": "hold",
+      "confidence": 0.5,
+      "created_at": "2026-04-28T16:19:16.938895",
+      "completed_at": "2026-04-28T16:20:48.248286",
+      "duration_seconds": null
+    },
+    {
+      "run_id": "20260428-161156-89dfb6",
+      "ticker": "002714",
+      "status": "running",
+      "action": null,
+      "confidence": 0.0,
+      "created_at": "2026-04-28T16:11:56.167279",
+      "completed_at": null,
+      "duration_seconds": null
+    },
+    {
+      "run_id": "20260428-160801-71ad7d",
+      "ticker": "002714",
+      "status": "completed",
+      "action": "hold",
+      "confidence": 0.5,
+      "created_at": "2026-04-28T16:08:01.578717",
+      "completed_at": "2026-04-28T16:09:37.450761",
+      "duration_seconds": null
+    }
+  ]
+}

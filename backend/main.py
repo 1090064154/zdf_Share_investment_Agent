@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from typing import Dict, List
+from pathlib import Path
 
 from .routers import logs, runs
 # 导入新增的路由器
@@ -43,6 +45,21 @@ app.include_router(api_runs.router)
 
 # 包含新的API路由
 app.include_router(api_router)
+
+# 挂载前端静态文件
+frontend_path = Path(__file__).parent.parent / "src" / "frontend"
+if frontend_path.exists():
+    app.mount("/static", StaticFiles(directory=str(frontend_path), html=True), name="frontend")
+
+# 添加前端路由 - 返回 index.html
+@app.get("/ui")
+async def serve_frontend():
+    """返回前端页面"""
+    from fastapi.responses import FileResponse
+    index_path = frontend_path / "index.html"
+    if index_path.exists():
+        return FileResponse(str(index_path))
+    return {"error": "Frontend not found"}
 
 # 根端点API导航
 

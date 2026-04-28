@@ -8,8 +8,14 @@ from datetime import datetime, UTC
 
 from backend.schemas import LLMInteractionLog, AgentExecutionLog
 from backend.storage.base import BaseLogStorage
-from src.agents.state import AgentState
+from src.agents.state import AgentState, normalize_agent_name
 from src.utils.serialization import serialize_agent_state
+
+try:
+    from src.api.log_hook import agent_started, agent_log, agent_completed, agent_failed
+    HAS_LOG_HOOK = True
+except ImportError:
+    HAS_LOG_HOOK = False
 
 # --- Context Variables ---
 # These variables hold state specific to the current execution context (e.g., a single agent run within a workflow).
@@ -35,20 +41,68 @@ current_run_id_context: ContextVar[Optional[str]] = ContextVar(
 class OutputCapture:
     """捕获标准输出和日志的工具类"""
 
-    def __init__(self):
+    class _LiveStream(io.TextIOBase):
+        """将输出同时写到原始流、缓存，并按行实时发送到 SSE。"""
+
+        def __init__(self, mirror, outputs, run_id=None, agent_name=None):
+            self.mirror = mirror
+            self.outputs = outputs
+            self.run_id = run_id
+            self.agent_name = agent_name
+            self._line_buffer = ""
+
+        def write(self, text):
+            if not text:
+                return 0
+
+            self.outputs.append(text)
+
+            if self.mirror:
+                self.mirror.write(text)
+                self.mirror.flush()
+
+            if HAS_LOG_HOOK and self.run_id and self.agent_name:
+                self._line_buffer += text
+                while "\n" in self._line_buffer:
+                    line, self._line_buffer = self._line_buffer.split("\n", 1)
+                    line = line.strip()
+                    if line:
+                        agent_log(self.run_id, self.agent_name, "info", line)
+
+            return len(text)
+
+        def flush(self):
+            if self.mirror:
+                self.mirror.flush()
+
+        def flush_pending(self):
+            if HAS_LOG_HOOK and self.run_id and self.agent_name:
+                line = self._line_buffer.strip()
+                if line:
+                    agent_log(self.run_id, self.agent_name, "info", line)
+            self._line_buffer = ""
+
+    def __init__(self, run_id: Optional[str] = None, agent_name: Optional[str] = None):
         self.outputs = []
         self.stdout_buffer = io.StringIO()
         self.old_stdout = None
         self.log_handler = None
         self.old_log_level = None
+        self.run_id = run_id
+        self.agent_name = agent_name
+        self.live_stream = None
 
     def __enter__(self):
-        # 捕获标准输出
         self.old_stdout = sys.stdout
-        sys.stdout = self.stdout_buffer
+        self.live_stream = self._LiveStream(
+            mirror=self.old_stdout,
+            outputs=self.outputs,
+            run_id=self.run_id,
+            agent_name=self.agent_name
+        )
+        sys.stdout = self.live_stream
 
-        # 捕获日志
-        self.log_handler = logging.StreamHandler(io.StringIO())
+        self.log_handler = logging.StreamHandler(self.live_stream)
         self.log_handler.setLevel(logging.INFO)
         root_logger = logging.getLogger()
         self.old_log_level = root_logger.level
@@ -58,18 +112,10 @@ class OutputCapture:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        # 恢复标准输出并捕获内容
         sys.stdout = self.old_stdout
-        stdout_content = self.stdout_buffer.getvalue()
-        if stdout_content.strip():
-            self.outputs.append(stdout_content)
+        if self.live_stream:
+            self.live_stream.flush_pending()
 
-        # 恢复日志并捕获内容
-        log_content = self.log_handler.stream.getvalue()
-        if log_content.strip():
-            self.outputs.append(log_content)
-
-        # 清理日志处理器
         root_logger = logging.getLogger()
         root_logger.removeHandler(self.log_handler)
         root_logger.setLevel(self.old_log_level)
@@ -126,6 +172,201 @@ def wrap_llm_call(original_llm_func: Callable) -> Callable:
     return wrapper
 
 
+def _normalize_confidence_value(value: Any) -> float:
+    if value is None:
+        return 0.0
+    if isinstance(value, str):
+        cleaned = value.strip().replace("%", "")
+        try:
+            numeric = float(cleaned)
+            return numeric / 100.0 if numeric > 1 else numeric
+        except ValueError:
+            return 0.0
+    try:
+        numeric = float(value)
+        return numeric / 100.0 if numeric > 1 else numeric
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _normalize_signal_value(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    normalized = str(value).strip().lower()
+    mapping = {
+        "positive": "bullish",
+        "negative": "bearish",
+        "buy": "bullish",
+        "sell": "bearish",
+        "hold": "neutral",
+        "reduce": "bearish",
+    }
+    return mapping.get(normalized, normalized or None)
+
+
+def _compact_payload(value: Any, depth: int = 0) -> Any:
+    if depth > 3:
+        return "..."
+    if isinstance(value, dict):
+        items = list(value.items())[:20]
+        compacted = {str(k): _compact_payload(v, depth + 1) for k, v in items}
+        if len(value) > 20:
+            compacted["_truncated"] = f"+{len(value) - 20} more keys"
+        return compacted
+    if isinstance(value, list):
+        compacted = [_compact_payload(item, depth + 1) for item in value[:12]]
+        if len(value) > 12:
+            compacted.append(f"... {len(value) - 12} more items")
+        return compacted
+    if isinstance(value, str):
+        return value if len(value) <= 1200 else value[:1200] + "...(truncated)"
+    return value
+
+
+def _build_agent_summary(agent_name: str, latest_payload: Dict[str, Any], reasoning: Any, serialized_input: Optional[Dict[str, Any]], serialized_output: Optional[Dict[str, Any]]) -> str:
+    input_data = (serialized_input or {}).get("data", {})
+    output_data = (serialized_output or {}).get("data", {})
+
+    if agent_name == "market_data_agent":
+        ticker = input_data.get("ticker") or output_data.get("ticker") or ""
+        prices = output_data.get("prices", [])
+        industry = output_data.get("industry") or "未知行业"
+        start_date = output_data.get("start_date") or input_data.get("start_date") or "未提供"
+        end_date = output_data.get("end_date") or input_data.get("end_date") or "未提供"
+        metrics_ready = bool(output_data.get("financial_metrics"))
+        return f"{ticker} 在 {start_date} 到 {end_date} 区间共整理 {len(prices)} 条价格数据，行业为 {industry}，财务指标{'已获取' if metrics_ready else '未获取'}。"
+
+    if agent_name == "technical_analyst_agent":
+        strategies = latest_payload.get("strategy_signals", {})
+        picked = []
+        for key in ("trend_following", "mean_reversion", "momentum"):
+            item = strategies.get(key, {})
+            if item:
+                picked.append(f"{key}={item.get('signal', 'neutral')}")
+        return f"技术面最终判断为 {latest_payload.get('signal', 'neutral')}，主要子策略结论：{', '.join(picked) or '暂无'}。"
+
+    if agent_name == "fundamentals_agent":
+        reason = latest_payload.get("reasoning", {}) if isinstance(latest_payload, dict) else {}
+        profitability = reason.get("profitability_signal", {}).get("signal", "neutral")
+        growth = reason.get("growth_signal", {}).get("signal", "neutral")
+        health = reason.get("financial_health_signal", {}).get("signal", "neutral")
+        return f"基本面综合判断为 {latest_payload.get('signal', 'neutral')}，其中盈利={profitability}、成长={growth}、财务健康={health}。"
+
+    if agent_name == "risk_management_agent":
+        action = latest_payload.get("交易行动", "hold")
+        score = latest_payload.get("风险评分", "N/A")
+        max_pos = latest_payload.get("最大持仓规模", "N/A")
+        return f"风险评分 {score}/10，建议动作为 {action}，允许的最大持仓约 {max_pos} 股。"
+
+    if agent_name == "portfolio_management_agent":
+        action = latest_payload.get("action", "hold")
+        quantity = latest_payload.get("quantity", 0)
+        confidence = _normalize_confidence_value(latest_payload.get("confidence"))
+        agent_signals = latest_payload.get("agent_signals", [])
+        return f"最终决策为 {action} {quantity} 股，决策把握度约 {round(confidence * 100)}%，综合参考了 {len(agent_signals)} 个模块信号。"
+
+    if agent_name == "macro_news_agent":
+        if isinstance(reasoning, str):
+            return reasoning[:140] + ("..." if len(reasoning) > 140 else "")
+
+    if isinstance(reasoning, dict):
+        for key in ("reasoning", "summary", "推理", "details"):
+            if key in reasoning and reasoning[key]:
+                return str(reasoning[key])[:160]
+
+    if isinstance(latest_payload, dict):
+        for key in ("reasoning", "summary", "details", "raw_content"):
+            if key in latest_payload and latest_payload[key]:
+                return str(latest_payload[key])[:160]
+
+    return "该节点已完成，但没有产出适合直接展示的摘要说明。"
+
+
+def extract_agent_completion_payload(
+    result_state: Optional[AgentState],
+    serialized_input: Optional[Dict[str, Any]] = None,
+    serialized_output: Optional[Dict[str, Any]] = None,
+    agent_name: str = "",
+) -> Tuple[Optional[str], float, Dict[str, Any]]:
+    """从 Agent 输出中提取前端展示所需的结构化信息。"""
+    signal = None
+    confidence = 0.0
+    reasoning = None
+    latest_payload = {}
+
+    if result_state:
+        messages = result_state.get("messages", [])
+        if messages:
+            last_msg = messages[-1]
+            if hasattr(last_msg, "content"):
+                try:
+                    import json
+                    latest_payload = json.loads(last_msg.content)
+                except Exception:
+                    latest_payload = {"raw_content": getattr(last_msg, "content", "")}
+
+        metadata = result_state.get("metadata", {})
+        reasoning = metadata.get("agent_reasoning")
+
+    if isinstance(latest_payload, dict):
+        signal = _normalize_signal_value(
+            latest_payload.get("signal")
+            or latest_payload.get("impact_on_stock")
+            or latest_payload.get("action")
+            or latest_payload.get("交易行动")
+            or latest_payload.get("macro_environment")
+        )
+        confidence = _normalize_confidence_value(
+            latest_payload.get("confidence")
+            or latest_payload.get("置信度")
+        )
+
+    if (not signal or confidence == 0.0) and isinstance(reasoning, dict):
+        signal = signal or _normalize_signal_value(
+            reasoning.get("signal")
+            or reasoning.get("impact_on_stock")
+            or reasoning.get("action")
+            or reasoning.get("交易行动")
+            or reasoning.get("macro_environment")
+        )
+        if confidence == 0.0:
+            confidence = _normalize_confidence_value(
+                reasoning.get("confidence")
+                or reasoning.get("置信度")
+            )
+
+    if confidence == 0.0 and isinstance(serialized_output, dict):
+        maybe_reasoning = serialized_output.get("metadata", {}).get("agent_reasoning", {})
+        if isinstance(maybe_reasoning, dict):
+            confidence = _normalize_confidence_value(
+                maybe_reasoning.get("confidence")
+                or maybe_reasoning.get("置信度")
+            )
+            signal = signal or _normalize_signal_value(
+                maybe_reasoning.get("signal")
+                or maybe_reasoning.get("impact_on_stock")
+                or maybe_reasoning.get("action")
+                or maybe_reasoning.get("交易行动")
+                or maybe_reasoning.get("macro_environment")
+            )
+
+    details = {
+        "input": _compact_payload((serialized_input or {}).get("data", serialized_input or {})),
+        "output": _compact_payload((serialized_output or {}).get("data", serialized_output or {})),
+        "reasoning": _compact_payload(reasoning if reasoning is not None else latest_payload),
+        "result": _compact_payload(latest_payload),
+        "summary": _build_agent_summary(
+            agent_name=agent_name,
+            latest_payload=latest_payload if isinstance(latest_payload, dict) else {},
+            reasoning=reasoning,
+            serialized_input=serialized_input,
+            serialized_output=serialized_output,
+        ),
+    }
+
+    return signal, confidence, details
+
+
 # --- Decorator for Agent Functions ---
 
 def log_agent_execution(agent_name: str):
@@ -153,11 +394,15 @@ def log_agent_execution(agent_name: str):
             serialized_input = serialize_agent_state(state)
 
             # 准备输出捕获
-            output_capture = OutputCapture()
+            output_capture = OutputCapture(run_id=run_id, agent_name=agent_name)
             result_state = None
             error = None
 
             try:
+                # 发送Agent开始事件
+                if HAS_LOG_HOOK and run_id:
+                    agent_started(run_id, agent_name, f"开始执行 {agent_name}")
+
                 # 使用输出捕获器
                 with output_capture:
                     # 执行原始Agent函数
@@ -165,12 +410,29 @@ def log_agent_execution(agent_name: str):
 
                 # 成功执行，记录日志
                 timestamp_end = datetime.now(UTC)
-                terminal_outputs = output_capture.outputs
+                terminal_outputs = ["".join(output_capture.outputs)] if output_capture.outputs else []
+
+                serialized_output = serialize_agent_state(result_state) if result_state else {}
+                normalized_agent_name = normalize_agent_name(agent_name)
+                signal, confidence, details = extract_agent_completion_payload(
+                    result_state=result_state,
+                    serialized_input=serialized_input,
+                    serialized_output=serialized_output,
+                    agent_name=normalized_agent_name,
+                )
+
+                # 发送Agent完成事件
+                if HAS_LOG_HOOK and run_id:
+                    agent_completed(
+                        run_id,
+                        normalized_agent_name,
+                        signal,
+                        confidence,
+                        f"{normalized_agent_name} 执行完成",
+                        details=details,
+                    )
 
                 if storage and result_state:
-                    # 序列化输出状态
-                    serialized_output = serialize_agent_state(result_state)
-
                     # 提取推理详情（如果有）
                     reasoning_details = None
                     if result_state.get("metadata", {}).get("show_reasoning", False):

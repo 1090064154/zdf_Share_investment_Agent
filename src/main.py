@@ -86,6 +86,13 @@ def run_hedge_fund(run_id: str, ticker: str, start_date: str, end_date: str, por
     except Exception as e:
         print(f"Note: Could not update API state: {str(e)}")
 
+    # 设置当前 run_id 用于 SSE 事件发送
+    try:
+        from src.agents.state import set_current_run_id
+        set_current_run_id(run_id)
+    except Exception as e:
+        print(f"Note: Could not set current run id: {str(e)}")
+
     initial_state = {
         "messages": [],  # 初始消息为空
         "data": {

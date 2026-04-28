@@ -68,6 +68,21 @@ class StockAnalysisRequest(BaseModel):
         ge=0,
         example=0
     )
+    investment_horizon: str = Field(
+        "medium",
+        description="持仓周期：short(1周-1月), medium(1-3月), long(3月以上)",
+        example="medium"
+    )
+    start_date: Optional[str] = Field(
+        None,
+        description="分析开始日期（YYYY-MM-DD），默认1年前",
+        example="2025-01-01"
+    )
+    end_date: Optional[str] = Field(
+        None,
+        description="分析结束日期（YYYY-MM-DD），默认昨天",
+        example="2025-04-20"
+    )
 
     class Config:
         schema_extra = {
@@ -76,7 +91,10 @@ class StockAnalysisRequest(BaseModel):
                 "show_reasoning": True,
                 "num_of_news": 5,
                 "initial_capital": 100000.0,
-                "initial_position": 0
+                "initial_position": 0,
+                "investment_horizon": "medium",
+                "start_date": "2025-01-01",
+                "end_date": "2025-04-20"
             }
         }
 

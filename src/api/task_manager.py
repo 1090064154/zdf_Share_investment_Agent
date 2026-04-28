@@ -53,25 +53,25 @@ class TaskManager:
 
     # 9个基础Agent
     BASE_AGENTS = [
-        "technical_analyst",      # 技术分析
-        "fundamentals_analyst",   # 基本面分析
-        "sentiment_analyst",      # 情绪分析
-        "valuation_analyst",      # 估值分析
-        "industry_cycle_analyst", # 行业周期
-        "institutional_analyst",  # 机构持仓
-        "expectation_diff_analyst", # 预期差
-        "macro_news_analyst",     # 宏观新闻
-        "macro_analyst",          # 宏观分析
+        "technical_analyst_agent",
+        "fundamentals_agent",
+        "sentiment_agent",
+        "valuation_agent",
+        "industry_cycle_agent",
+        "institutional_agent",
+        "expectation_diff_agent",
+        "macro_news_agent",
+        "macro_analyst_agent",
     ]
 
     # Level 2 综合Agent
-    RESEARCHER_AGENTS = ["bull_researcher", "bear_researcher"]
+    RESEARCHER_AGENTS = ["researcher_bull_agent", "researcher_bear_agent"]
 
     # Level 3 辩论Agent
-    DEBATE_AGENTS = ["debate_room"]
+    DEBATE_AGENTS = ["debate_room_agent"]
 
     # Level 4 最终决策Agent
-    FINAL_AGENTS = ["risk_management", "macro_consensus", "portfolio_management"]
+    FINAL_AGENTS = ["risk_management_agent", "portfolio_management_agent"]
 
     def __init__(self):
         self.tasks: Dict[str, TaskState] = {}

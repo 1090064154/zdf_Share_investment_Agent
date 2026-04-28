@@ -44,6 +44,8 @@ from backend.utils.api_utils import (
 from backend.schemas import LLMInteractionLog  # Keep
 from backend.schemas import AgentExecutionLog  # Keep
 from src.utils.serialization import serialize_agent_state  # Keep
+from src.utils.llm_interaction_logger import OutputCapture, extract_agent_completion_payload
+from src.agents.state import normalize_agent_name
 
 # 导入日志记录器
 try:
@@ -286,43 +288,16 @@ def agent_endpoint(agent_name: str, description: str = ""):
             error = None
             terminal_outputs = []  # Capture terminal output
 
-            # Capture stdout/stderr and logs during agent execution
-            old_stdout = sys.stdout
-            old_stderr = sys.stderr
-            log_stream = io.StringIO()
-            log_handler = logging.StreamHandler(log_stream)
-            log_handler.setLevel(logging.INFO)
-            root_logger = logging.getLogger()
-            root_logger.addHandler(log_handler)
-
-            redirect_stdout = io.StringIO()
-            redirect_stderr = io.StringIO()
-            sys.stdout = redirect_stdout
-            sys.stderr = redirect_stderr
-
             try:
-                # --- 执行Agent核心逻辑 ---
-                # 直接调用原始 agent_func
-                result = agent_func(state)
-                # --------------------------
+                output_capture = OutputCapture(run_id=run_id, agent_name=agent_name)
+                with output_capture:
+                    # --- 执行Agent核心逻辑 ---
+                    # 直接调用原始 agent_func
+                    result = agent_func(state)
+                    # --------------------------
 
                 timestamp_end = datetime.now(UTC)
-
-                # 恢复标准输出/错误
-                sys.stdout = old_stdout
-                sys.stderr = old_stderr
-                root_logger.removeHandler(log_handler)
-
-                # 获取捕获的输出
-                stdout_content = redirect_stdout.getvalue()
-                stderr_content = redirect_stderr.getvalue()
-                log_content = log_stream.getvalue()
-                if stdout_content:
-                    terminal_outputs.append(stdout_content)
-                if stderr_content:
-                    terminal_outputs.append(stderr_content)
-                if log_content:
-                    terminal_outputs.append(log_content)
+                terminal_outputs = ["".join(output_capture.outputs)] if output_capture.outputs else []
 
                 # 序列化输出状态
                 serialized_output = serialize_agent_state(result)
@@ -342,6 +317,27 @@ def agent_endpoint(agent_name: str, description: str = ""):
 
                 # 更新Agent状态为已完成
                 api_state.update_agent_state(agent_name, "completed")
+
+                normalized_agent_name = normalize_agent_name(agent_name)
+                signal, confidence, details = extract_agent_completion_payload(
+                    result_state=result,
+                    serialized_input=serialized_input,
+                    serialized_output=serialized_output,
+                    agent_name=normalized_agent_name,
+                )
+                if run_id:
+                    try:
+                        from src.api.log_hook import agent_completed
+                        agent_completed(
+                            run_id,
+                            normalized_agent_name,
+                            signal,
+                            confidence,
+                            f"{normalized_agent_name} 执行完成",
+                            details=details,
+                        )
+                    except Exception as sse_err:
+                        logger.debug(f"发送Agent完成SSE失败: {sse_err}")
 
                 # --- 添加Agent执行日志到BaseLogStorage ---
                 try:
@@ -374,25 +370,19 @@ def agent_endpoint(agent_name: str, description: str = ""):
                 # Record end time even on error
                 timestamp_end = datetime.now(UTC)
                 error = str(e)
-                # 恢复标准输出/错误
-                sys.stdout = old_stdout
-                sys.stderr = old_stderr
-                root_logger.removeHandler(log_handler)
-                # 获取捕获的输出
-                stdout_content = redirect_stdout.getvalue()
-                stderr_content = redirect_stderr.getvalue()
-                log_content = log_stream.getvalue()
-                if stdout_content:
-                    terminal_outputs.append(stdout_content)
-                if stderr_content:
-                    terminal_outputs.append(stderr_content)
-                if log_content:
-                    terminal_outputs.append(log_content)
+                if 'output_capture' in locals() and output_capture.outputs:
+                    terminal_outputs = ["".join(output_capture.outputs)]
 
                 # 更新Agent状态为错误
                 api_state.update_agent_state(agent_name, "error")
                 # 记录错误信息
                 api_state.update_agent_data(agent_name, "error", error)
+                if run_id:
+                    try:
+                        from src.api.log_hook import agent_failed
+                        agent_failed(run_id, agent_name, error)
+                    except Exception as sse_err:
+                        logger.debug(f"发送Agent失败SSE失败: {sse_err}")
 
                 # --- 添加错误日志到BaseLogStorage ---
                 try:

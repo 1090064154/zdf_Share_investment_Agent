@@ -1,0 +1,6 @@
+{
+  "action": "buy",
+  "confidence": 0.88,
+  "quantity": 100,
+  "reasoning": "fake"
+}

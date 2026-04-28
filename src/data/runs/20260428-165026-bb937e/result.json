@@ -1,0 +1,64 @@
+{
+  "action": "hold",
+  "quantity": 0,
+  "confidence": 0.3,
+  "agent_signals": [
+    {
+      "agent_name": "技术分析",
+      "signal": "bearish",
+      "confidence": 0.77
+    },
+    {
+      "agent_name": "基本面分析",
+      "signal": "bearish",
+      "confidence": 0.5
+    },
+    {
+      "agent_name": "情绪分析",
+      "signal": "neutral",
+      "confidence": 0.95
+    },
+    {
+      "agent_name": "估值分析",
+      "signal": "bearish",
+      "confidence": 0.85
+    },
+    {
+      "agent_name": "风险管理",
+      "signal": "hold",
+      "confidence": 1.0
+    },
+    {
+      "agent_name": "宏观分析",
+      "signal": "negative",
+      "confidence": 0.5
+    },
+    {
+      "agent_name": "宏观新闻分析",
+      "signal": "neutral",
+      "confidence": 0.1
+    },
+    {
+      "agent_name": "辩论室",
+      "signal": "bearish",
+      "confidence": 0.82
+    },
+    {
+      "agent_name": "行业周期",
+      "signal": "neutral",
+      "confidence": 0.3
+    },
+    {
+      "agent_name": "机构持仓",
+      "signal": "neutral",
+      "confidence": 0.4
+    },
+    {
+      "agent_name": "预期差",
+      "signal": "bullish",
+      "confidence": 0.75
+    }
+  ],
+  "reasoning": "[DecisionEngine] 风险评分6，高风险(>5.0)，强制持有",
+  "validation_overridden": false
+}

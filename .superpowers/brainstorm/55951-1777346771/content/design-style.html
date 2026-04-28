@@ -1,0 +1,65 @@
+<h2>A股分析交互系统 - 系统架构设计</h2>
+<p class="subtitle">请选择前端界面风格</p>
+
+<div class="options">
+  <div class="option" data-choice="modern" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>现代科技风</h3>
+      <p>深色主题，霓虹色强调，实时数据流，K线风格图表</p>
+    </div>
+  </div>
+  <div class="option" data-choice="clean" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>简洁金融风</h3>
+      <p>浅色主题，蓝色强调，清晰的信息层级，专业报表风格</p>
+    </div>
+  </div>
+</div>
+
+<hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;" />
+
+<h3>系统架构预览</h3>
+<div class="mockup">
+  <div class="mockup-header">系统架构图</div>
+  <div class="mockup-body">
+    <div style="display: flex; justify-content: space-around; padding: 20px; background: #f5f5f5;">
+      <div style="text-align: center;">
+        <div style="background: #4A90D9; color: white; padding: 15px 25px; border-radius: 8px; margin-bottom: 10px;">🌐 前端<br><small>HTML+JS</small></div>
+        <div style="font-size: 24px;">⬇️ SSE/WebSocket</div>
+      </div>
+      <div style="text-align: center;">
+        <div style="background: #5CB85C; color: white; padding: 15px 25px; border-radius: 8px; margin-bottom: 10px;">⚡ FastAPI<br><small>任务调度</small></div>
+        <div style="font-size: 24px;">⬇️ 异步</div>
+      </div>
+      <div style="text-align: center;">
+        <div style="background: #F0AD4E; color: white; padding: 15px 25px; border-radius: 8px; margin-bottom: 10px;">📊 LangGraph<br><small>Agent工作流</small></div>
+      </div>
+    </div>
+    <div style="display: flex; justify-content: center; gap: 40px; padding: 20px; background: #fff;">
+      <div style="text-align: center;">
+        <div style="background: #333; color: white; padding: 10px 20px; border-radius: 6px; font-size: 12px;">📁 JSON文件<br><small>runs/{id}.json</small></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="pros-cons" style="margin-top: 20px;">
+  <div class="pros">
+    <h4>实时特性</h4>
+    <ul>
+      <li>SSE长连接实时推送</li>
+      <li>Agent状态卡片动态更新</li>
+      <li>日志流式渲染</li>
+    </ul>
+  </div>
+  <div class="cons">
+    <h4>数据存储</h4>
+    <ul>
+      <li>每个任务一个JSON</li>
+      <li>索引文件加速查询</li>
+      <li>支持历史回看</li>
+    </ul>
+  </div>
+</div>

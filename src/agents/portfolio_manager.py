@@ -188,7 +188,7 @@ def portfolio_management_agent(state: AgentState):
     for msg in cleaned_messages_for_processing:
         logger.info(f"    - {msg.name}")
 
-    show_workflow_status(f"{agent_name}: --- 正在执行投资组合管理 ---")
+    show_workflow_status(agent_name)
     show_reasoning_flag = state["metadata"]["show_reasoning"]
     portfolio = state["data"]["portfolio"]
     logger.info(f"  当前投资组合: 现金={portfolio.get('cash', 0):.2f}元, 持仓={portfolio.get('stock', 0)}股")
@@ -660,7 +660,7 @@ def portfolio_management_agent(state: AgentState):
     logger.info(f"  ✅ 置信度: {decision_json.get('confidence', 0)*100:.0f}%")
     logger.info("="*60)
 
-    show_workflow_status(f"{agent_name}: --- 投资组合管理完成 ---")
+    show_workflow_status(agent_name, "completed")
 
     # ==================== 步骤13: 构造返回结果 ====================
     # 将最终决策消息添加到清理后的消息列表中

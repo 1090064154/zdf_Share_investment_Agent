@@ -1,0 +1,1 @@
+{"type":"click","text":"A\n    \n      扩展现有FastAPI\n      在现有backend基础上新增任务管理端点，Agent通过回调推送状态\n      \n        ✓ 改动最小\n        ✓ 与现有系统集成简单\n        ✗ 现有代码耦合较紧","choice":"extend","id":null,"timestamp":1777347508198}

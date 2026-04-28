@@ -183,7 +183,7 @@ def macro_news_agent(state: AgentState) -> Dict[str, Any]:
             show_agent_reasoning(
                 f"Failed to save summary to {output_file_path}: {str(e)}", agent_name)
 
-    show_workflow_status(f"{agent_name}: 执行完成。")
+    show_workflow_status(agent_name, "completed")
 
     new_message_content = f"宏观新闻Agent分析 {analysis_date} (是否从缓存加载={from_cache}):\\n{summary}"
     new_message = HumanMessage(content=new_message_content, name=agent_name)

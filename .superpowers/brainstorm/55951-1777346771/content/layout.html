@@ -1,0 +1,103 @@
+<h2>界面布局设计</h2>
+<p class="subtitle">选择主面板布局方式</p>
+
+<div class="options">
+  <div class="option" data-choice="single" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>单页流式布局</h3>
+      <p>垂直滚动，从上到下：参数区 → 状态区 → 实时日志 → 决策结果</p>
+    </div>
+  </div>
+  <div class="option" data-choice="dashboard" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>仪表盘布局</h3>
+      <p>左侧参数+历史列表，右侧实时监控面板，底部展开详情</p>
+    </div>
+  </div>
+  <div class="option" data-choice="wizard" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>向导式布局</h3>
+      <p>分步引导：选择股票 → 配置参数 → 执行监控 → 查看结果</p>
+    </div>
+  </div>
+</div>
+
+<hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;" />
+
+<h3>仪表盘布局预览（推荐）</h3>
+<div class="mockup">
+  <div class="mockup-header">Dashboard Preview</div>
+  <div class="mockup-body">
+    <div style="display: flex; height: 400px; background: #1a1a2e;">
+      <!-- 左侧边栏 -->
+      <div style="width: 280px; background: #16213e; padding: 15px; border-right: 1px solid #0f3460;">
+        <div style="color: #e94560; font-weight: bold; margin-bottom: 15px;">📈 A股分析系统</div>
+        <div style="background: #0f3460; padding: 10px; border-radius: 6px; margin-bottom: 10px;">
+          <div style="color: #888; font-size: 11px;">股票代码</div>
+          <input style="background: transparent; border: none; color: #fff; font-size: 16px; width: 100%;" value="002714" />
+        </div>
+        <div style="background: #0f3460; padding: 10px; border-radius: 6px; margin-bottom: 10px;">
+          <div style="color: #888; font-size: 11px;">持仓周期</div>
+          <select style="background: transparent; border: none; color: #fff; width: 100%;">
+            <option>短线(1-5天)</option>
+            <option selected>中线(1-3月)</option>
+            <option>长线(6月+)</option>
+          </select>
+        </div>
+        <button style="background: #e94560; color: white; border: none; padding: 12px; width: 100%; border-radius: 6px; cursor: pointer;">🚀 执行分析</button>
+        <hr style="border-color: #0f3460; margin: 15px 0;">
+        <div style="color: #888; font-size: 11px; margin-bottom: 10px;">📋 历史记录</div>
+        <div style="font-size: 11px; color: #4fc3f7;">• 002714 - 2026-04-28</div>
+        <div style="font-size: 11px; color: #888;">• 601127 - 2026-04-27</div>
+        <div style="font-size: 11px; color: #888;">• 600519 - 2026-04-25</div>
+      </div>
+      <!-- 主内容区 -->
+      <div style="flex: 1; padding: 15px; overflow-y: auto;">
+        <div style="color: #fff; margin-bottom: 15px;">🔄 实时执行状态</div>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px;">
+          <div style="background: #0f3460; padding: 12px; border-radius: 6px; border-left: 3px solid #4fc3f7;">
+            <div style="color: #4fc3f7; font-size: 11px;">数据收集</div>
+            <div style="color: #4fc3f7;">✓ 完成</div>
+          </div>
+          <div style="background: #0f3460; padding: 12px; border-radius: 6px; border-left: 3px solid #e94560;">
+            <div style="color: #e94560; font-size: 11px;">九维分析</div>
+            <div style="color: #e94560;">⏳ 执行中</div>
+          </div>
+          <div style="background: #0f3460; padding: 12px; border-radius: 6px; border-left: 3px solid #666;">
+            <div style="color: #666; font-size: 11px;">辩论室</div>
+            <div style="color: #666;">○ 等待</div>
+          </div>
+        </div>
+        <div style="background: #0f3460; padding: 15px; border-radius: 6px; height: 200px; overflow-y: auto;">
+          <div style="color: #888; font-size: 11px; margin-bottom: 10px;">📜 实时日志</div>
+          <div style="font-family: monospace; font-size: 11px; color: #4fc3f7;">09:24:11 - technical_analyst: 开始技术分析...</div>
+          <div style="font-family: monospace; font-size: 11px; color: #4fc3f7;">09:24:12 - fundamentals: 数据加载完成</div>
+          <div style="font-family: monospace; font-size: 11px; color: #e94560;">09:24:13 - ⚠️ 数据不足警告</div>
+          <div style="font-family: monospace; font-size: 11px; color: #fff;">09:24:14 - valuation: 估值计算中...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="pros-cons" style="margin-top: 20px;">
+  <div class="pros">
+    <h4>仪表盘优点</h4>
+    <ul>
+      <li>一目了然全局状态</li>
+      <li>左侧快速切换历史</li>
+      <li>实时信息不中断</li>
+    </ul>
+  </div>
+  <div class="cons">
+    <h4>向导式优点</h4>
+    <ul>
+      <li>引导清晰</li>
+      <li>适合新手</li>
+      <li>步骤感强</li>
+    </ul>
+  </div>
+</div>

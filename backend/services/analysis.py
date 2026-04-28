@@ -50,11 +50,12 @@ def execute_stock_analysis(request: StockAnalysisRequest, run_id: str) -> Dict[s
             result = run_hedge_fund(
                 run_id=run_id,
                 ticker=request.ticker,
-                start_date=None,  # 使用系统默认值
-                end_date=None,    # 使用系统默认值
+                start_date=request.start_date,
+                end_date=request.end_date,
                 portfolio=portfolio,
                 show_reasoning=request.show_reasoning,
-                num_of_news=request.num_of_news
+                num_of_news=request.num_of_news,
+                investment_horizon=request.investment_horizon
             )
 
             # 更新工作流日志的结束时间和输出状态

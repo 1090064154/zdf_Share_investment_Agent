@@ -1,0 +1,63 @@
+<h2>实时日志展示设计</h2>
+<p class="subtitle">如何展示执行过程中的实时日志？</p>
+
+<div class="options">
+  <div class="option" data-choice="stream" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>流式滚动日志</h3>
+      <p>类似终端，日志从上往下滚动，新日志自动追加，支持关键词高亮</p>
+    </div>
+  </div>
+  <div class="option" data-choice="grouped" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>分组折叠日志</h3>
+      <p>按Agent分组，每组可折叠，点击展开查看详情，方便定位问题</p>
+    </div>
+  </div>
+  <div class="option" data-choice="hybrid" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>混合模式</h3>
+      <p>顶部简要汇总，底部可切换流式/分组视图，兼顾概览和细节</p>
+    </div>
+  </div>
+</div>
+
+<hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;" />
+
+<h3>流式滚动日志预览（推荐）</h3>
+<div class="mockup">
+  <div class="mockup-header">实时日志面板</div>
+  <div class="mockup-body">
+    <div style="background: #0d1117; padding: 15px; height: 250px; overflow-y: auto; font-family: 'Consolas', monospace; font-size: 12px;">
+      <div style="color: #4fc3f7;">[09:24:11] <span style="color: #888;">INFO</span> - market_data_agent: 开始收集数据</div>
+      <div style="color: #4fc3f7;">[09:24:12] <span style="color: #888;">INFO</span> - market_data_agent: 加载价格数据 365天</div>
+      <div style="color: #4fc3f7;">[09:24:13] <span style="color: #888;">INFO</span> - market_data_agent: 加载财务指标完成</div>
+      <div style="color: #5CB85C;">[09:24:14] <span style="color: #888;">INFO</span> - market_data_agent: ✓ 数据收集完成</div>
+      <div style="color: #F0AD4E;">[09:24:15] <span style="color: #888;">WARNING</span> - technical_analyst: 数据不足70天</div>
+      <div style="color: #4fc3f7;">[09:24:16] <span style="color: #888;">INFO</span> - technical_analyst: 计算技术指标...</div>
+      <div style="color: #4fc3f7;">[09:24:18] <span style="color: #888;">INFO</span> - fundamentals_agent: 开始基本面分析</div>
+      <div style="color: #e94560;">[09:24:19] <span style="color: #888;">ERROR</span> - fundamentals_agent: ROE数据异常</div>
+      <div style="color: #4fc3f7;">[09:24:20] <span style="color: #888;">INFO</span> - valuation_agent: 开始估值分析...</div>
+      <div style="color: #e94560;">[09:24:21] <span style="color: #F0AD4E;">⚠</span> - valuation_agent: 企业亏损，P/E无法计算</div>
+    </div>
+    <div style="background: #161b22; padding: 8px 15px; display: flex; gap: 10px; font-size: 11px;">
+      <span style="color: #4fc3f7;">● INFO</span>
+      <span style="color: #F0AD4E;">● WARNING</span>
+      <span style="color: #e94560;">● ERROR</span>
+      <span style="color: #5CB85C;">● SUCCESS</span>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top: 20px; padding: 15px; background: #f8f8f8; border-radius: 8px;">
+  <h4 style="margin-top: 0;">日志关键词高亮规则</h4>
+  <div style="display: flex; gap: 20px; flex-wrap: wrap; font-size: 12px;">
+    <span style="color: #e94560;">买入/卖出</span>
+    <span style="color: #5CB85C;">完成/成功</span>
+    <span style="color: #F0AD4E;">警告/异常</span>
+    <span style="color: #4fc3f7;">开始/进行中</span>
+  </div>
+</div>

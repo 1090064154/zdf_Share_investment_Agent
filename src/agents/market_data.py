@@ -143,6 +143,8 @@ def market_data_agent(state: AgentState):
         show_agent_reasoning(market_data_summary, "Market Data Agent")
         state["metadata"]["agent_reasoning"] = market_data_summary
 
+    show_workflow_status("市场数据Agent", "completed")
+
     return {
         "messages": messages,
         "data": {

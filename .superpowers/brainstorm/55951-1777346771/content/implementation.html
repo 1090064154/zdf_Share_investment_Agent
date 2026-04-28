@@ -1,0 +1,123 @@
+<h2>后端实现方案</h2>
+<p class="subtitle">选择后端架构实现方式</p>
+
+<div class="options">
+  <div class="option" data-choice="extend" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>扩展现有FastAPI</h3>
+      <p>在现有backend基础上新增任务管理端点，Agent通过回调推送状态</p>
+      <ul style="font-size: 12px; color: #666; margin-top: 8px;">
+        <li>✓ 改动最小</li>
+        <li>✓ 与现有系统集成简单</li>
+        <li>✗ 现有代码耦合较紧</li>
+      </ul>
+    </div>
+  </div>
+  <div class="option" data-choice="middleware" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>任务管理层中间件</h3>
+      <p>新增独立任务管理服务，监听Agent执行日志，实时推送到前端</p>
+      <ul style="font-size: 12px; color: #666; margin-top: 8px;">
+        <li>✓ 架构清晰，扩展性好</li>
+        <li>✓ Agent代码无需修改</li>
+        <li>✗ 需要新增服务</li>
+      </ul>
+    </div>
+  </div>
+  <div class="option" data-choice="standalone" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>完全独立服务</h3>
+      <p>新建独立Web服务，完全解耦，只负责任务调度和前端展示</p>
+      <ul style="font-size: 12px; color: #666; margin-top: 8px;">
+        <li>✓ 完全解耦，独立部署</li>
+        <li>✓ 可以被其他系统复用</li>
+        <li>✗ 需要API适配器</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;" />
+
+<h3>推荐方案：扩展现有FastAPI + 任务管理层</h3>
+<div class="mockup">
+  <div class="mockup-header">系统架构</div>
+  <div class="mockup-body">
+    <div style="display: flex; flex-direction: column; gap: 15px; padding: 15px; background: #f5f5f5;">
+      <!-- 前端层 -->
+      <div style="display: flex; justify-content: center;">
+        <div style="background: #4A90D9; color: white; padding: 12px 30px; border-radius: 8px; text-align: center;">
+          🌐 前端 (HTML+JS)<br>
+          <small>SSE实时连接</small>
+        </div>
+      </div>
+      <div style="text-align: center; font-size: 20px;">⬇️ HTTP/WebSocket</div>
+      <!-- API层 -->
+      <div style="display: flex; justify-content: center; gap: 20px;">
+        <div style="background: #5CB85C; color: white; padding: 15px 25px; border-radius: 8px; text-align: center;">
+          📡 API层<br>
+          <small>FastAPI扩展</small>
+        </div>
+        <div style="background: #F0AD4E; color: white; padding: 15px 25px; border-radius: 8px; text-align: center;">
+          📋 任务管理<br>
+          <small>asyncio队列</small>
+        </div>
+      </div>
+      <div style="text-align: center; font-size: 20px;">⬇️ 回调/事件</div>
+      <!-- Agent层 -->
+      <div style="display: flex; justify-content: center;">
+        <div style="background: #333; color: white; padding: 15px 40px; border-radius: 8px; text-align: center;">
+          ⚡ LangGraph Agent工作流<br>
+          <small>原有执行逻辑</small>
+        </div>
+      </div>
+      <div style="text-align: center; font-size: 20px;">⬇️ 写入</div>
+      <!-- 存储层 -->
+      <div style="display: flex; justify-content: center; gap: 20px;">
+        <div style="background: #e94560; color: white; padding: 12px 25px; border-radius: 8px;">
+          📁 runs/{id}.json
+        </div>
+        <div style="background: #9B59B6; color: white; padding: 12px 25px; border-radius: 8px;">
+          📇 runs/index.json
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3 style="margin-top: 20px;">核心API设计</h3>
+<table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+  <tr style="background: #4A90D9; color: white;">
+    <th style="padding: 8px; text-align: left;">接口</th>
+    <th style="padding: 8px; text-align: left;">方法</th>
+    <th style="padding: 8px; text-align: left;">说明</th>
+  </tr>
+  <tr style="background: #f8f8f8;">
+    <td style="padding: 8px;">/api/runs</td>
+    <td style="padding: 8px;">GET</td>
+    <td style="padding: 8px;">获取历史任务列表</td>
+  </tr>
+  <tr>
+    <td style="padding: 8px;">/api/run</td>
+    <td style="padding: 8px;">POST</td>
+    <td style="padding: 8px;">创建新任务</td>
+  </tr>
+  <tr style="background: #f8f8f8;">
+    <td style="padding: 8px;">/api/run/{id}</td>
+    <td style="padding: 8px;">GET</td>
+    <td style="padding: 8px;">获取任务详情</td>
+  </tr>
+  <tr>
+    <td style="padding: 8px;">/api/run/{id}/cancel</td>
+    <td style="padding: 8px;">POST</td>
+    <td style="padding: 8px;">取消任务</td>
+  </tr>
+  <tr style="background: #f8f8f8;">
+    <td style="padding: 8px;">/api/run/{id}/stream</td>
+    <td style="padding: 8px;">GET (SSE)</td>
+    <td style="padding: 8px;">实时日志流</td>
+  </tr>
+</table>

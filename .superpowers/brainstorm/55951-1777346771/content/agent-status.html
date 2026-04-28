@@ -1,0 +1,123 @@
+<h2>Agent状态展示设计</h2>
+<p class="subtitle">如何展示9个Agent的并行执行状态？</p>
+
+<div class="options">
+  <div class="option" data-choice="grid" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>网格卡片式</h3>
+      <p>3x3网格，每个Agent一个卡片，实时显示：等待/执行中/完成/失败</p>
+    </div>
+  </div>
+  <div class="option" data-choice="timeline" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>时间线式</h3>
+      <p>水平时间线，左到右按执行顺序展示，每个节点显示状态和耗时</p>
+    </div>
+  </div>
+  <div class="option" data-choice="flow" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>流程图式</h3>
+      <p>保留原工作流图结构，节点状态动态高亮，连线显示数据流向</p>
+    </div>
+  </div>
+</div>
+
+<hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;" />
+
+<h3>网格卡片式预览（推荐）</h3>
+<div class="mockup">
+  <div class="mockup-header">Agent状态面板</div>
+  <div class="mockup-body">
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 15px; background: #1a1a2e;">
+      <!-- Row 1 -->
+      <div style="background: #0f3460; padding: 12px; border-radius: 8px; border-top: 3px solid #4fc3f7;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="color: #4fc3f7; font-size: 12px;">📊 技术分析</span>
+          <span style="background: #4fc3f7; color: #000; padding: 2px 8px; border-radius: 10px; font-size: 10px;">完成</span>
+        </div>
+        <div style="color: #fff; margin-top: 8px;">bullish</div>
+        <div style="color: #888; font-size: 10px; margin-top: 4px;">置信度: 65%</div>
+      </div>
+      <div style="background: #0f3460; padding: 12px; border-radius: 8px; border-top: 3px solid #4fc3f7;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="color: #4fc3f7; font-size: 12px;">💼 基本面</span>
+          <span style="background: #4fc3f7; color: #000; padding: 2px 8px; border-radius: 10px; font-size: 10px;">完成</span>
+        </div>
+        <div style="color: #fff; margin-top: 8px;">neutral</div>
+        <div style="color: #888; font-size: 10px; margin-top: 4px;">置信度: 40%</div>
+      </div>
+      <div style="background: #0f3460; padding: 12px; border-radius: 8px; border-top: 3px solid #e94560;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="color: #e94560; font-size: 12px;">😊 情绪分析</span>
+          <span style="background: #e94560; color: #fff; padding: 2px 8px; border-radius: 10px; font-size: 10px;">执行中</span>
+        </div>
+        <div style="color: #888; margin-top: 8px;">...</div>
+        <div style="color: #666; font-size: 10px; margin-top: 4px;">抓取股吧数据</div>
+      </div>
+      <!-- Row 2 -->
+      <div style="background: #0f3460; padding: 12px; border-radius: 8px; border-top: 3px solid #666;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="color: #888; font-size: 12px;">📈 估值分析</span>
+          <span style="background: #666; color: #fff; padding: 2px 8px; border-radius: 10px; font-size: 10px;">等待</span>
+        </div>
+        <div style="color: #666; margin-top: 8px;">-</div>
+        <div style="color: #666; font-size: 10px; margin-top: 4px;">-</div>
+      </div>
+      <div style="background: #0f3460; padding: 12px; border-radius: 8px; border-top: 3px solid #666;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="color: #888; font-size: 12px;">🔄 行业周期</span>
+          <span style="background: #666; color: #fff; padding: 2px 8px; border-radius: 10px; font-size: 10px;">等待</span>
+        </div>
+        <div style="color: #666; margin-top: 8px;">-</div>
+        <div style="color: #666; font-size: 10px; margin-top: 4px;">-</div>
+      </div>
+      <div style="background: #0f3460; padding: 12px; border-radius: 8px; border-top: 3px solid #666;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="color: #888; font-size: 12px;">🏦 机构持仓</span>
+          <span style="background: #666; color: #fff; padding: 2px 8px; border-radius: 10px; font-size: 10px;">等待</span>
+        </div>
+        <div style="color: #666; margin-top: 8px;">-</div>
+        <div style="color: #666; font-size: 10px; margin-top: 4px;">-</div>
+      </div>
+      <!-- Row 3 -->
+      <div style="background: #0f3460; padding: 12px; border-radius: 8px; border-top: 3px solid #666;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="color: #888; font-size: 12px;">📊 预期差</span>
+          <span style="background: #666; color: #fff; padding: 2px 8px; border-radius: 10px; font-size: 10px;">等待</span>
+        </div>
+        <div style="color: #666; margin-top: 8px;">-</div>
+        <div style="color: #666; font-size: 10px; margin-top: 4px;">-</div>
+      </div>
+      <div style="background: #0f3460; padding: 12px; border-radius: 8px; border-top: 3px solid #666;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="color: #888; font-size: 12px;">🌍 宏观新闻</span>
+          <span style="background: #666; color: #fff; padding: 2px 8px; border-radius: 10px; font-size: 10px;">等待</span>
+        </div>
+        <div style="color: #666; margin-top: 8px;">-</div>
+        <div style="color: #666; font-size: 10px; margin-top: 4px;">-</div>
+      </div>
+      <div style="background: #0f3460; padding: 12px; border-radius: 8px; border-top: 3px solid #666;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="color: #888; font-size: 12px;">📋 宏观分析</span>
+          <span style="background: #666; color: #fff; padding: 2px 8px; border-radius: 10px; font-size: 10px;">等待</span>
+        </div>
+        <div style="color: #666; margin-top: 8px;">-</div>
+        <div style="color: #666; font-size: 10px; margin-top: 4px;">-</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top: 20px; padding: 15px; background: #f8f8f8; border-radius: 8px;">
+  <h4 style="margin-top: 0;">状态颜色说明</h4>
+  <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+    <span style="color: #4fc3f7;">● 蓝色 - 完成</span>
+    <span style="color: #e94560;">● 红色 - 执行中</span>
+    <span style="color: #F0AD4E;">● 橙色 - 警告</span>
+    <span style="color: #666;">● 灰色 - 等待</span>
+    <span style="color: #5CB85C;">● 绿色 - 成功</span>
+  </div>
+</div>
