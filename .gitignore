@@ -30,6 +30,8 @@ ENV/
 .env
 .env.local
 .env.*.local
+*.json
+
 
 # IDE
 .idea/

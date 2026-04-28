@@ -231,10 +231,9 @@ workflow.add_edge(
 # Level 3: researchers -> debate_room
 workflow.add_edge(["researcher_bull_agent", "researcher_bear_agent"], "debate_room_agent")
 
-# Level 4: debate -> risk -> macro_analyst -> portfolio (最终决策)
+# Level 4: debate -> risk -> portfolio (最终决策)
 workflow.add_edge("debate_room_agent", "risk_management_agent")
-workflow.add_edge("risk_management_agent", "macro_analyst_agent")
-workflow.add_edge("macro_analyst_agent", "portfolio_management_agent")
+workflow.add_edge("risk_management_agent", "portfolio_management_agent")
 
 # Final node
 workflow.add_edge("portfolio_management_agent", END)
