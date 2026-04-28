@@ -3,19 +3,14 @@ from src.utils.logging_config import setup_logger
 from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status
 from src.utils.api_utils import agent_endpoint, log_llm_interaction
 from src.utils.error_handler import resilient_agent
+from src.agents.fundamentals import INDUSTRY_CYCLE_CLASSIFICATION
 import json
 import math
 
 # 初始化 logger
 logger = setup_logger('valuation_agent')
 
-# [OPTIMIZED] A股行业分类，用于估值方法选择
-INDUSTRY_CYCLE_CLASSIFICATION = {
-    '强周期': ['农林牧渔', '钢铁', '煤炭', '有色金属', '化工', '建材', '房地产', '汽车', '交通运输', '工程机械'],
-    '弱周期': ['食品饮料', '医药生物', '家用电器', '纺织服装', '日用化工'],
-    '成长': ['电子', '计算机', '通信', '传媒', '新能源'],
-    '防御': ['公用事业', '银行', '保险', '券商']
-}
+# [OPTIMIZED] A股行业分类 - 从fundamentals.py统一导入，避免重复定义
 
 
 def _safe_first(items):

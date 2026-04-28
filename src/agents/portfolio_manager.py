@@ -492,7 +492,7 @@ def portfolio_management_agent(state: AgentState):
             # ==================== 步骤7.2: 执行DecisionEngine决策 ====================
             # DecisionEngine根据预定义规则进行决策，比LLM更快更稳定
             # 注意：macro因子已通过9维度信号中的macro信号加权计算，不再单独检查
-            investment_horizon = data.get('investment_horizon', 'medium')
+            investment_horizon = state["data"].get('investment_horizon', 'medium')
             engine = create_decision_engine(config.get_agent_weights(), investment_horizon)
             engine_decision = engine.make_decision(
                 signals=signals,

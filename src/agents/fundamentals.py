@@ -10,12 +10,26 @@ import json
 # 初始化 logger
 logger = setup_logger('fundamentals_agent')
 
-# [OPTIMIZED] A股行业周期分类
+# [OPTIMIZED] A股行业周期分类 - 与industry_cycle.py保持一致
 INDUSTRY_CYCLE_CLASSIFICATION = {
-    '强周期': ['农林牧渔', '钢铁', '煤炭', '有色金属', '化工', '建材', '房地产', '汽车', '交通运输', '工程机械'],
-    '弱周期': ['食品饮料', '医药生物', '家用电器', '纺织服装', '日用化工'],
-    '成长': ['电子', '计算机', '通信', '传媒', '新能源'],
-    '防御': ['公用事业', '银行', '保险', '券商']
+    '强周期': [
+        '农林牧渔', '养殖', '猪', '禽', '饲料', '化肥', '化肥农药',
+        '钢铁', '煤炭', '有色金属', '化工', '建材', '房地产',
+        '汽车', '交通运输', '工程机械', '航运', '港口', '船舶',
+        '石油', '石化', '炼化', '橡胶', '塑料', '化纤'
+    ],
+    '弱周期': [
+        '食品饮料', '医药生物', '家用电器', '纺织服装', '日用化工',
+        '商贸零售', '旅游', '酒店', '餐饮', '酿酒', '化妆品'
+    ],
+    '成长': [
+        '电子', '半导体', '计算机', '软件', '通信', '5G', '物联网',
+        '新能源', '光伏', '风电', '锂电池', '电动车', '芯片', '集成电路',
+        '医疗器械', '新材料', '机器人', '人工智能', '云计算'
+    ],
+    '防御': [
+        '公用事业', '电力', '燃气', '水务', '环保', '银行', '保险', '券商', '多元金融'
+    ]
 }
 
 
@@ -27,18 +41,21 @@ def _identify_cyclical_stock(ticker: str, industry: str = None) -> tuple:
     """
     [OPTIMIZED] 识别是否为周期股
     返回: (is_cyclical: bool, reason: str)
-    """
-    if not industry:
-        # 简单根据股票代码判断（仅作为后备方案）
-        # 农林牧渔养殖类通常是周期股
-        if ticker.startswith('00') or ticker.startswith('30'):
-            # 中小创股票可能包含养殖类
-            return False, "无法确定行业，默认非周期股"
 
-    # 行业判断
+    判断优先级：
+    1. 行业关键词匹配（优先）
+    2. 股票代码辅助判断（仅作为后备，不单独决定）
+    """
+    # 优先行业判断
     for cycle_type, industries in INDUSTRY_CYCLE_CLASSIFICATION.items():
         if industry and any(ind in industry for ind in industries):
-            return True, f"属于周期行业: {industry}"
+            return True, f"属于{cycle_type}行业: {industry}"
+
+    # 后备方案：根据股票代码特征辅助判断
+    # 农林牧渔养殖类（002xxx, 000xxx常见）
+    if ticker.startswith('00') or ticker.startswith('30'):
+        # 尝试更精细判断
+        return False, "未匹配行业关键词，默认为非周期股（请检查行业数据）"
 
     return False, "非周期行业"
 
@@ -203,18 +220,14 @@ def fundamentals_agent(state: AgentState):
             show_agent_reasoning(message_content, "基本面分析师")
             state["metadata"]["agent_reasoning"] = message_content
         show_workflow_status("基本面分析师", "completed")
+        
+        logger.info("────────────────────────────────────────────────────────")
+        logger.info("✅ 基本面分析完成:")
+        logger.info(f"  📊 最终信号: {message_content.get('signal')}")
+        logger.info(f"  📈 置信度: {message_content.get('confidence')}")
+        logger.info("────────────────────────────────────────────────────────")
 
-    # 打印最终分析结果
-    logger.info("────────────────────────────────────────────────────────")
-    logger.info("✅ 基本面分析完成:")
-    logger.info(f"  📊 最终信号: {message_content.get('signal')}")
-    logger.info(f"  📈 置信度: {message_content.get('confidence')}")
-    logger.info(f"  📈 盈利信号: {message_content.get('profitability_signal', {}).get('signal', 'N/A')}")
-    logger.info(f"  📈 成长信号: {message_content.get('growth_signal', {}).get('signal', 'N/A')}")
-    logger.info(f"  📊 财务健康: {message_content.get('financial_health_signal', {}).get('signal', 'N/A')}")
-    logger.info("────────────────────────────────────────────────────────")
-
-    return {
+        return {
             "messages": [message],
             "data": {
                 **data,
@@ -394,11 +407,19 @@ def fundamentals_agent(state: AgentState):
     # Print the reasoning if the flag is set
     if show_reasoning:
         show_agent_reasoning(message_content, "基本面分析师")
-        # 保存推理信息到metadata供API使用
         state["metadata"]["agent_reasoning"] = message_content
 
     show_workflow_status("基本面分析师", "completed")
-    # logger.info(f"--- DEBUG: fundamentals_agent RETURN messages: {[msg.name for msg in [message]]} ---")
+    
+    logger.info("────────────────────────────────────────────────────────")
+    logger.info("✅ 基本面分析完成:")
+    logger.info(f"  📊 最终信号: {message_content.get('signal')}")
+    logger.info(f"  📈 置信度: {message_content.get('confidence')}")
+    logger.info(f"  📈 盈利信号: {message_content.get('profitability_signal', {}).get('signal', 'N/A')}")
+    logger.info(f"  📈 成长信号: {message_content.get('growth_signal', {}).get('signal', 'N/A')}")
+    logger.info(f"  📊 财务健康: {message_content.get('financial_health_signal', {}).get('signal', 'N/A')}")
+    logger.info("────────────────────────────────────────────────────────")
+    
     return {
         "messages": [message],
         "data": {
