@@ -5,6 +5,11 @@ from typing import Dict, List
 from .routers import logs, runs
 # 导入新增的路由器
 from .routers import agents, workflow, analysis, api_runs
+# 导入新的API路由
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from src.api.routes import router as api_router
 
 # Create FastAPI app instance
 app = FastAPI(
@@ -35,6 +40,9 @@ app.include_router(agents.router)
 app.include_router(workflow.router)
 app.include_router(analysis.router)
 app.include_router(api_runs.router)
+
+# 包含新的API路由
+app.include_router(api_router)
 
 # 根端点API导航
 
