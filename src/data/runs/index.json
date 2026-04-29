@@ -1,43 +1,13 @@
 {
   "runs": [
     {
-      "run_id": "20260429-182823-93562c",
-      "ticker": "600926",
+      "run_id": "20260429-214747-88ad1f",
+      "ticker": "601127",
       "status": "completed",
       "action": "hold",
       "confidence": 0.3,
-      "created_at": "2026-04-29T18:28:23.739904",
-      "completed_at": "2026-04-29T18:29:38.819918",
-      "duration_seconds": null
-    },
-    {
-      "run_id": "20260429-172335-903027",
-      "ticker": "600418",
-      "status": "completed",
-      "action": "hold",
-      "confidence": 0.3,
-      "created_at": "2026-04-29T17:23:35.502132",
-      "completed_at": "2026-04-29T17:25:36.699957",
-      "duration_seconds": null
-    },
-    {
-      "run_id": "20260429-161537-ea861d",
-      "ticker": "600418",
-      "status": "completed",
-      "action": "hold",
-      "confidence": 0.3,
-      "created_at": "2026-04-29T16:15:37.726783",
-      "completed_at": "2026-04-29T16:17:29.591311",
-      "duration_seconds": null
-    },
-    {
-      "run_id": "20260429-154431-d27a96",
-      "ticker": "600926",
-      "status": "completed",
-      "action": "hold",
-      "confidence": 0.3,
-      "created_at": "2026-04-29T15:44:31.836441",
-      "completed_at": "2026-04-29T15:46:14.242508",
+      "created_at": "2026-04-29T21:47:47.495746",
+      "completed_at": "2026-04-29T21:49:41.025780",
       "duration_seconds": null
     }
   ]

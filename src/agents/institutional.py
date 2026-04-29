@@ -4,7 +4,7 @@
 """
 from langchain_core.messages import HumanMessage
 from src.utils.logging_config import setup_logger
-from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status
+from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status, show_workflow_complete
 from src.utils.api_utils import agent_endpoint, log_llm_interaction
 from src.utils.error_handler import resilient_agent
 import json
@@ -445,7 +445,13 @@ def institutional_agent(state: AgentState):
         "决策逻辑": decision_logic
     }, "机构持仓分析师")
 
-    show_workflow_status("机构持仓分析师", "completed")
+    show_workflow_complete(
+        "机构持仓分析师",
+        signal=signal,
+        confidence=conf_float,
+        details=message_content,
+        message=f"机构持仓分析完成：信号{signal_cn}，置信度{conf_float*100:.0f}%"
+    )
 
     return {
         "messages": [message],

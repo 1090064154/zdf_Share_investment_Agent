@@ -681,7 +681,14 @@ def portfolio_management_agent(state: AgentState):
         agent_name,
         signal=final_action,
         confidence=validation_result.confidence,
-        details={"action": final_action, "quantity": final_quantity, "confidence": validation_result.confidence},
+        details={
+            "action": final_action,
+            "quantity": final_quantity,
+            "confidence": validation_result.confidence,
+            "reasoning": decision_json.get("reasoning", ""),
+            "agent_signals": parsed_agent_signals if parsed_agent_signals else agent_signals,
+            "signal_summary": signals_summary,
+        },
         message=f"最终决策完成，动作:{final_action}，数量:{final_quantity}股，置信度:{validation_result.confidence*100:.0f}%"
     )
 

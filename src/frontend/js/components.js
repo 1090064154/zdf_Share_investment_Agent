@@ -1,3 +1,11 @@
+function normalizeConfidence(conf) {
+    if (conf === undefined || conf === null || conf === '') return '-';
+    const num = typeof conf === 'number' ? conf : parseFloat(conf);
+    if (isNaN(num)) return '-';
+    if (num > 1) return Math.round(num) + '%';
+    return Math.round(num * 100) + '%';
+}
+
 const AGENT_DESCRIPTIONS = {
     'market_data_agent': `【当前任务】收集股票的基础数据，为后续分析提供原材料
 
@@ -230,10 +238,10 @@ const Components = {
                 ${signal ? `<div class="agent-signal ${signal}">信号: ${this.getSignalText(signal)}</div>` : ''}
                 ${confidence > 0 ? `
                     <div class="agent-confidence">
-                        置信度: ${Math.round(confidence * 100)}%
+                        置信度: ${normalizeConfidence(confidence)}
                     </div>
                     <div class="confidence-bar">
-                        <div class="confidence-fill" style="width: ${confidence * 100}%"></div>
+                        <div class="confidence-fill" style="width: ${Math.min(100, Math.max(0, confidence > 1 ? confidence : confidence * 100))}%"></div>
                     </div>
                 ` : ''}
                 ${message ? `<div class="agent-message">${this.escapeHtml(message)}</div>` : ''}
@@ -352,7 +360,7 @@ const Components = {
                 </div>
                 <div class="result-item">
                     <div class="result-label">置信度</div>
-                    <div class="result-value">${Math.round(confidence * 100)}%</div>
+                    <div class="result-value">${normalizeConfidence(confidence)}</div>
                 </div>
                 <div class="result-item">
                     <div class="result-label">建议数量</div>
@@ -397,7 +405,7 @@ const Components = {
     buildDecisionNarrative(action, confidence, quantity, bullishSignals, bearishSignals, neutralSignals) {
         const lines = [];
         const actionText = this.getActionText(action);
-        lines.push(`最终建议为${actionText}，建议数量 ${quantity} 股，系统整体把握度约 ${Math.round(confidence * 100)}%。`);
+        lines.push(`最终建议为${actionText}，建议数量 ${quantity} 股，系统整体把握度约 ${normalizeConfidence(confidence)}。`);
 
         if (bullishSignals.length) {
             lines.push(`偏正向的模块有 ${bullishSignals.map((s) => s.agent_name).join('、')}。`);
@@ -427,7 +435,7 @@ createAgentDetail(agentName, state = {}, logs = []) {
         const confidence = state.confidence || 0;
         const details = state.details || {};
         const signalText = signal ? this.getSignalText(signal) : (status === 'completed' ? '无信号' : '等待中');
-        const confidenceText = confidence > 0 ? `${Math.round(confidence * 100)}%` : '-';
+        const confidenceText = normalizeConfidence(confidence);
         const summary = details.summary || '';
         const resultData = details.result || {};
 
@@ -523,7 +531,7 @@ createAgentDetail(agentName, state = {}, logs = []) {
             const action = decisionResult.action || '';
             const recommendation = decisionResult.recommendation || '';
             const summary = recommendation || action ? `，建议${recommendation || action}` : '';
-            return `宏观分析：环境${env}，对股票${impact}，置信度${d.confidence ? Math.round(d.confidence * 100) + '%' : '-'}${summary}`;
+            return `宏观分析：环境${env}，对股票${impact}，置信度${normalizeConfidence(d.confidence)}${summary}`;
         }
         if (agentName === 'macro_news_agent') {
             const newsResult = d.macro_news_analysis_result || d;
@@ -547,7 +555,10 @@ createAgentDetail(agentName, state = {}, logs = []) {
             return `风险评分：${riskScore}/10（大盘${marketRisk}分/个股${stockRisk}分），波动率${(volatility*100).toFixed(1)}%，VaR${(var95*100).toFixed(1)}%，建议：${actionText}，最大持仓：${typeof maxPos === 'number' ? Math.round(maxPos) : maxPos}`;
         }
         if (agentName === 'portfolio_management_agent') {
-            return `最终决策：${this.getActionText(d.action || 'hold')} ${d.quantity || 0}股`;
+            const confNum = typeof d.confidence === 'number' ? d.confidence : parseFloat(d.confidence);
+            const confPct = !isNaN(confNum) ? Math.round(confNum * 100) + '%' : '-';
+            const reason = d.reasoning ? d.reasoning.slice(0, 80) + (d.reasoning.length > 80 ? '...' : '') : '';
+            return `最终决策：${this.getActionText(d.action || 'hold')} ${d.quantity || 0}股，置信度${confPct}${reason ? ' — ' + reason : ''}`;
         }
         if (agentName === 'industry_cycle_agent') {
             const signalText = this.getSignalText(d.signal);
@@ -769,7 +780,7 @@ createAgentDetail(agentName, state = {}, logs = []) {
 
         if (agentName === 'industry_cycle_agent') {
             const signalText = this.getSignalText(resultData.signal);
-            const confPct = resultData.confidence != null ? Math.round(resultData.confidence * 100) + '%' : '-';
+            const confPct = normalizeConfidence(resultData.confidence);
             const cycle = resultData.cycle_type_cn || resultData.cycle_type || '-';
             const phase = resultData.phase || '-';
             const logic = resultData.decision_logic || resultData.reason || '';
@@ -800,7 +811,7 @@ createAgentDetail(agentName, state = {}, logs = []) {
 
             if (resultData.signal) {
                 const signalText = this.getSignalText(resultData.signal);
-                const confPct = resultData.confidence != null ? Math.round(resultData.confidence * 100) + '%' : '-';
+                const confPct = normalizeConfidence(resultData.confidence);
                 html += `<div class="detail-section">
                     <div class="detail-section-title">综合判断</div>
                     <div class="detail-point"><span class="point-num sig-${resultData.signal}">${signalText}</span>置信度 ${confPct}</div>
@@ -906,7 +917,7 @@ createAgentDetail(agentName, state = {}, logs = []) {
             html += `<div class="detail-section"><div class="detail-section-title">决策逻辑</div>`;
             html += `<div class="detail-point"><strong>综合信号：</strong>${this.getSignalText(resultData.signal)}</div>`;
             const conf = typeof resultData.confidence === 'number' ? resultData.confidence : parseFloat(resultData.confidence || 0);
-            html += `<div class="detail-point"><strong>置信度：</strong>${!isNaN(conf) ? Math.round(conf * 100) + '%' : '-'}</div>`;
+            html += `<div class="detail-point"><strong>置信度：</strong>${normalizeConfidence(conf)}</div>`;
             if (r.decision_logic) {
                 html += `<div class="detail-point">${this.escapeHtml(r.decision_logic)}</div>`;
             }
@@ -943,7 +954,7 @@ createAgentDetail(agentName, state = {}, logs = []) {
             html += `<div class="detail-section"><div class="detail-section-title">决策逻辑</div>`;
             html += `<div class="detail-point"><strong>综合信号：</strong>${this.getSignalText(resultData.signal)}</div>`;
             const conf = typeof resultData.confidence === 'number' ? resultData.confidence : parseFloat(resultData.confidence || 0);
-            html += `<div class="detail-point"><strong>置信度：</strong>${!isNaN(conf) ? Math.round(conf * 100) + '%' : '-'}</div>`;
+            html += `<div class="detail-point"><strong>置信度：</strong>${normalizeConfidence(conf)}</div>`;
             if (resultData.decision_logic) {
                 html += `<div class="detail-point">${this.escapeHtml(resultData.decision_logic)}</div>`;
             }
@@ -989,7 +1000,7 @@ createAgentDetail(agentName, state = {}, logs = []) {
             html += `<div class="detail-section"><div class="detail-section-title">决策逻辑</div>`;
             html += `<div class="detail-point"><strong>综合信号：</strong>${this.getSignalText(resultData.signal)}</div>`;
             const conf = typeof resultData.confidence === 'number' ? resultData.confidence : parseFloat(resultData.confidence || 0);
-            html += `<div class="detail-point"><strong>置信度：</strong>${!isNaN(conf) ? Math.round(conf * 100) + '%' : '-'}</div>`;
+            html += `<div class="detail-point"><strong>置信度：</strong>${normalizeConfidence(conf)}</div>`;
             if (resultData.decision_logic) {
                 html += `<div class="detail-point">${this.escapeHtml(resultData.decision_logic)}</div>`;
             }
@@ -1027,7 +1038,7 @@ createAgentDetail(agentName, state = {}, logs = []) {
             html += `<div class="detail-point"><strong>对股票影响：</strong>${impactMap[resultData.impact_on_stock] || resultData.impact_on_stock || '-'}</div>`;
             html += `<div class="detail-point"><strong>信号：</strong>${this.getSignalText(resultData.signal)}</div>`;
             const conf = typeof resultData.confidence === 'number' ? resultData.confidence : parseFloat(resultData.confidence || 0);
-            html += `<div class="detail-point"><strong>置信度：</strong>${!isNaN(conf) ? Math.round(conf * 100) + '%' : '-'}</div>`;
+            html += `<div class="detail-point"><strong>置信度：</strong>${normalizeConfidence(conf)}</div>`;
             html += `</div>`;
 
             // 决策逻辑（详细）
@@ -1081,22 +1092,35 @@ createAgentDetail(agentName, state = {}, logs = []) {
             const newsResult = resultData.macro_news_analysis_result || resultData;
             let html = '';
 
-            html += `<div class="detail-section"><div class="detail-section-title">决策逻辑</div>`;
-            html += `<div class="detail-point"><strong>新闻数量：</strong>${newsResult.retrieved_news_count || newsResult.获取新闻数 || 0}条</div>`;
+            html += `<div class="detail-section"><div class="detail-section-title">📊 新闻概览</div>`;
+            html += `<div class="detail-point"><strong>获取数量：</strong>${newsResult.retrieved_news_count || newsResult.获取新闻数 || 0}条</div>`;
             if (newsResult.summary_content || newsResult.新闻摘要) {
-                html += `<div class="detail-point"><strong>摘要：</strong>${this.escapeHtml(newsResult.summary_content || newsResult.新闻摘要)}</div>`;
+                html += `<div class="detail-point"><strong>分析摘要：</strong></div>`;
+                html += `<div class="detail-point" style="margin-left: 10px; border-left: 2px solid var(--accent-info); padding-left: 10px;">${this.escapeHtml(newsResult.summary_content || newsResult.新闻摘要)}</div>`;
             }
             html += `</div>`;
 
-            const newsList = newsResult.news_list || newsResult.新闻列表 || [];
+            const newsList = resultData.news_list || d.news_list || newsResult.news_list || newsResult.新闻列表 || [];
             if (newsList.length > 0) {
-                html += `<div class="detail-section"><div class="detail-section-title">新闻详情</div>`;
-                const items = newsList.slice(0, 10).map(item => {
-                    const title = item.title || item.标题 || '';
+                html += `<div class="detail-section"><div class="detail-section-title">📰 新闻列表</div>`;
+                newsList.slice(0, 10).forEach((item, idx) => {
+                    const title = item.title || item.标题 || '无标题';
+                    const date = item.date || item.发布日期 || '';
+                    const source = item.source || item.来源 || '';
                     const sentiment = item.sentiment || item.情绪 || '';
-                    return `<div class="detail-point"><strong>${title.slice(0, 40)}</strong>${title.length > 40 ? '...' : ''} [${sentiment}]</div>`;
-                }).join('');
-                html += items;
+                    const sentimentColor = sentiment === 'positive' ? 'var(--accent-success)' : sentiment === 'negative' ? 'var(--accent-danger)' : 'var(--text-muted)';
+                    html += `<div class="news-item" style="margin-bottom: 12px; padding: 10px; background: var(--bg-input); border-radius: 8px; border-left: 3px solid var(--accent-primary);">`;
+                    html += `<div style="font-weight: 500; color: var(--text-primary); margin-bottom: 6px;">${idx + 1}. ${this.escapeHtml(title)}</div>`;
+                    html += `<div style="font-size: 12px; color: var(--text-muted);">`;
+                    if (date) html += `<span style="margin-right: 12px;">📅 ${date}</span>`;
+                    if (source) html += `<span style="margin-right: 12px;"> source:${source}</span>`;
+                    if (sentiment) html += `<span style="color: ${sentimentColor};">🏷️ ${sentiment}</span>`;
+                    html += `</div></div>`;
+                });
+                html += `</div>`;
+            } else {
+                html += `<div class="detail-section"><div class="detail-section-title">📰 新闻列表</div>`;
+                html += `<div class="detail-point" style="color: var(--text-muted);">暂无新闻数据</div>`;
                 html += `</div>`;
             }
 
@@ -1111,12 +1135,21 @@ createAgentDetail(agentName, state = {}, logs = []) {
                 html += this.createKlineChart(prices, 'portfolio-kline');
             }
 
-            const signals = resultData.signal_summary || resultData.各模块信号汇总 || resultData.agent_signals || {};
-            if (Object.keys(signals).length > 0) {
+            const signals = resultData.signal_summary || resultData.各模块信号汇总 || resultData.agent_signals;
+            if (signals) {
                 html += `<div class="detail-section"><div class="detail-section-title">各模块信号汇总</div>`;
-                for (const [key, val] of Object.entries(signals)) {
-                    const sig = val.signal || val;
-                    html += `<div class="detail-point"><strong>${key}：</strong>${this.getSignalText(sig)}</div>`;
+                if (Array.isArray(signals)) {
+                    for (const item of signals) {
+                        const name = item.agent_name || item.agent || Object.keys(item)[0] || '-';
+                        const sig = item.signal || '';
+                        const conf = typeof item.confidence === 'number' ? Math.round(item.confidence * 100) + '%' : (item.confidence || '-');
+                        html += `<div class="detail-point"><strong>${this.escapeHtml(name)}：</strong>${this.getSignalText(sig)} （置信度${conf}）</div>`;
+                    }
+                } else if (typeof signals === 'object') {
+                    for (const [key, val] of Object.entries(signals)) {
+                        const sig = val.signal || val;
+                        html += `<div class="detail-point"><strong>${this.escapeHtml(key)}：</strong>${this.getSignalText(sig)}</div>`;
+                    }
                 }
                 html += `</div>`;
             }
@@ -1201,7 +1234,7 @@ createAgentDetail(agentName, state = {}, logs = []) {
                     <div class="history-ticker">${ticker}</div>
                     <div class="history-meta">
                         <span>${createdAt}</span>
-                        <span>置信度: ${Math.round(confidence * 100)}%</span>
+                        <span>置信度: ${normalizeConfidence(confidence)}</span>
                     </div>
                     ${action ? `<span class="history-action ${action}">${this.getActionText(action)}</span>` : ''}
                 </div>
@@ -1271,7 +1304,7 @@ createAgentDetail(agentName, state = {}, logs = []) {
                 <div class="decision-title">最终决策</div>
                 <div class="decision-action ${signalClass}">${actionText}</div>
                 <div class="decision-quantity">数量: ${quantity}股</div>
-                <div class="decision-confidence">置信度: ${Math.round(confidence * 100)}%</div>
+                <div class="decision-confidence">置信度: ${normalizeConfidence(confidence)}</div>
                 ${reasoning ? `<div class="decision-reasoning">${reasoning}</div>` : ''}
             </div>
         `;
@@ -1279,7 +1312,7 @@ createAgentDetail(agentName, state = {}, logs = []) {
         // 构建 Agent 卡片（各模块信号）
         const agentCards = agents.map(sig => {
             const signalText = sig.signal ? this.getSignalText(sig.signal) : '-';
-            const conf = sig.confidence ? `${Math.round(sig.confidence * 100)}%` : '-';
+            const conf = normalizeConfidence(sig.confidence);
             return `
                 <div class="agent-card status-completed" data-agent="${sig.agent_name}">
                     <div class="agent-header">
@@ -1461,14 +1494,27 @@ createAgentDetail(agentName, state = {}, logs = []) {
         const actionMap = { buy: '买入', sell: '卖出', hold: '持有' };
         const actionText = actionMap[action] || '持有';
 
+        // 兼容对象和数组两种格式
         const signalSummary = resultData.signal_summary || resultData.各模块信号汇总 || {};
+        const agentSignalsArr = resultData.agent_signals || [];
+        let bullishCount = 0, bearishCount = 0, neutralCount = 0;
 
-        const bullishCount = Object.values(signalSummary).filter(s => s.signal === 'bullish' || s === 'bullish').length;
-        const bearishCount = Object.values(signalSummary).filter(s => s.signal === 'bearish' || s === 'bearish').length;
-        const neutralCount = Object.values(signalSummary).filter(s => s.signal === 'neutral' || s === 'neutral').length;
+        if (Array.isArray(agentSignalsArr) && agentSignalsArr.length > 0) {
+            agentSignalsArr.forEach(s => {
+                const sig = (s.signal || '').toLowerCase();
+                if (sig === 'bullish' || sig === 'buy' || sig === 'positive') bullishCount++;
+                else if (sig === 'bearish' || sig === 'sell' || sig === 'negative' || sig === 'reduce') bearishCount++;
+                else neutralCount++;
+            });
+        } else {
+            bullishCount = Object.values(signalSummary).filter(s => s.signal === 'bullish' || s === 'bullish').length;
+            bearishCount = Object.values(signalSummary).filter(s => s.signal === 'bearish' || s === 'bearish').length;
+            neutralCount = Object.values(signalSummary).filter(s => s.signal === 'neutral' || s === 'neutral').length;
+        }
 
-        const signalLevel = confidence > 0.7 ? 'high' : confidence > 0.4 ? 'medium' : 'low';
-        const signalPercent = Math.round(confidence * 100);
+        const normalizedConf = confidence > 1 ? confidence / 100 : confidence;
+        const signalLevel = normalizedConf > 0.7 ? 'high' : normalizedConf > 0.4 ? 'medium' : 'low';
+        const signalPercent = Math.round(normalizedConf * 100);
 
         const actionIcons = { buy: '📈', sell: '📉', hold: '⏸️' };
 
@@ -1517,31 +1563,38 @@ createAgentDetail(agentName, state = {}, logs = []) {
                 <div class="decision-signal-breakdown">
                     <div class="decision-signal-title">各模块信号分布</div>
                     <div class="decision-signal-grid">
-                        ${Object.entries(signalSummary).map(([name, s]) => {
-                            const sig = s.signal || s;
-                            const label = {
-                                'market_data': '市场数据',
-                                'technical': '技术分析',
-                                'fundamentals': '基本面',
-                                'sentiment': '情绪',
-                                'valuation': '估值',
-                                'industry_cycle': '行业周期',
-                                'institutional': '机构持仓',
-                                'expectation_diff': '预期差',
-                                'macro_news': '宏观新闻',
-                                'macro': '宏观',
-                                'bull_research': '看多研究',
-                                'bear_research': '看空研究',
-                                'debate': '辩论',
-                                'risk': '风险管理'
-                            }[name] || name;
-                            return `
-                                <div class="decision-signal-item">
-                                    <div class="name">${label}</div>
-                                    <div class="signal ${sig}">${this.getSignalText(sig)}</div>
-                                </div>
-                            `;
-                        }).join('')}
+                        ${(() => {
+                            const labelMap = {
+                                'market_data': '市场数据', 'technical': '技术分析', '技术分析': '技术分析',
+                                'fundamentals': '基本面', '基本面分析': '基本面',
+                                'sentiment': '情绪', '情绪分析': '情绪',
+                                'valuation': '估值', '估值分析': '估值',
+                                'industry_cycle': '行业周期', '行业周期': '行业周期',
+                                'institutional': '机构持仓', '机构持仓': '机构持仓',
+                                'expectation_diff': '预期差', '预期差': '预期差',
+                                'macro_news': '宏观新闻', '宏观新闻分析': '宏观新闻',
+                                'macro': '宏观', '宏观分析': '宏观分析',
+                                'bull_research': '看多研究', '看多研究员': '看多研究',
+                                'bear_research': '看空研究', '看空研究员': '看空研究',
+                                'debate': '辩论', '辩论室': '辩论',
+                                'risk': '风险管理', '风险管理': '风险管理'
+                            };
+                            const gt = Components.getSignalText.bind(Components);
+                            if (Array.isArray(agentSignalsArr) && agentSignalsArr.length > 0) {
+                                return agentSignalsArr.map(item => {
+                                    const name = item.agent_name || item.agent || '';
+                                    const sig = item.signal || 'neutral';
+                                    const label = labelMap[name] || name;
+                                    return '<div class="decision-signal-item"><div class="name">' + Components.escapeHtml(label) + '</div><div class="signal ' + sig + '">' + gt(sig) + '</div></div>';
+                                }).join('');
+                            } else {
+                                return Object.entries(signalSummary).map(([name, s]) => {
+                                    const sig = s.signal || s;
+                                    const label = labelMap[name] || name;
+                                    return '<div class="decision-signal-item"><div class="name">' + Components.escapeHtml(label) + '</div><div class="signal ' + sig + '">' + gt(sig) + '</div></div>';
+                                }).join('');
+                            }
+                        })()}
                     </div>
                 </div>
 

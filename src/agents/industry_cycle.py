@@ -4,7 +4,7 @@
 """
 from langchain_core.messages import HumanMessage
 from src.utils.logging_config import setup_logger
-from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status
+from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status, show_workflow_complete
 from src.utils.api_utils import agent_endpoint, log_llm_interaction
 from src.utils.error_handler import resilient_agent
 import json
@@ -187,18 +187,7 @@ def industry_cycle_agent(state: AgentState):
     # 3. 生成周期信号
     cycle_signal = _generate_cycle_signal(cycle_position)
 
-    # 发送行业周期分析结果到前端
-    show_agent_reasoning({
-        "行业": industry,
-        "周期类型": cycle_type_cn,
-        "周期阶段": phase,
-        "信号": signal_cn,
-        "置信度": f"{conf_float*100:.0f}%",
-        "决策逻辑": decision_logic,
-        "权重系数": f"{wf:.1f}",
-        "分析依据": reason
-    }, "行业周期分析师")
-
+    # 获取信号结果
     conf_float = cycle_signal.get('confidence', 0.3)
     cycle_type_cn_map = {'强周期': '强周期行业', '弱周期': '弱周期行业', '成长': '成长型行业', '防御': '防御型行业', 'other': '其他', 'unknown': '未知'}
     cycle_type_cn = cycle_type_cn_map.get(cycle_signal.get('cycle_type', 'unknown'), cycle_signal.get('cycle_type', 'unknown'))
@@ -215,6 +204,18 @@ def industry_cycle_agent(state: AgentState):
         decision_logic = f"{industry}属于{cycle_type_cn}，当前处于{phase}，建议减配（权重系数{wf}）"
     else:
         decision_logic = f"{industry}属于{cycle_type_cn}，当前处于{phase}，建议标配（权重系数{wf}）"
+
+    # 发送行业周期分析结果到前端
+    show_agent_reasoning({
+        "行业": industry,
+        "周期类型": cycle_type_cn,
+        "周期阶段": phase,
+        "信号": signal_cn,
+        "置信度": f"{conf_float*100:.0f}%",
+        "决策逻辑": decision_logic,
+        "权重系数": f"{wf:.1f}",
+        "分析依据": reason
+    }, "行业周期分析师")
 
     message_content = {
         "signal": signal,
@@ -254,7 +255,13 @@ def industry_cycle_agent(state: AgentState):
         "投资策略": reason
     }, "行业周期分析师")
 
-    show_workflow_status("行业周期分析师", "completed")
+    show_workflow_complete(
+        "行业周期分析师",
+        signal=signal,
+        confidence=conf_float,
+        details=message_content,
+        message=f"行业周期分析完成：{cycle_type_cn}，{phase}，信号{signal_cn}，置信度{conf_float*100:.0f}%"
+    )
 
     return {
         "messages": [message],

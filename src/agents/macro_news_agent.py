@@ -5,7 +5,7 @@ import akshare as ak
 from src.utils.logging_config import setup_logger
 # from langgraph.graph import AgentState # Changed import
 # Added for alignment
-from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status
+from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status, show_workflow_complete
 from typing import Dict, Any, List
 from src.utils.api_utils import agent_endpoint  # Added for alignment
 from src.tools.openrouter_config import get_chat_completion
@@ -183,15 +183,33 @@ def macro_news_agent(state: AgentState) -> Dict[str, Any]:
             show_agent_reasoning(
                 f"Failed to save summary to {output_file_path}: {str(e)}", agent_name)
 
-    show_workflow_status(agent_name, "completed")
+    show_workflow_complete(
+        agent_name,
+        signal="neutral",
+        confidence=1.0 if summary and '暂不可用' not in str(summary) else 0.0,
+        details={"summary": summary, "news_count": retrieved_news_count, "from_cache": from_cache},
+        message=f"宏观新闻分析完成：获取{retrieved_news_count}条新闻"
+    )
 
-    new_message_content = f"宏观新闻Agent分析 {analysis_date} (是否从缓存加载={from_cache}):\\n{summary}"
-    new_message = HumanMessage(content=new_message_content, name=agent_name)
+    message_content = {
+        "retrieved_news_count": retrieved_news_count,
+        "summary_content": summary,
+        "news_list": news_list_for_llm[:10] if news_list_for_llm else [],
+        "from_cache": from_cache,
+        "analysis_date": analysis_date
+    }
+    new_message = HumanMessage(
+        content=json.dumps(message_content, ensure_ascii=False),
+        name=agent_name
+    )
 
     show_agent_reasoning({
         "最终结论": summary[:150] + "..." if len(summary) > 150 else summary,
         "获取新闻数": f"{retrieved_news_count}条",
-        "数据来源": "缓存" if from_cache else "实时获取"
+        "数据来源": "缓存" if from_cache else "实时获取",
+        "retrieved_news_count": retrieved_news_count,
+        "summary_content": summary,
+        "news_list": news_list_for_llm[:10] if news_list_for_llm else []
     }, agent_name)
 
     if not from_cache and news_list_for_llm and len(news_list_for_llm) > 0:

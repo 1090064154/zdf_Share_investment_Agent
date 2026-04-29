@@ -1,5 +1,5 @@
 from langchain_core.messages import HumanMessage
-from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status
+from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status, show_workflow_complete
 from src.tools.news_crawler import get_stock_news, get_news_sentiment
 from src.tools.guba_crawler import get_guba_sentiment
 from src.tools.quant_sentiment import get_quant_sentiment
@@ -641,7 +641,13 @@ def sentiment_agent(state: AgentState):
         name="sentiment_agent",
     )
 
-    show_workflow_status("情绪分析师", "completed")
+    show_workflow_complete(
+        "情绪分析师",
+        signal=combined_result['signal'],
+        confidence=combined_result['confidence'],
+        details=message_content,
+        message=f"情绪分析完成，信号:{signal_cn}，分数:{combined_result['combined_score']:.3f}"
+    )
 
     return {
         "messages": [message],

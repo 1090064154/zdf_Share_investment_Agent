@@ -85,11 +85,13 @@ def debate_room_agent(state: AgentState):
     # 分析辩论观点
     debate_summary = []
     debate_summary.append("看多观点:")
-    for point in bull_thesis.get("thesis_points", []):
+    bull_points_list = bull_thesis.get("thesis_points", []) if bull_thesis else []
+    for point in bull_points_list:
         debate_summary.append(f"+ {point}")
 
     debate_summary.append("\n看空观点:")
-    for point in bear_thesis.get("thesis_points", []):
+    bear_points_list = bear_thesis.get("risk_points", []) if bear_thesis else []
+    for point in bear_points_list:
         debate_summary.append(f"- {point}")
 
 # ============================================================
@@ -186,8 +188,8 @@ def debate_room_agent(state: AgentState):
         "看多置信度": f"{bull_confidence:.2%}",
         "看空置信度": f"{bear_confidence:.2%}",
         "差距": f"{abs(confidence_diff):.2%}",
-        "看多论点": [p[:80] + '...' if len(p) > 80 else p for p in bull_points[:3]] if bull_points else [],
-        "看空论点": [p[:80] + '...' if len(p) > 80 else p for p in bear_points[:3]] if bear_points else []
+        "看多论点": bull_points[:3] if bull_points else [],
+        "看空论点": bear_points[:3] if bear_points else []
     }, "辩论室")
     llm_weight = 0.3 * (llm_score if llm_analysis else 0.5)
     researcher_direction = 1 if confidence_diff > 0 else -1

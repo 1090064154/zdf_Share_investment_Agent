@@ -1,6 +1,6 @@
 from langchain_core.messages import HumanMessage
 from src.tools.openrouter_config import get_chat_completion
-from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status
+from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status, show_workflow_complete
 from src.tools.api import get_financial_metrics, get_financial_statements, get_market_data, get_price_history, get_industry
 from src.utils.logging_config import setup_logger
 from src.utils.api_utils import agent_endpoint, log_llm_interaction
@@ -128,6 +128,8 @@ def market_data_agent(state: AgentState):
             "financial_statements": _has_meaningful_records(financial_line_items),
             "market_data": _has_meaningful_records(market_data)
         },
+        "has_financial_metrics": _has_meaningful_records(financial_metrics),
+        "has_financial_statements": _has_meaningful_records(financial_line_items),
         "summary": f"为{ticker}收集了从{start_date}到{end_date}的市场数据，包括价格历史、财务指标和市场信息"
     }
 
@@ -135,14 +137,22 @@ def market_data_agent(state: AgentState):
         "价格记录": f"{len(prices_dict)}条",
         "财务指标": "✓" if _has_meaningful_records(financial_metrics) else "✗",
         "财务报表": "✓" if _has_meaningful_records(financial_line_items) else "✗",
-        "行业": industry
+        "行业": industry,
+        "has_financial_metrics": _has_meaningful_records(financial_metrics),
+        "has_financial_statements": _has_meaningful_records(financial_line_items)
     }, "市场数据Agent")
 
     if show_reasoning:
         show_agent_reasoning(market_data_summary, "Market Data Agent")
         state["metadata"]["agent_reasoning"] = market_data_summary
 
-    show_workflow_status("市场数据Agent", "completed")
+    show_workflow_complete(
+        "市场数据Agent",
+        signal="neutral",
+        confidence=1.0,
+        details=market_data_summary,
+        message=f"市场数据收集完成：{len(prices_dict)}条价格，行业{industry}"
+    )
 
     # 构建结构化输出
     latest_price = prices_df.iloc[-1]['close'] if len(prices_df) > 0 else 0

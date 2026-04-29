@@ -4,7 +4,7 @@
 """
 from langchain_core.messages import HumanMessage
 from src.utils.logging_config import setup_logger
-from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status
+from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status, show_workflow_complete
 from src.utils.api_utils import agent_endpoint, log_llm_interaction
 from src.utils.error_handler import resilient_agent
 import json
@@ -281,7 +281,13 @@ def expectation_diff_agent(state: AgentState):
         "判断逻辑": decision_logic
     }, "预期差分析师")
 
-    show_workflow_status("预期差分析师", "completed")
+    show_workflow_complete(
+        "预期差分析师",
+        signal=combined['signal'],
+        confidence=combined.get('confidence', 0.3),
+        details=message_content,
+        message=f"预期差分析完成：信号{to_cn(combined.get('signal'))}，置信度{combined.get('confidence', 0.3)*100:.0f}%"
+    )
 
     return {
         "messages": [message],

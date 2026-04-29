@@ -422,8 +422,6 @@ const App = {
         this.initAgentGrid();
         document.getElementById('logContainer').innerHTML = '<div class="log-empty">点击"执行分析"开始...</div>';
         document.getElementById('resultPanel').style.display = 'none';
-        document.getElementById('startDate').value = '';
-        document.getElementById('endDate').value = '';
         this.updateProgress();
     },
 

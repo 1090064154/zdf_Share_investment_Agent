@@ -30,10 +30,10 @@
       "free_cash_flow_per_share": -0.1594,
       "earnings_per_share": -0.22,
       "pe_ratio": 0,
-      "price_to_book": 2.79,
+      "price_to_book": 2.95,
       "price_to_sales": 8.7
     },
-    "updated": "2026-04-28T09:24:25.815472"
+    "updated": "2026-04-29T21:36:29.444826"
   },
   "600519": {
     "metrics": {
@@ -109,21 +109,21 @@
   },
   "601127": {
     "metrics": {
-      "return_on_equity": 0.1456,
-      "net_margin": 0.037240999999999996,
-      "operating_margin": 0.045548000000000005,
-      "revenue_growth": 0.136922,
-      "earnings_growth": 0.296749,
-      "book_value_growth": 2.515865,
-      "current_ratio": 1.0542,
-      "debt_to_equity": 0.7091270000000001,
-      "free_cash_flow_per_share": 16.5982,
-      "earnings_per_share": 3.67,
-      "pe_ratio": 24.75,
-      "price_to_book": 3.78,
+      "return_on_equity": 0.0183,
+      "net_margin": 0.023714,
+      "operating_margin": 0.031289,
+      "revenue_growth": 0.34462899999999996,
+      "earnings_growth": -0.175641,
+      "book_value_growth": 0.8434699999999999,
+      "current_ratio": 1.0687,
+      "debt_to_equity": 0.659226,
+      "free_cash_flow_per_share": -12.0267,
+      "earnings_per_share": 0.43,
+      "pe_ratio": 210.35,
+      "price_to_book": 3.74,
       "price_to_sales": 0.96
     },
-    "updated": "2026-04-27T11:30:26.278507"
+    "updated": "2026-04-29T21:48:02.369608"
   },
   "600418": {
     "metrics": {

@@ -133,16 +133,19 @@ def show_workflow_complete(agent_name: str, signal: str = None, confidence: floa
         message: Optional completion message
     """
     logger.info(f"✅ {agent_name} 分析完成")
-    kwargs = {}
-    if signal:
-        kwargs['signal'] = signal
-    if confidence is not None:
-        kwargs['confidence'] = confidence
-    if details:
-        kwargs['details'] = details
-    if message:
-        kwargs['message'] = message
-    _send_sse_event('agent_complete', agent_name, **kwargs)
+    try:
+        data = {}
+        if signal:
+            data['signal'] = signal
+        if confidence is not None:
+            data['confidence'] = confidence
+        if details:
+            data['details'] = details
+        if message:
+            data['message'] = message
+        _send_sse_event('agent_complete', agent_name, message=message, data=data)
+    except Exception as e:
+        logger.warning(f"show_workflow_complete SSE发送失败: {e}")
 
 
 def show_agent_reasoning(output, agent_name):
@@ -235,7 +238,7 @@ def _send_key_reasoning(agent_name: str, reasoning_data: dict):
                     _send_sse_event('agent_log', agent_name, level='info', message=msg)
 
         # 基本面分析：发送各维度信号
-        elif 'fundamental' in agent_name_lower or '基本面' in agent_name or 'reasoning' in reasoning_data:
+        elif 'fundamental' in agent_name_lower or '基本面' in agent_name:
             reasoning = reasoning_data.get('reasoning', {})
             key_map = {
                 'profitability': '盈利能力',
@@ -480,6 +483,22 @@ def _send_key_reasoning(agent_name: str, reasoning_data: dict):
             price_count = len(prices) if isinstance(prices, list) else '-'
             msg = f"价格:{price_count}条 行业:{industry} 财务指标:{'✓' if has_metrics else '✗'} 报表:{'✓' if has_statements else '✗'}"
             _send_sse_event('agent_log', agent_name, level='info', message=msg)
+
+        # 通用回退：对未匹配特定处理器的数据，发送关键字段作为agent_log
+        else:
+            for key, value in reasoning_data.items():
+                if isinstance(value, dict):
+                    _send_sse_event('agent_log', agent_name, level='info',
+                                    message=f"【{key}】{json.dumps(value, ensure_ascii=False)[:200]}")
+                elif isinstance(value, list):
+                    if len(value) > 0:
+                        _send_sse_event('agent_log', agent_name, level='info',
+                                        message=f"【{key}】共{len(value)}项: {str(value[0])[:100]}")
+                elif isinstance(value, str) and len(value) > 150:
+                    _send_sse_event('agent_log', agent_name, level='info',
+                                    message=f"【{key}】{value[:150]}...")
+                elif value is not None:
+                    _send_sse_event('agent_log', agent_name, level='info', message=f"【{key}】{value}")
 
     except Exception as e:
         logger.debug(f"发送关键推理日志失败: {e}")

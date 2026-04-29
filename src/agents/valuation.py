@@ -1,6 +1,6 @@
 from langchain_core.messages import HumanMessage
 from src.utils.logging_config import setup_logger
-from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status
+from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status, show_workflow_complete
 from src.utils.api_utils import agent_endpoint, log_llm_interaction
 from src.utils.error_handler import resilient_agent
 from src.agents.fundamentals import INDUSTRY_CYCLE_CLASSIFICATION
@@ -242,7 +242,13 @@ def valuation_agent(state: AgentState):
         if show_reasoning:
             state["metadata"]["agent_reasoning"] = message_content
         show_agent_reasoning({"最终信号": "中性", "置信度": "0%", "原因": "估值输入不足"}, "估值Agent")
-        show_workflow_status("估值Agent", "completed")
+        show_workflow_complete(
+            "估值Agent",
+            signal="neutral",
+            confidence=0.0,
+            details=message_content,
+            message="估值分析完成：数据输入不足"
+        )
         return {
             "messages": [message],
             "data": {
@@ -271,7 +277,13 @@ def valuation_agent(state: AgentState):
         if show_reasoning:
             state["metadata"]["agent_reasoning"] = message_content
         show_agent_reasoning({"最终信号": "中性", "置信度": "0%", "原因": "关键财务数据缺失"}, "估值Agent")
-        show_workflow_status("估值Agent", "completed")
+        show_workflow_complete(
+            "估值Agent",
+            signal="neutral",
+            confidence=0.0,
+            details=message_content,
+            message="估值分析完成：关键财务数据缺失"
+        )
         return {
             "messages": [message],
             "data": {
@@ -463,7 +475,13 @@ def valuation_agent(state: AgentState):
             "置信度": "0%",
             "原因": message_content.get("reasoning", {}).get("fallback", {}).get("details", "数据不足")
         }, "估值Agent")
-        show_workflow_status("估值Agent", "completed")
+        show_workflow_complete(
+            "估值Agent",
+            signal="neutral",
+            confidence=0.0,
+            details=message_content,
+            message="估值分析完成：数据不足，无法估值"
+        )
         return {
             "messages": [message],
             "data": {
@@ -612,7 +630,13 @@ def valuation_agent(state: AgentState):
 
     show_agent_reasoning(show_reasoning, "估值Agent")
 
-    show_workflow_status("估值Agent", "completed")
+    show_workflow_complete(
+        "估值Agent",
+        signal=message_content.get('signal', 'neutral'),
+        confidence=message_content.get('confidence', 0) if isinstance(message_content.get('confidence'), (int, float)) else 0,
+        details=message_content,
+        message=f"估值分析完成：{message_content.get('summary', '估值分析')}"
+    )
 
     return {
         "messages": [message],

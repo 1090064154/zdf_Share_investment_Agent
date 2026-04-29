@@ -1,7 +1,7 @@
 from langchain_core.messages import HumanMessage
 from src.utils.logging_config import setup_logger
 
-from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status
+from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status, show_workflow_complete
 from src.utils.api_utils import agent_endpoint, log_llm_interaction
 from src.utils.error_handler import resilient_agent
 
@@ -220,7 +220,13 @@ def fundamentals_agent(state: AgentState):
         if show_reasoning:
             state["metadata"]["agent_reasoning"] = message_content
         show_agent_reasoning({"最终信号": "中性", "置信度": "0%"}, "基本面分析师")
-        show_workflow_status("基本面分析师", "completed")
+        show_workflow_complete(
+            "基本面分析师",
+            signal="neutral",
+            confidence=0.0,
+            details=message_content,
+            message="基本面分析完成：财务数据不足，无法判断"
+        )
 
         return {
             "messages": [message],
@@ -404,7 +410,11 @@ def fundamentals_agent(state: AgentState):
     message_content = {
         "signal": overall_signal,
         "confidence": f"{round(confidence * 100)}%",
-        "reasoning": reasoning
+        "reasoning": reasoning,
+        "profitability_signal": reasoning.get("profitability_signal", {}),
+        "growth_signal": reasoning.get("growth_signal", {}),
+        "financial_health_signal": reasoning.get("financial_health_signal", {}),
+        "price_ratios_signal": reasoning.get("price_ratios_signal", {})
     }
 
     # Create the fundamental analysis message
@@ -468,8 +478,14 @@ def fundamentals_agent(state: AgentState):
         "判断逻辑": decision_logic
     }, "基本面分析师")
 
-    show_workflow_status("基本面分析师", "completed")
-    
+    show_workflow_complete(
+        "基本面分析师",
+        signal=overall_signal,
+        confidence=confidence,
+        details=message_content,
+        message=f"基本面分析完成，信号:{signal_cn}，置信度:{message_content.get('confidence')}"
+    )
+
     return {
         "messages": [message],
         "data": {

@@ -4,7 +4,7 @@ from src.utils.logging_config import setup_logger
 
 from langchain_core.messages import HumanMessage
 
-from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status
+from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status, show_workflow_complete
 from src.utils.api_utils import agent_endpoint, log_llm_interaction
 from src.utils.error_handler import resilient_agent
 
@@ -83,7 +83,13 @@ def technical_analyst_agent(state: AgentState):
         if show_reasoning:
             show_agent_reasoning(analysis_report, "技术分析师")
             state["metadata"]["agent_reasoning"] = analysis_report
-        show_workflow_status("技术分析师", "completed")
+        show_workflow_complete(
+            "技术分析师",
+            signal=analysis_report.get('signal'),
+            confidence=0,
+            details=analysis_report,
+            message="技术分析不可用：数据不足"
+        )
         return {
             "messages": [message],
             "data": data,
@@ -302,7 +308,13 @@ def technical_analyst_agent(state: AgentState):
     }
     show_agent_reasoning(final_summary, "技术分析师")
 
-    show_workflow_status("技术分析师", "completed")
+    show_workflow_complete(
+        "技术分析师",
+        signal=analysis_report.get('signal'),
+        confidence=combined_signal.get('confidence', 0),
+        details=analysis_report,
+        message=f"技术分析完成，信号:{analysis_report.get('signal')}，置信度:{analysis_report.get('confidence')}"
+    )
 
     return {
         "messages": [message],
