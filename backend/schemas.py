@@ -80,3 +80,4 @@ class WorkflowFlow(BaseModel):
     agents: Dict[str, AgentSummary] = Field(..., description="执行的Agents")
     state_transitions: List[Dict] = Field(..., description="状态转换")
     final_decision: Optional[str] = Field(None, description="最终决策")
+    result_data: Optional[Dict] = Field(None, description="完整结果数据(从文件系统)")

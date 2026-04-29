@@ -1,5 +1,5 @@
 from langchain_core.messages import HumanMessage
-from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status
+from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status, show_workflow_complete
 from src.tools.news_crawler import get_stock_news
 from src.utils.logging_config import setup_logger
 from src.utils.api_utils import agent_endpoint, log_llm_interaction
@@ -84,9 +84,100 @@ def macro_analyst_agent(state: AgentState):
         macro_analysis = get_macro_news_analysis(recent_news)
         message_content = macro_analysis
 
+    # 提取并规范化字段
+    raw_env = message_content.get('macro_environment', 'neutral')
+    raw_impact = message_content.get('impact_on_stock', 'neutral')
+    key_factors = message_content.get('key_factors', [])
+    reasoning = message_content.get('reasoning', '')
+
+    # 兼容 LLM 可能返回的各种值
+    env_map = {'favorable': '有利', 'positive': '有利', 'unfavorable': '不利', 'negative': '不利', 'neutral': '中性'}
+    impact_map = {'positive': '正面', 'favorable': '正面', 'negative': '负面', 'unfavorable': '负面', 'neutral': '中性'}
+    env_cn = env_map.get(raw_env, raw_env)
+    impact_cn = impact_map.get(raw_impact, raw_impact)
+
+    # 派生 signal
+    if raw_impact in ('positive', 'favorable'):
+        signal = 'bullish'
+    elif raw_impact in ('negative', 'unfavorable'):
+        signal = 'bearish'
+    else:
+        signal = 'neutral'
+    signal_cn = {'bullish': '看多', 'bearish': '看空', 'neutral': '中性'}.get(signal, signal)
+
+    # 估算置信度（基于关键因素数量和分析详细程度）
+    confidence = min(0.5 + len(key_factors) * 0.1 + (0.1 if len(reasoning) > 200 else 0), 0.9)
+
+    # 构建决策逻辑（详细）
+    factor_text = "；".join(key_factors[:5]) if key_factors else "无明显关键因素"
+
+    # 生成详细决策逻辑
+    env_score = {"有利": "+1", "中性": "0", "不利": "-1"}.get(env_cn, "0")
+    impact_score = {"正面": "+1", "中性": "0", "负面": "-1"}.get(impact_cn, "0")
+
+    decision_logic = f"""【宏观环境评估】{env_cn}（得分：{env_score}）
+- 环境判断依据：{reasoning[:200] + '...' if reasoning and len(reasoning) > 200 else reasoning or '基于新闻数据分析'}
+
+【对个股影响评估】{impact_cn}（得分：{impact_score}）
+- 影响路径：宏观环境变化 → 行业层面传导 → 个股基本面影响
+- 关键因素包括：{factor_text}
+
+【综合决策逻辑】
+1. 宏观环境：当前{env_cn}，{('流动性收紧，风险偏好下降' if env_cn == '不利' else '经济运行平稳' if env_cn == '中性' else '政策支持力度加大，经济活跃度提升')}
+2. 行业传导：{('下游需求承压' if impact_cn == '负面' else '需求相对稳定' if impact_cn == '中性' else '需求端受益')}
+3. 估值影响：{('估值面临下修压力' if impact_cn == '负面' else '估值支撑中性' if impact_cn == '中性' else '估值有望提升')}
+4. 最终结论：宏观层面{'不支持' if impact_cn == '负面' else '对' if impact_cn == '中性' else '支持'}股价表现"""
+
+    # 决策结果
+    decision_result = {
+        "recommendation": signal_cn,
+        "environment_assessment": env_cn,
+        "stock_impact": impact_cn,
+        "confidence": round(confidence, 4),
+        "key_factors": key_factors,
+        "action": {
+            "bullish": "可考虑逢低布局或加仓",
+            "bearish": "建议谨慎，控制仓位或对冲",
+            "neutral": "保持现有仓位，等待更多信号"
+        }.get(signal, "观望为主"),
+        "risk_warning": {
+            "bullish": "注意市场波动，避免追高",
+            "bearish": "关注超跌反弹机会",
+            "neutral": "保持中性思路，等待方向明确"
+        }.get(signal, "控制仓位")
+    }
+
+    # 重建完整的 message_content
+    message_content = {
+        "signal": signal,
+        "confidence": round(confidence, 4),
+        "signal_cn": signal_cn,
+        "macro_environment": raw_env,
+        "macro_environment_cn": env_cn,
+        "impact_on_stock": raw_impact,
+        "impact_on_stock_cn": impact_cn,
+        "key_factors": key_factors,
+        "reasoning": reasoning,
+        "decision_logic": decision_logic,
+        "decision_result": decision_result,
+        "summary": f"宏观分析{signal_cn}（置信度{confidence*100:.0f}%），环境{env_cn}，对个股影响{impact_cn}，{len(key_factors)}个关键因素"
+    }
+
     # 如果需要显示推理过程
     if show_reasoning:
-        show_agent_reasoning(message_content, "宏观分析师")
+        show_agent_reasoning({
+            "macro_environment": raw_env,
+            "impact_on_stock": raw_impact,
+            "signal": signal,
+            "confidence": round(confidence, 4),
+            "关键因素": key_factors if key_factors else ["无明显关键因素"],
+            "decision_logic": decision_logic,
+            "decision_result": decision_result,
+            "reasoning": reasoning,
+            "最终结论": f"宏观环境{env_cn}，对股票影响{impact_cn}",
+            "信号": signal_cn,
+            "置信度": f"{confidence*100:.0f}%",
+        }, "宏观分析师")
         # 保存推理信息到metadata供API使用
         state["metadata"]["agent_reasoning"] = message_content
 
@@ -96,7 +187,14 @@ def macro_analyst_agent(state: AgentState):
         name="macro_analyst_agent",
     )
 
-    show_workflow_status("宏观分析师", "completed")
+    # 发送完整的完成事件，包含信号、置信度和详情
+    show_workflow_complete(
+        "宏观分析师",
+        signal=signal,
+        confidence=confidence,
+        details=message_content,
+        message=f"宏观分析完成，信号:{signal_cn}，置信度:{confidence*100:.0f}%"
+    )
     logger.info("────────────────────────────────────────────────────────")
     logger.info("✅ 宏观分析完成:")
     logger.info(f"  🌍 宏观环境: {message_content.get('macro_environment')}")

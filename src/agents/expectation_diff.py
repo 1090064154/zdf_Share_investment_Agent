@@ -221,6 +221,16 @@ def expectation_diff_agent(state: AgentState):
     # 3. 综合分析
     combined = _analyze_expectation_diff(forecast_result, rating_result)
 
+    # 发送预期差分析结果到前端
+    show_agent_reasoning({
+        "业绩预告": forecast_result.get('signal', '-'),
+        "业绩预告详情": forecast_result.get('reason', '-'),
+        "研报评级": rating_result.get('signal', '-'),
+        "研报评级详情": rating_result.get('reason', '-'),
+        "综合信号": combined.get('signal', '-'),
+        "综合置信度": f"{combined.get('confidence', 0.3) * 100:.0f}%"
+    }, "预期差分析师")
+
     message_content = {
         "signal": combined['signal'],
         "confidence": f"{combined.get('confidence', 0.3) * 100:.0f}%",
@@ -236,17 +246,42 @@ def expectation_diff_agent(state: AgentState):
     )
 
     if show_reasoning:
-        show_agent_reasoning(message_content, "预期差分析")
         state["metadata"]["agent_reasoning"] = message_content
 
+    def to_cn(s):
+        return {'bullish': '看涨', 'bearish': '看跌', 'neutral': '中性'}.get(s, s) if s else 'N/A'
+
+    forecast = message_content.get('earnings_forecast', {})
+    rating = message_content.get('research_rating', {})
+    forecast_signal = forecast.get('signal', 'neutral')
+    rating_signal = rating.get('signal', 'neutral')
+
+    logic_parts = []
+    if forecast_signal == 'bullish':
+        logic_parts.append("业绩预增")
+    elif forecast_signal == 'bearish':
+        logic_parts.append("业绩预减")
+    else:
+        logic_parts.append("业绩持平")
+
+    if rating_signal == 'bullish':
+        logic_parts.append("机构看多")
+    elif rating_signal == 'bearish':
+        logic_parts.append("机构看空")
+    else:
+        logic_parts.append("机构中性")
+
+    decision_logic = "，".join(logic_parts)
+
+    show_agent_reasoning({
+        "最终信号": to_cn(combined.get('signal')),
+        "置信度": f"{combined.get('confidence', 0.3)*100:.0f}%",
+        "业绩预告": to_cn(forecast_signal),
+        "研报评级": to_cn(rating_signal),
+        "判断逻辑": decision_logic
+    }, "预期差分析师")
+
     show_workflow_status("预期差分析师", "completed")
-    logger.info("────────────────────────────────────────────────────────")
-    logger.info("✅ 预期差分析完成:")
-    logger.info(f"  📊 最终信号: {combined.get('signal')}")
-    logger.info(f"  📈 置信度: {combined.get('confidence')}")
-    logger.info(f"  📈 盈利预测: {message_content.get('earnings_forecast', {}).get('signal', 'N/A')}")
-    logger.info(f"  📊 预期差: {message_content.get('expectation_diff', {}).get('signal', 'N/A')}")
-    logger.info("────────────────────────────────────────────────────────")
 
     return {
         "messages": [message],

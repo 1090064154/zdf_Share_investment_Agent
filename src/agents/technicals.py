@@ -61,25 +61,20 @@ def technical_analyst_agent(state: AgentState):
     5. Statistical Arbitrage Signals
     """
     show_workflow_status("技术分析师")
-    logger.info("="*50)
-    logger.info("📈 [TECHNICAL] 开始技术分析")
-    logger.info("="*50)
+
     show_reasoning = state["metadata"]["show_reasoning"]
     data = state["data"]
     prices = data["prices"]
     prices_df = prices_to_df(prices)
-    logger.info(
-        "Technical analyst received price frame: rows=%s columns=%s",
-        len(prices_df),
-        list(prices_df.columns),
-    )
+
+    latest_price = prices_df['close'].iloc[-1] if len(prices_df) > 0 else 0
+    show_agent_reasoning({"数据点": f"{len(prices_df)}条", "最新价": f"{latest_price:.2f}"}, "技术分析师")
 
     if prices_df.empty or len(prices_df) < 60:
         reason = (
             f"Insufficient price history for technical analysis: "
             f"received {len(prices_df)} rows, need at least 60."
         )
-        logger.warning(reason)
         analysis_report = _build_fallback_analysis(reason)
         message = HumanMessage(
             content=json.dumps(analysis_report, ensure_ascii=False),
@@ -101,15 +96,20 @@ def technical_analyst_agent(state: AgentState):
     # Calculate indicators
     # 1. MACD (Moving Average Convergence Divergence)
     macd_line, signal_line = calculate_macd(prices_df)
+    macd_val = macd_line.iloc[-1] if len(macd_line) > 0 else 0
+    signal_val = signal_line.iloc[-1] if len(signal_line) > 0 else 0
 
     # 2. RSI (Relative Strength Index)
     rsi = calculate_rsi(prices_df)
+    rsi_val = rsi.iloc[-1] if len(rsi) > 0 else 50
 
     # 3. Bollinger Bands (Bollinger Bands)
     upper_band, lower_band = calculate_bollinger_bands(prices_df)
 
     # 4. OBV (On-Balance Volume)
     obv = calculate_obv(prices_df)
+
+    show_agent_reasoning({"MACD": f"{macd_val:.4f}", "RSI": f"{rsi_val:.2f}"}, "技术分析师")
 
     # Generate individual signals
     signals = []
@@ -209,18 +209,28 @@ def technical_analyst_agent(state: AgentState):
 
     # 1. Trend Following Strategy
     trend_signals = calculate_trend_signals(prices_df)
+    logger.info(f"📈 趋势跟踪: {trend_signals['signal']} 置信度:{trend_signals['confidence']:.2%}")
+    show_agent_reasoning({"strategy_signals": {"trend_following": {"signal": trend_signals['signal'], "confidence": f"{trend_signals['confidence']:.0%}"}}}, "技术分析师")
 
     # 2. Mean Reversion Strategy
     mean_reversion_signals = calculate_mean_reversion_signals(prices_df)
+    logger.info(f"📊 均值回归: {mean_reversion_signals['signal']} 置信度:{mean_reversion_signals['confidence']:.2%}")
+    show_agent_reasoning({"strategy_signals": {"mean_reversion": {"signal": mean_reversion_signals['signal'], "confidence": f"{mean_reversion_signals['confidence']:.0%}"}}}, "技术分析师")
 
     # 3. Momentum Strategy
     momentum_signals = calculate_momentum_signals(prices_df)
+    logger.info(f"📉 动量策略: {momentum_signals['signal']} 置信度:{momentum_signals['confidence']:.2%}")
+    show_agent_reasoning({"strategy_signals": {"momentum": {"signal": momentum_signals['signal'], "confidence": f"{momentum_signals['confidence']:.0%}"}}}, "技术分析师")
 
     # 4. Volatility Strategy
     volatility_signals = calculate_volatility_signals(prices_df)
+    logger.info(f"🌊 波动率策略: {volatility_signals['signal']} 置信度:{volatility_signals['confidence']:.2%}")
+    show_agent_reasoning({"strategy_signals": {"volatility": {"signal": volatility_signals['signal'], "confidence": f"{volatility_signals['confidence']:.0%}"}}}, "技术分析师")
 
     # 5. Statistical Arbitrage Signals
     stat_arb_signals = calculate_stat_arb_signals(prices_df)
+    logger.info(f"📐 统计套利: {stat_arb_signals['signal']} 置信度:{stat_arb_signals['confidence']:.2%}")
+    show_agent_reasoning({"strategy_signals": {"stat_arb": {"signal": stat_arb_signals['signal'], "confidence": f"{stat_arb_signals['confidence']:.0%}"}}}, "技术分析师")
 
     # Combine all signals using a weighted ensemble approach
     # [OPTIMIZED] A股特性：强化趋势(45%)，削弱均值回归(5%)，动量保持(30%)
@@ -284,22 +294,22 @@ def technical_analyst_agent(state: AgentState):
         # 保存推理信息到state的metadata供API使用
         state["metadata"]["agent_reasoning"] = analysis_report
 
-    show_workflow_status("技术分析师", "completed")
+    # 发送最终分析结果摘要到前端
+    final_summary = {
+        "最终信号": analysis_report.get('signal'),
+        "置信度": analysis_report.get('confidence'),
+        "策略详情": {k: v.get('signal') for k, v in analysis_report.get('strategy_signals', {}).items()}
+    }
+    show_agent_reasoning(final_summary, "技术分析师")
 
-    # 打印最终分析结果
-    logger.info("────────────────────────────────────────────────────────")
-    logger.info("✅ 技术分析完成:")
-    logger.info(f"  📊 最终信号: {analysis_report.get('signal')}")
-    logger.info(f"  📈 置信度: {analysis_report.get('confidence')}")
-    logger.info(f"  📉 子策略信号:")
-    for strategy, result in analysis_report.get('strategy_signals', {}).items():
-        cn_name = STRATEGY_NAME_CN.get(strategy, strategy)
-        logger.info(f"     - {cn_name}: {result.get('signal')} ({result.get('confidence')})")
-    logger.info("────────────────────────────────────────────────────────")
+    show_workflow_status("技术分析师", "completed")
 
     return {
         "messages": [message],
-        "data": data,
+        "data": {
+            **data,
+            "prices": prices[-100:] if len(prices) > 0 else []
+        },
         "metadata": state["metadata"],
     }
 

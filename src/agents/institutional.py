@@ -372,15 +372,59 @@ def institutional_agent(state: AgentState):
     # 5. 综合分析（含资金流和融资融券）
     combined = _analyze_institutional_signals(north_result, fund_result, money_flow_result, margin_result)
 
+    conf_float = combined.get('confidence', 0.3)
+    signal = combined['signal']
+    signal_cn = {'bullish': '看多', 'bearish': '看空', 'neutral': '中性'}.get(signal, signal)
+
+    def _sig_cn(r):
+        s = r.get('signal', 'neutral') if r else 'neutral'
+        return {'bullish': '看多', 'bearish': '看空', 'neutral': '中性'}.get(s, s)
+
+    decision_preview = f"北向{_sig_cn(north_result)}，主力{_sig_cn(fund_result)}，资金流{_sig_cn(money_flow_result)}，融资融券{_sig_cn(margin_result)}"
+
+    # 发送机构持仓分析结果到前端
+    show_agent_reasoning({
+        "北向资金": f"{_sig_cn(north_result)} | {north_result.get('reason', '-')}",
+        "主力资金": f"{_sig_cn(fund_result)} | {fund_result.get('reason', '-')}",
+        "资金流向": f"{_sig_cn(money_flow_result)} | {money_flow_result.get('reason', '-')}",
+        "融资融券": f"{_sig_cn(margin_result)} | {margin_result.get('reason', '-')}",
+        "综合信号": signal_cn,
+        "置信度": f"{conf_float*100:.0f}%",
+        "决策预览": decision_preview
+    }, "机构持仓分析师")
+
+    # 构建详细的数据项
+    def _to_detail(result, name):
+        if not result:
+            return None
+        s = result.get('signal', 'neutral')
+        sc = {'bullish': '看多', 'bearish': '看空', 'neutral': '中性'}.get(s, s)
+        return {"name": name, "signal": s, "signal_cn": sc, "reason": result.get('reason', ''), "confidence": result.get('confidence', 0)}
+
+    details = []
+    for r, n in [(north_result, "北向资金"), (fund_result, "主力资金"), (money_flow_result, "资金流向"), (margin_result, "融资融券")]:
+        d = _to_detail(r, n)
+        if d and d["confidence"] > 0:
+            details.append(d)
+
+    # 构建决策逻辑
+    parts = []
+    for d_item in details:
+        parts.append(f"{d_item['name']}：{d_item['signal_cn']}（{d_item['reason']}）")
+    decision_logic = "；".join(parts) if parts else "无有效机构数据"
+
     message_content = {
-        "signal": combined['signal'],
-        "confidence": f"{combined.get('confidence', 0.3) * 100:.0f}%",
+        "signal": signal,
+        "confidence": round(conf_float, 4),
+        "signal_cn": signal_cn,
         "reason": combined.get('reason', ''),
+        "decision_logic": decision_logic,
+        "details": details,
+        "summary": f"机构持仓信号{signal_cn}（置信度{conf_float*100:.0f}%），{decision_logic}",
         "north_money": north_result,
         "fund_holding": fund_result,
         "money_flow": money_flow_result,
         "margin": margin_result,
-        "combined_analysis": combined
     }
 
     message = HumanMessage(
@@ -389,17 +433,19 @@ def institutional_agent(state: AgentState):
     )
 
     if show_reasoning:
-        show_agent_reasoning(message_content, "机构持仓分析")
         state["metadata"]["agent_reasoning"] = message_content
 
+    show_agent_reasoning({
+        "最终信号": signal_cn,
+        "置信度": f"{conf_float*100:.0f}%",
+        "北向资金": f"{_sig_cn(north_result)} | {north_result.get('reason', '-')}",
+        "主力资金": f"{_sig_cn(fund_result)} | {fund_result.get('reason', '-')}",
+        "资金流向": f"{_sig_cn(money_flow_result)} | {money_flow_result.get('reason', '-')}",
+        "融资融券": f"{_sig_cn(margin_result)} | {margin_result.get('reason', '-')}",
+        "决策逻辑": decision_logic
+    }, "机构持仓分析师")
+
     show_workflow_status("机构持仓分析师", "completed")
-    logger.info("────────────────────────────────────────────────────────")
-    logger.info("✅ 机构持仓分析完成:")
-    logger.info(f"  📊 最终信号: {combined.get('signal')}")
-    logger.info(f"  📈 置信度: {combined.get('confidence')}")
-    logger.info(f"  📈 基金持仓: {message_content.get('fund_holding', {}).get('signal', 'N/A')}")
-    logger.info(f"  📊 北向资金: {message_content.get('north_money', {}).get('signal', 'N/A')}")
-    logger.info("────────────────────────────────────────────────────────")
 
     return {
         "messages": [message],

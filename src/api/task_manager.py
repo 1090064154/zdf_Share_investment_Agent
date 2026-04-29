@@ -12,17 +12,17 @@ from .sse_manager import sse_manager, SSEEvent
 logger = logging.getLogger("task_manager")
 
 class TaskStatus(Enum):
-    PENDING = "pending"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    CANCELLED = "cancelled"
+    PENDING = "待处理"
+    RUNNING = "执行中"
+    COMPLETED = "已完成"
+    FAILED = "失败"
+    CANCELLED = "已取消"
 
 class AgentStatus(Enum):
-    PENDING = "pending"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    FAILED = "failed"
+    PENDING = "待处理"
+    RUNNING = "执行中"
+    COMPLETED = "已完成"
+    FAILED = "失败"
 
 @dataclass
 class AgentState:

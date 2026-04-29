@@ -188,6 +188,24 @@ def macro_news_agent(state: AgentState) -> Dict[str, Any]:
     new_message_content = f"宏观新闻Agent分析 {analysis_date} (是否从缓存加载={from_cache}):\\n{summary}"
     new_message = HumanMessage(content=new_message_content, name=agent_name)
 
+    show_agent_reasoning({
+        "最终结论": summary[:150] + "..." if len(summary) > 150 else summary,
+        "获取新闻数": f"{retrieved_news_count}条",
+        "数据来源": "缓存" if from_cache else "实时获取"
+    }, agent_name)
+
+    if not from_cache and news_list_for_llm and len(news_list_for_llm) > 0:
+        for i, news in enumerate(news_list_for_llm[:10], 1):
+            title = news.get('title', '无标题')[:60]
+            date = news.get('date', '')
+            show_agent_reasoning({
+                f"新闻{i}": title + (f" ({date})" if date else "")
+            }, agent_name)
+        if len(news_list_for_llm) > 10:
+            show_agent_reasoning({
+                f"...还有{len(news_list_for_llm)-10}条": "未展示"
+            }, agent_name)
+
     agent_details_for_metadata = {
         "summary_generated_on": analysis_date,
         "news_count_for_summary": retrieved_news_count,

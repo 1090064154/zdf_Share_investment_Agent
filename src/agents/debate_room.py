@@ -1,5 +1,5 @@
 from langchain_core.messages import HumanMessage
-from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status
+from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status, show_workflow_complete
 from src.tools.openrouter_config import get_chat_completion
 from src.utils.api_utils import agent_endpoint, log_llm_interaction
 from src.utils.error_handler import resilient_agent
@@ -178,6 +178,17 @@ def debate_room_agent(state: AgentState):
     # ============================================================
     logger.info("🔢 Step 4: 计算混合置信度...")
     confidence_diff = bull_confidence - bear_confidence
+
+    # 发送研究员论点汇总到前端
+    bull_points = bull_thesis.get("thesis_points", []) if bull_thesis else []
+    bear_points = bear_thesis.get("risk_points", []) if bear_thesis else []
+    show_agent_reasoning({
+        "看多置信度": f"{bull_confidence:.2%}",
+        "看空置信度": f"{bear_confidence:.2%}",
+        "差距": f"{abs(confidence_diff):.2%}",
+        "看多论点": [p[:80] + '...' if len(p) > 80 else p for p in bull_points[:3]] if bull_points else [],
+        "看空论点": [p[:80] + '...' if len(p) > 80 else p for p in bear_points[:3]] if bear_points else []
+    }, "辩论室")
     llm_weight = 0.3 * (llm_score if llm_analysis else 0.5)
     researcher_direction = 1 if confidence_diff > 0 else -1
     llm_direction = 1 if llm_score > 0 else -1 if llm_analysis else 0
@@ -202,18 +213,21 @@ def debate_room_agent(state: AgentState):
     # 确定最终信号
     if abs(mixed_confidence_diff) < 0.1:
         final_signal = "neutral"
+        final_signal_cn = "中性"
         reasoning = "多空双方论点均衡"
         confidence = max(bull_confidence, bear_confidence)
     elif mixed_confidence_diff > 0:
         final_signal = "bullish"
+        final_signal_cn = "看涨"
         reasoning = "看多观点更具说服力"
         confidence = bull_confidence
     else:
         final_signal = "bearish"
+        final_signal_cn = "看跌"
         reasoning = "看空观点更具说服力"
         confidence = bear_confidence
 
-    logger.info(f"🎯 最终信号: {final_signal}, 置信度: {confidence}")
+    logger.info(f"🎯 最终信号: {final_signal_cn}, 置信度: {confidence}")
 
     # 构建返回消息，包含 LLM 分析
     message_content = {
@@ -236,12 +250,27 @@ def debate_room_agent(state: AgentState):
     )
 
     if show_reasoning:
-        show_agent_reasoning(message_content, "辩论室")
-        # 保存推理信息到metadata供API使用
         state["metadata"]["agent_reasoning"] = message_content
 
-    show_workflow_status("辩论室", "completed")
-    logger.info("辩论室分析完成")
+    show_agent_reasoning({
+        "最终信号": final_signal_cn,
+        "置信度": f"{confidence:.2%}",
+        "决策逻辑": reasoning,
+        "看多论点": len(bull_points),
+        "看空论点": len(bear_points),
+        "LLM评估": f"{llm_score:.2%}" if llm_analysis else "无",
+        "signal": final_signal,
+        "bull_points": bull_points,
+        "bear_points": bear_points
+    }, "辩论室")
+
+    show_workflow_complete(
+        "辩论室",
+        signal=final_signal,
+        confidence=confidence,
+        details=message_content,
+        message=f"辩论完成，结论:{final_signal_cn}，置信度:{confidence:.2%}"
+    )
     return {
         "messages": state["messages"] + [message],
         "data": {

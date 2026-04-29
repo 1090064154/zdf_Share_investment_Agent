@@ -187,15 +187,47 @@ def industry_cycle_agent(state: AgentState):
     # 3. 生成周期信号
     cycle_signal = _generate_cycle_signal(cycle_position)
 
+    # 发送行业周期分析结果到前端
+    show_agent_reasoning({
+        "行业": industry,
+        "周期类型": cycle_type_cn,
+        "周期阶段": phase,
+        "信号": signal_cn,
+        "置信度": f"{conf_float*100:.0f}%",
+        "决策逻辑": decision_logic,
+        "权重系数": f"{wf:.1f}",
+        "分析依据": reason
+    }, "行业周期分析师")
+
+    conf_float = cycle_signal.get('confidence', 0.3)
+    cycle_type_cn_map = {'强周期': '强周期行业', '弱周期': '弱周期行业', '成长': '成长型行业', '防御': '防御型行业', 'other': '其他', 'unknown': '未知'}
+    cycle_type_cn = cycle_type_cn_map.get(cycle_signal.get('cycle_type', 'unknown'), cycle_signal.get('cycle_type', 'unknown'))
+    phase = cycle_signal.get('phase', '未知')
+    reason = cycle_signal.get('reason', '')
+    signal = cycle_signal.get('signal', 'neutral')
+    signal_cn = {'bullish': '看多', 'bearish': '看空', 'neutral': '中性'}.get(signal, signal)
+    wf = cycle_signal.get('weight_factor', 1.0)
+
+    # 构建决策逻辑
+    if signal == 'bullish':
+        decision_logic = f"{industry}属于{cycle_type_cn}，当前处于{phase}，建议增配（权重系数{wf}）"
+    elif signal == 'bearish':
+        decision_logic = f"{industry}属于{cycle_type_cn}，当前处于{phase}，建议减配（权重系数{wf}）"
+    else:
+        decision_logic = f"{industry}属于{cycle_type_cn}，当前处于{phase}，建议标配（权重系数{wf}）"
+
     message_content = {
-        "cycle_type": cycle_signal.get('cycle_type', 'unknown'),
-        "phase": cycle_signal.get('phase', '未知'),
-        "signal": cycle_signal.get('signal', 'neutral'),
-        "confidence": f"{cycle_signal.get('confidence', 0.3) * 100:.0f}%",
-        "reason": cycle_signal.get('reason', ''),
-        "weight_factor": cycle_signal.get('weight_factor', 1.0),
+        "signal": signal,
+        "confidence": round(conf_float, 4),
         "industry": industry,
-        "raw_analysis": cycle_position
+        "cycle_type": cycle_signal.get('cycle_type', 'unknown'),
+        "cycle_type_cn": cycle_type_cn,
+        "phase": phase,
+        "signal_cn": signal_cn,
+        "reason": reason,
+        "decision_logic": decision_logic,
+        "weight_factor": wf,
+        "summary": f"{industry}：{cycle_type_cn}，{phase}，信号{signal_cn}（置信度{conf_float*100:.0f}%），{reason}"
     }
 
     message = HumanMessage(
@@ -204,16 +236,25 @@ def industry_cycle_agent(state: AgentState):
     )
 
     if show_reasoning:
-        show_agent_reasoning(message_content, "行业周期分析")
         state["metadata"]["agent_reasoning"] = message_content
 
+    def to_cn(s):
+        return {'bullish': '看涨', 'bearish': '看跌', 'neutral': '中性'}.get(s, s) if s else 'N/A'
+
+    cycle_type_cn = {'cyclical': '周期性行业', 'growth': '成长型行业', 'defensive': '防御型行业', 'unknown': '未知'}.get(cycle_signal.get('cycle_type', 'unknown'), cycle_signal.get('cycle_type', 'unknown'))
+    phase_cn = {'early': '复苏期', 'mid': '繁荣期', 'late': '衰退期', 'bottom': '萧条期', 'unknown': '未知'}.get(cycle_signal.get('phase', 'unknown'), cycle_signal.get('phase', 'unknown'))
+
+    show_agent_reasoning({
+        "最终信号": signal_cn,
+        "置信度": f"{conf_float*100:.0f}%",
+        "行业": industry,
+        "周期类型": cycle_type_cn,
+        "周期阶段": phase,
+        "决策逻辑": decision_logic,
+        "投资策略": reason
+    }, "行业周期分析师")
+
     show_workflow_status("行业周期分析师", "completed")
-    logger.info("────────────────────────────────────────────────────────")
-    logger.info("✅ 行业周期分析完成:")
-    logger.info(f"  📊 最终信号: {cycle_signal.get('signal')}")
-    logger.info(f"  📈 置信度: {cycle_signal.get('confidence')}")
-    logger.info(f"  📈 周期阶段: {cycle_signal.get('stage', 'N/A')}")
-    logger.info("────────────────────────────────────────────────────────")
 
     return {
         "messages": [message],

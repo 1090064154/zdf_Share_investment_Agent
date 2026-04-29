@@ -170,7 +170,7 @@ const Api = {
     },
 
     async getRunFlow(runId) {
-        const response = await fetch(`${API_BASE}/runs/${runId}/flow`);
+        const response = await fetch(`/runs/${runId}/flow`);
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.detail || '获取流程失败');
@@ -179,7 +179,7 @@ const Api = {
     },
 
     async getRunAgents(runId) {
-        const response = await fetch(`${API_BASE}/runs/${runId}/agents`);
+        const response = await fetch(`/runs/${runId}/agents`);
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.detail || '获取Agent列表失败');
@@ -188,7 +188,7 @@ const Api = {
     },
 
     async getAgentDetail(runId, agentName) {
-        const response = await fetch(`${API_BASE}/runs/${runId}/agents/${agentName}?include_states=true`);
+        const response = await fetch(`/runs/${runId}/agents/${agentName}?include_states=true`);
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.detail || '获取详情失败');

@@ -199,9 +199,10 @@ def fundamentals_agent(state: AgentState):
         if not _is_missing_metric(value)
     ] if isinstance(metrics, dict) else []
 
+    show_agent_reasoning({"有效财务指标": f"{len(populated_metrics)}项"}, "基本面分析师")
+
     if not populated_metrics:
         reason = "Financial metrics unavailable, defaulting fundamentals analysis to neutral."
-        logger.warning(reason)
         message_content = {
             "signal": "neutral",
             "confidence": "0%",
@@ -217,15 +218,9 @@ def fundamentals_agent(state: AgentState):
             name="fundamentals_agent",
         )
         if show_reasoning:
-            show_agent_reasoning(message_content, "基本面分析师")
             state["metadata"]["agent_reasoning"] = message_content
+        show_agent_reasoning({"最终信号": "中性", "置信度": "0%"}, "基本面分析师")
         show_workflow_status("基本面分析师", "completed")
-        
-        logger.info("────────────────────────────────────────────────────────")
-        logger.info("✅ 基本面分析完成:")
-        logger.info(f"  📊 最终信号: {message_content.get('signal')}")
-        logger.info(f"  📈 置信度: {message_content.get('confidence')}")
-        logger.info("────────────────────────────────────────────────────────")
 
         return {
             "messages": [message],
@@ -276,6 +271,8 @@ def fundamentals_agent(state: AgentState):
         "signal": signals[0],
         "details": f"{roe_str}, {netm_str}, {opm_str}"
     }
+    logger.info(f"  💰 盈利能力: {signals[0]} - ROE:{return_on_equity:.2%}, 净利率:{net_margin:.2%}")
+    show_agent_reasoning({"reasoning": {"profitability_signal": {"signal": signals[0], "details": f"ROE:{return_on_equity:.2%}, 净利率:{net_margin:.2%}, 营业利润率:{operating_margin:.2%}"}}}, "基本面分析师")
 
     # 2. Growth Analysis
     revenue_growth = metrics.get("revenue_growth", 0) or 0
@@ -301,6 +298,8 @@ def fundamentals_agent(state: AgentState):
         "signal": signals[1],
         "details": f"{revg_str}, {erng_str}"
     }
+    logger.info(f"  📈 成长性: {signals[1]} - 营收增长率:{revenue_growth:.2%}, 盈利增长率:{earnings_growth:.2%}")
+    show_agent_reasoning({"reasoning": {"growth_signal": {"signal": signals[1], "details": f"营收增长率:{revenue_growth:.2%}, 盈利增长率:{earnings_growth:.2%}"}}}, "基本面分析师")
 
     # 3. Financial Health
     current_ratio = metrics.get("current_ratio", 0) or 0
@@ -325,6 +324,8 @@ def fundamentals_agent(state: AgentState):
         "signal": signals[2],
         "details": f"{cr_str}, {de_str}"
     }
+    logger.info(f"  🏦 财务健康: {signals[2]} - 流动比率:{current_ratio:.2f}, 负债权益比:{debt_to_equity:.2f}")
+    show_agent_reasoning({"reasoning": {"financial_health_signal": {"signal": signals[2], "details": f"流动比率:{current_ratio:.2f}, 负债权益比:{debt_to_equity:.2f}"}}}, "基本面分析师")
 
     # 4. Price to X ratios
     pe_ratio = metrics.get("pe_ratio", 0) or 0
@@ -351,11 +352,15 @@ def fundamentals_agent(state: AgentState):
         "signal": signals[3],
         "details": f"{pe_str}, {pb_str}, {ps_str}"
     }
+    logger.info(f"  📊 估值比率: {signals[3]} - P/E:{pe_ratio:.2f}, P/B:{price_to_book:.2f}, P/S:{price_to_sales:.2f}")
+    show_agent_reasoning({"reasoning": {"price_ratios_signal": {"signal": signals[3], "details": f"P/E:{pe_ratio:.2f}, P/B:{price_to_book:.2f}, P/S:{price_to_sales:.2f}"}}}, "基本面分析师")
 
     # [OPTIMIZED] 5. PB-ROE分位点分析
     pb_roe_analysis = _analyze_pb_roe_percentile(price_to_book, return_on_equity)
     reasoning["pb_roe_analysis"] = pb_roe_analysis
     signals.append(pb_roe_analysis['signal'])
+    logger.info(f"  📐 PB-ROE: {pb_roe_analysis['signal']} - {pb_roe_analysis.get('reasoning', '')}")
+    show_agent_reasoning({"reasoning": {"pb_roe_analysis": {"signal": pb_roe_analysis['signal'], "details": pb_roe_analysis.get('reasoning', '')}}}, "基本面分析师")
 
     # [OPTIMIZED] 6. 周期股识别
     ticker = data.get("ticker", "")
@@ -366,6 +371,8 @@ def fundamentals_agent(state: AgentState):
         "industry": industry,
         "reasoning": cyclical_reason
     }
+    logger.info(f"  🔄 周期股识别: {'是' if is_cyclical else '否'} - {cyclical_reason}")
+    show_agent_reasoning({"reasoning": {"cyclical_analysis": {"signal": "bullish" if is_cyclical else "neutral", "details": cyclical_reason}}}, "基本面分析师")
 
     # [OPTIMIZED] 7. 营收质量分析
     financial_line_items = data.get("financial_line_items", [])
@@ -376,6 +383,8 @@ def fundamentals_agent(state: AgentState):
     revenue_quality = _analyze_revenue_quality(fli)
     reasoning["revenue_quality_analysis"] = revenue_quality
     signals.append(revenue_quality['signal'])
+    logger.info(f"  📋 营收质量: {revenue_quality['signal']} - {revenue_quality.get('reasoning', '')}")
+    show_agent_reasoning({"reasoning": {"revenue_quality_analysis": {"signal": revenue_quality['signal'], "details": revenue_quality.get('reasoning', '')}}}, "基本面分析师")
 
     # Determine overall signal
     bullish_signals = signals.count('bullish')
@@ -406,19 +415,60 @@ def fundamentals_agent(state: AgentState):
 
     # Print the reasoning if the flag is set
     if show_reasoning:
-        show_agent_reasoning(message_content, "基本面分析师")
         state["metadata"]["agent_reasoning"] = message_content
 
+    signal_cn = {'bullish': '看涨', 'bearish': '看跌', 'neutral': '中性'}.get(message_content.get('signal', 'neutral'), message_content.get('signal', 'neutral'))
+    def to_cn(s):
+        return {'bullish': '看涨', 'bearish': '看跌', 'neutral': '中性'}.get(s, s) if s else 'N/A'
+
+    profitability = message_content.get('profitability_signal', {}).get('signal', 'neutral')
+    growth = message_content.get('growth_signal', {}).get('signal', 'neutral')
+    financial = message_content.get('financial_health_signal', {}).get('signal', 'neutral')
+
+    profit_details = message_content.get('profitability_signal', {}).get('details', '')
+    growth_details = message_content.get('growth_signal', {}).get('details', '')
+    financial_details = message_content.get('financial_health_signal', {}).get('details', '')
+
+    is_data_insufficient = not profit_details and not growth_details and not financial_details
+
+    logic_parts = []
+    if is_data_insufficient:
+        logic_parts.append("财务数据不足，无法准确判断")
+    else:
+        if profitability == 'bullish':
+            logic_parts.append(f"盈利判断：ROE/净利率表现良好")
+        elif profitability == 'bearish':
+            logic_parts.append(f"盈利判断：ROE/净利率偏低")
+        else:
+            logic_parts.append(f"盈利判断：指标一般")
+
+        if growth == 'bullish':
+            logic_parts.append(f"成长判断：营收/盈利增长强劲")
+        elif growth == 'bearish':
+            logic_parts.append(f"成长判断：增长放缓或负增长")
+        else:
+            logic_parts.append(f"成长判断：增长平稳")
+
+        if financial == 'bullish':
+            logic_parts.append(f"财务判断：负债率低，流动性好")
+        elif financial == 'bearish':
+            logic_parts.append(f"财务判断：负债率高，偿债压力大")
+        else:
+            logic_parts.append(f"财务判断：财务状况正常")
+
+    decision_logic = "；".join(logic_parts)
+
+    show_agent_reasoning({
+        "最终信号": signal_cn,
+        "置信度": message_content.get('confidence'),
+        "盈利": to_cn(profitability),
+        "成长": to_cn(growth),
+        "财务": to_cn(financial),
+        "数据状态": "数据不足" if is_data_insufficient else "数据完整",
+        "判断逻辑": decision_logic
+    }, "基本面分析师")
+
     show_workflow_status("基本面分析师", "completed")
-    
-    logger.info("────────────────────────────────────────────────────────")
-    logger.info("✅ 基本面分析完成:")
-    logger.info(f"  📊 最终信号: {message_content.get('signal')}")
-    logger.info(f"  📈 置信度: {message_content.get('confidence')}")
-    logger.info(f"  📈 盈利信号: {message_content.get('profitability_signal', {}).get('signal', 'N/A')}")
-    logger.info(f"  📈 成长信号: {message_content.get('growth_signal', {}).get('signal', 'N/A')}")
-    logger.info(f"  📊 财务健康: {message_content.get('financial_health_signal', {}).get('signal', 'N/A')}")
-    logger.info("────────────────────────────────────────────────────────")
     
     return {
         "messages": [message],

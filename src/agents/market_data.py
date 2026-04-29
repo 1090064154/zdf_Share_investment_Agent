@@ -8,6 +8,7 @@ from src.utils.error_handler import resilient_agent
 
 from datetime import datetime, timedelta
 import pandas as pd
+import json
 
 # 设置日志记录
 logger = setup_logger('market_data_agent')
@@ -57,56 +58,55 @@ def market_data_agent(state: AgentState):
     # Get all required data
     ticker = data["ticker"]
 
-    logger.info(f"  📈 股票代码: {ticker}")
-    logger.info(f"  📅 数据区间: {start_date} ~ {end_date}")
+    show_agent_reasoning({"股票": ticker, "数据区间": f"{start_date} ~ {end_date}"}, "市场数据Agent")
 
     # 获取价格数据并验证
-    logger.info("  [1/4] 获取价格历史...")
     prices_df = get_price_history(ticker, start_date, end_date)
     if prices_df is None or prices_df.empty:
-        logger.warning(f"  ⚠️ 无法获取{ticker}的价格数据，将使用空数据继续")
+        show_agent_reasoning({"错误": f"无法获取{ticker}的价格数据"}, "市场数据Agent")
         prices_df = pd.DataFrame(
             columns=['close', 'open', 'high', 'low', 'volume'])
     else:
-        logger.info(f"  ✅ 获取到 {len(prices_df)} 条价格记录")
+        latest_price = prices_df.iloc[-1]['close'] if len(prices_df) > 0 else 0
+        show_agent_reasoning({"价格记录": f"{len(prices_df)}条", "最新价": f"{latest_price:.2f}"}, "市场数据Agent")
 
     # 获取财务指标
-    logger.info("  [2/4] 获取财务指标...")
     try:
-        financial_metrics = get_financial_metrics(ticker)
-        logger.info(f"  ✅ 财务指标获取成功")
+        financial_metrics_result = get_financial_metrics(ticker)
+        if isinstance(financial_metrics_result, list) and len(financial_metrics_result) > 0:
+            financial_metrics = financial_metrics_result[0]
+            has_metrics = True
+        else:
+            financial_metrics = {}
+            has_metrics = False
+        market_cap_val = financial_metrics.get('market_cap', 0) if financial_metrics else 0
+        metrics_status = "已获取" if has_metrics else "未获取"
+        show_agent_reasoning({"财务指标": metrics_status, "市值": f"{market_cap_val/1e8:.1f}亿" if market_cap_val else "无数据"}, "市场数据Agent")
     except Exception as e:
-        logger.error(f"  ❌ 获取财务指标失败: {str(e)}")
         financial_metrics = {}
+        show_agent_reasoning({"财务指标": "获取异常", "错误": str(e)[:30]}, "市场数据Agent")
 
     # 获取财务报表
-    logger.info("  [3/4] 获取财务报表...")
     try:
         financial_line_items = get_financial_statements(ticker)
-        logger.info(f"  ✅ 财务报表获取成功")
+        has_statements = bool(financial_line_items and len(financial_line_items) > 0)
+        statements_status = "已获取" if has_statements else "未获取"
+        show_agent_reasoning({"财务报表": statements_status, "报告期数": len(financial_line_items) if has_statements else 0}, "市场数据Agent")
     except Exception as e:
-        logger.error(f"  ❌ 获取财务报表失败: {str(e)}")
         financial_line_items = {}
+        show_agent_reasoning({"财务报表": "获取异常"}, "市场数据Agent")
 
     # 获取市场数据
-    logger.info("  [4/4] 获取市场数据...")
     try:
         market_data = get_market_data(ticker)
-        logger.info(f"  ✅ 市场数据获取成功")
     except Exception as e:
-        logger.error(f"  ❌ 获取市场数据失败: {str(e)}")
         market_data = {"market_cap": 0}
 
     # 获取行业信息
-    logger.info("  [5/5] 获取行业信息...")
     try:
         industry = get_industry(ticker)
-        if industry:
-            logger.info(f"  ✅ 行业信息获取成功: {industry}")
-        else:
-            logger.warning(f"  ⚠️ 无法获取行业信息")
+        show_agent_reasoning({"行业": industry}, "市场数据Agent")
     except Exception as e:
-        logger.error(f"  ❌ 获取行业信息失败: {str(e)}")
         industry = ""
 
     # 确保数据格式正确
@@ -131,13 +131,12 @@ def market_data_agent(state: AgentState):
         "summary": f"为{ticker}收集了从{start_date}到{end_date}的市场数据，包括价格历史、财务指标和市场信息"
     }
 
-    logger.info("────────────────────────────────────────────────────────")
-    logger.info("✅ 市场数据收集完成:")
-    logger.info(f"  📈 价格记录: {len(prices_dict)} 条")
-    logger.info(f"  💰 财务指标: {'✅' if _has_meaningful_records(financial_metrics) else '❌'}")
-    logger.info(f"  📊 财务报表: {'✅' if _has_meaningful_records(financial_line_items) else '❌'}")
-    logger.info(f"  🏢 行业: {industry}")
-    logger.info("────────────────────────────────────────────────────────")
+    show_agent_reasoning({
+        "价格记录": f"{len(prices_dict)}条",
+        "财务指标": "✓" if _has_meaningful_records(financial_metrics) else "✗",
+        "财务报表": "✓" if _has_meaningful_records(financial_line_items) else "✗",
+        "行业": industry
+    }, "市场数据Agent")
 
     if show_reasoning:
         show_agent_reasoning(market_data_summary, "Market Data Agent")
@@ -145,8 +144,28 @@ def market_data_agent(state: AgentState):
 
     show_workflow_status("市场数据Agent", "completed")
 
+    # 构建结构化输出
+    latest_price = prices_df.iloc[-1]['close'] if len(prices_df) > 0 else 0
+    message_content = {
+        "ticker": ticker,
+        "start_date": start_date,
+        "end_date": end_date,
+        "prices_count": len(prices_dict),
+        "latest_price": round(float(latest_price), 2) if latest_price else None,
+        "industry": industry,
+        "market_cap": market_data.get("market_cap", 0),
+        "has_financial_metrics": _has_meaningful_records(financial_metrics),
+        "has_financial_statements": _has_meaningful_records(financial_line_items),
+        "summary": f"为{ticker}收集了{start_date}至{end_date}的数据：{len(prices_dict)}条价格记录、行业{industry}、市值{market_data.get('market_cap', 0)/1e8:.1f}亿"
+    }
+
+    message = HumanMessage(
+        content=json.dumps(message_content, ensure_ascii=False),
+        name="market_data_agent",
+    )
+
     return {
-        "messages": messages,
+        "messages": messages + [message],
         "data": {
             **data,
             "prices": prices_dict,

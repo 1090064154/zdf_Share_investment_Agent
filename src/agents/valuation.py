@@ -211,28 +211,20 @@ def _generate_relative_valuation_signal(percentile_data: dict, industry: str = N
 def valuation_agent(state: AgentState):
     """Responsible for valuation analysis"""
     show_workflow_status("估值Agent")
-    logger.info("="*50)
-    logger.info("💰 [VALUATION] 开始估值分析")
-    logger.info("="*50)
+
     show_reasoning = state["metadata"]["show_reasoning"]
     data = state["data"]
     metrics = _safe_first(data.get("financial_metrics", []))
     current_financial_line_item = _safe_first(data.get("financial_line_items", []))
     previous_financial_line_item = _safe_second(data.get("financial_line_items", []))
     market_cap = data.get("market_cap") or 0
-    logger.info(
-        "Valuation inputs prepared: market_cap=%s metrics_keys=%s current_line_item_keys=%s previous_line_item_keys=%s",
-        market_cap,
-        list(metrics.keys()) if isinstance(metrics, dict) else type(metrics).__name__,
-        list(current_financial_line_item.keys()) if isinstance(current_financial_line_item, dict) else type(current_financial_line_item).__name__,
-        list(previous_financial_line_item.keys()) if isinstance(previous_financial_line_item, dict) else type(previous_financial_line_item).__name__,
-    )
+
+    show_agent_reasoning({"市值": f"{market_cap/1e8:.1f}亿"}, "估值Agent")
 
     reasoning = {}
 
     if market_cap <= 0 or not current_financial_line_item:
         reason = "估值输入不足：市值缺失或财务报表不可用。"
-        logger.warning(reason)
         message_content = {
             "signal": "neutral",
             "confidence": "0%",
@@ -248,8 +240,8 @@ def valuation_agent(state: AgentState):
             name="valuation_agent",
         )
         if show_reasoning:
-            show_agent_reasoning(message_content, "估值分析Agent")
             state["metadata"]["agent_reasoning"] = message_content
+        show_agent_reasoning({"最终信号": "中性", "置信度": "0%", "原因": "估值输入不足"}, "估值Agent")
         show_workflow_status("估值Agent", "completed")
         return {
             "messages": [message],
@@ -262,7 +254,6 @@ def valuation_agent(state: AgentState):
 
     if not _has_meaningful_valuation_inputs(current_financial_line_item):
         reason = "估值输入不足：关键现金流和利润字段缺失或均为0，回退为中性。"
-        logger.warning(reason)
         message_content = {
             "signal": "neutral",
             "confidence": "0%",
@@ -278,8 +269,8 @@ def valuation_agent(state: AgentState):
             name="valuation_agent",
         )
         if show_reasoning:
-            show_agent_reasoning(message_content, "估值分析Agent")
             state["metadata"]["agent_reasoning"] = message_content
+        show_agent_reasoning({"最终信号": "中性", "置信度": "0%", "原因": "关键财务数据缺失"}, "估值Agent")
         show_workflow_status("估值Agent", "completed")
         return {
             "messages": [message],
@@ -351,6 +342,8 @@ def valuation_agent(state: AgentState):
             "signal": relative_signal['signal'],
             "details": f"分位点分析: {relative_signal.get('reasoning', '')}"
         }
+        logger.info(f"  📊 相对估值: {relative_signal['signal']} - {relative_signal.get('reasoning', '')}")
+        show_agent_reasoning({"reasoning": {"relative_analysis": {"signal": relative_signal['signal'], "details": relative_signal.get('reasoning', '')}}}, "估值分析师")
 
     # [OPTIMIZED] 2. 周期股清算价值
     if stock_type == 'cyclical' and current_financial_line_item:
@@ -369,6 +362,8 @@ def valuation_agent(state: AgentState):
                     "signal": liq_signal,
                     "details": f"清算价值: {liquidation_value/1e8:.1f}亿, 市值: {market_cap/1e8:.1f}亿"
                 }
+                logger.info(f"  💰 清算价值: {liq_signal} - 清算价值{liquidation_value/1e8:.1f}亿 vs 市值{market_cap/1e8:.1f}亿")
+                show_agent_reasoning({"reasoning": {"liquidation_analysis": {"signal": liq_signal, "details": f"清算价值{liquidation_value/1e8:.1f}亿 vs 市值{market_cap/1e8:.1f}亿"}}}, "估值分析师")
 
     # 3. DCF分析（权重降低）
     if dcf_value > 0:
@@ -386,10 +381,12 @@ def valuation_agent(state: AgentState):
             "signal": valid_valuations[-1]["signal"],
             "details": f"DCF内在价值: {dcf_value/1e8:.1f}亿, 市值: {market_cap/1e8:.1f}亿, 差距: {capped_dcf_gap:.1%}"
         }
+        logger.info(f"  📈 DCF估值: {valid_valuations[-1]['signal']} - DCF内在价值{dcf_value/1e8:.1f}亿 vs 市值{market_cap/1e8:.1f}亿")
+        show_agent_reasoning({"reasoning": {"dcf_analysis": {"signal": valid_valuations[-1]["signal"], "details": f"DCF内在价值{dcf_value/1e8:.1f}亿 vs 市值{market_cap/1e8:.1f}亿"}}}, "估值分析师")
     else:
         reasoning["dcf_analysis"] = {
             "signal": "neutral",
-            "details": f"DCF计算无效（自由现金流: ${fcff:,.2f}），已跳过"
+            "details": "现金流数据不足，跳过DCF"
         }
 
     # 4. 所有者收益分析（权重降低）
@@ -406,10 +403,12 @@ def valuation_agent(state: AgentState):
             "signal": valid_valuations[-1]["signal"],
             "details": f"所有者收益: {owner_earnings_value/1e8:.1f}亿"
         }
+        logger.info(f"  💎 所有者收益: {valid_valuations[-1]['signal']} - 所有者收益{owner_earnings_value/1e8:.1f}亿")
+        show_agent_reasoning({"reasoning": {"owner_earnings_analysis": {"signal": valid_valuations[-1]["signal"], "details": f"所有者收益{owner_earnings_value/1e8:.1f}亿"}}}, "估值分析师")
     else:
         reasoning["owner_earnings_analysis"] = {
             "signal": "neutral",
-            "details": "所有者收益计算无效，已跳过"
+            "details": "盈利数据不足，跳过所有者收益"
         }
 
     # [OPTIMIZED] 注意：PE/PB分位点分析已在上面relative_valuation中完成
@@ -458,8 +457,12 @@ def valuation_agent(state: AgentState):
             name="valuation_agent",
         )
         if show_reasoning:
-            show_agent_reasoning(message_content, "估值分析Agent")
             state["metadata"]["agent_reasoning"] = message_content
+        show_agent_reasoning({
+            "最终信号": "中性",
+            "置信度": "0%",
+            "原因": message_content.get("reasoning", {}).get("fallback", {}).get("details", "数据不足")
+        }, "估值Agent")
         show_workflow_status("估值Agent", "completed")
         return {
             "messages": [message],
@@ -474,33 +477,92 @@ def valuation_agent(state: AgentState):
     total_weight = sum(v["weight"] for v in valid_valuations)
     weighted_gap = sum(v["gap"] * v["weight"] for v in valid_valuations) / total_weight
 
+    # 获取当前股价
+    prices = data.get("prices", [])
+    current_price = 0
+    if isinstance(prices, list) and len(prices) > 0:
+        current_price = prices[-1].get("close", 0) if isinstance(prices[-1], dict) else 0
+
+    # 推断合理价格（基于加权差距）
+    if current_price > 0 and abs(weighted_gap) < 100:
+        fair_value = current_price * (1 + weighted_gap)
+    else:
+        fair_value = 0
+
+    # 计算折扣率（正=低估，负=高估）
+    if current_price > 0 and fair_value > 0:
+        discount = (fair_value - current_price) / current_price
+    else:
+        discount = 0
+
+    # 构建清晰的方法列表
+    methods = []
+    for v in valid_valuations:
+        method_name_map = {
+            "dcf": "DCF估值",
+            "owner_earnings": "所有者收益",
+            "relative_valuation": "相对估值(PE/PB)",
+            "liquidation_value": "清算价值",
+            "revenue_analysis": "营收分析",
+        }
+        name = method_name_map.get(v["method"], v["method"])
+        signal_cn = {"bullish": "看多", "bearish": "看空", "neutral": "中性"}.get(v["signal"], v["signal"])
+        methods.append({
+            "name": name,
+            "signal": v["signal"],
+            "signal_cn": signal_cn,
+            "weight": v["weight"],
+        })
+
     # 统计各信号的数量
     bullish_count = sum(1 for v in valid_valuations if v["signal"] == "bullish")
     bearish_count = sum(1 for v in valid_valuations if v["signal"] == "bearish")
     neutral_count = sum(1 for v in valid_valuations if v["signal"] == "neutral")
 
     # 确定最终信号
-    # 如果多数方法看空，则看空；如果多数看多，则看多；否则中性
     if bearish_count > bullish_count and bearish_count >= len(valid_valuations) / 2:
         signal = "bearish"
-        # 置信度基于加权差距的绝对值
-        confidence = min(abs(weighted_gap) * 100, 90)
+        confidence = min(abs(weighted_gap) * 100, 90) / 100
     elif bullish_count > bearish_count and bullish_count >= len(valid_valuations) / 2:
         signal = "bullish"
-        confidence = min(abs(weighted_gap) * 100, 90)
+        confidence = min(abs(weighted_gap) * 100, 90) / 100
     else:
         signal = "neutral"
-        # 中性信号的置信度基于估值方法的一致性
-        confidence = 50 - abs(bullish_count - bearish_count) * 10
+        confidence = max(10, 50 - abs(bullish_count - bearish_count) * 10) / 100
 
-    # 确保置信度在合理范围内
-    confidence = max(10, min(95, confidence))
-    confidence_str = f"{confidence:.0f}%"
+    confidence = max(0.1, min(0.95, confidence))
+
+    # 生成人类可读的摘要
+    signal_cn = {"bullish": "看多", "bearish": "看空", "neutral": "中性"}.get(signal, signal)
+    price_info = ""
+    if current_price > 0 and fair_value > 0:
+        discount_pct = discount * 100
+        if discount > 0.05:
+            price_info = f"当前价{current_price:.2f}元低于合理价{fair_value:.2f}元，折扣率{discount_pct:.1f}%"
+        elif discount < -0.05:
+            price_info = f"当前价{current_price:.2f}元高于合理价{fair_value:.2f}元，溢价率{abs(discount_pct):.1f}%"
+        else:
+            price_info = f"当前价{current_price:.2f}元接近合理价{fair_value:.2f}元"
+    elif current_price > 0:
+        price_info = f"当前价{current_price:.2f}元（无法确定合理价）"
+    else:
+        price_info = "无价格数据"
+
+    method_names = [m["name"] for m in methods]
+    summary = f"估值{signal_cn}（置信度{confidence*100:.0f}%），{price_info}。采用方法：{'、'.join(method_names)}"
 
     message_content = {
         "signal": signal,
-        "confidence": confidence_str,
-        "reasoning": reasoning
+        "confidence": round(confidence, 4),
+        "current_price": round(current_price, 2) if current_price else None,
+        "fair_value": round(fair_value, 2) if fair_value else None,
+        "discount": round(discount, 4) if current_price else None,
+        "methods": methods,
+        "summary": summary,
+        "reasoning": reasoning,
+        "pe_ratio": pe_ratio if pe_ratio else None,
+        "pb_ratio": pb_ratio if pb_ratio else None,
+        "stock_type": stock_type,
     }
 
     message = HumanMessage(
@@ -509,23 +571,48 @@ def valuation_agent(state: AgentState):
     )
 
     if show_reasoning:
-        show_agent_reasoning(message_content, "估值分析师")
-        # 保存推理信息到metadata供API使用
         state["metadata"]["agent_reasoning"] = message_content
 
-    show_workflow_status("估值Agent", "completed")
+    signal_cn = {'bullish': '看涨', 'bearish': '看跌', 'neutral': '中性'}.get(message_content.get('signal', 'neutral'), message_content.get('signal', 'neutral'))
 
-    # 打印最终分析结果
-    logger.info("────────────────────────────────────────────────────────")
-    logger.info("✅ 估值分析完成:")
-    logger.info(f"  📊 最终信号: {message_content.get('signal')}")
-    logger.info(f"  📈 置信度: {message_content.get('confidence')}")
-    logger.info(f"  💰 估值方法: {message_content.get('valuation_method', 'N/A')}")
-    if 'pe_ratio' in message_content:
-        logger.info(f"  📊 P/E: {message_content.get('pe_ratio'):.2f}")
-    if 'pb_ratio' in message_content:
-        logger.info(f"  🏢 P/B: {message_content.get('pb_ratio'):.2f}")
-    logger.info("────────────────────────────────────────────────────────")
+    method_descriptions = {
+        'DCF': '现金流折现法',
+        '所有者收益': '巴菲特估值法（净利润+折旧摊销-资本支出）',
+        '相对估值': 'PE/PB分位点对比',
+        '清算价值': '资产变现能力',
+        'PE估值': '市盈率法',
+        'PB估值': '市净率法'
+    }
+
+    # 构建友好的推理输出
+    show_reasoning = {}
+    show_reasoning["最终信号"] = signal_cn
+    show_reasoning["置信度"] = f"{message_content.get('confidence', 0)*100:.0f}%"
+    if message_content.get("current_price"):
+        show_reasoning["当前股价"] = f"{message_content['current_price']:.2f}元"
+    if message_content.get("fair_value"):
+        show_reasoning["合理价"] = f"{message_content['fair_value']:.2f}元"
+    if message_content.get("discount") is not None:
+        pct = message_content["discount"] * 100
+        show_reasoning["估值对比"] = f"{'低估' if pct > 0 else '高估' if pct < 0 else '公允'}({pct:+.1f}%)"
+
+    for m in message_content.get("methods", []):
+        method_desc = method_descriptions.get(m["name"], m["name"])
+        show_reasoning[m["name"]] = f"{m['signal_cn']}（权重{m['weight']*100:.0f}%）"
+
+    if 'DCF' in message_content.get('reasoning', {}):
+        dcf_data = message_content['reasoning'].get('DCF', {})
+        if dcf_data.get('details'):
+            show_reasoning["DCF说明"] = dcf_data['details'][:50] + "..."
+
+    if '所有者收益' in message_content.get('reasoning', {}):
+        oe_data = message_content['reasoning'].get('所有者收益', {})
+        if oe_data.get('details'):
+            show_reasoning["所有者收益"] = oe_data['details'][:50] + "..."
+
+    show_agent_reasoning(show_reasoning, "估值Agent")
+
+    show_workflow_status("估值Agent", "completed")
 
     return {
         "messages": [message],

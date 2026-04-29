@@ -11,6 +11,47 @@ const App = {
         this.initAgentGrid();
         this.bindEvents();
         this.loadHistory();
+        this.initDateLimits();
+    },
+
+    initDateLimits() {
+        const endDateInput = document.getElementById('endDate');
+        const startDateInput = document.getElementById('startDate');
+
+        if (endDateInput) {
+            const today = new Date();
+            endDateInput.max = today.toISOString().split('T')[0];
+            endDateInput.value = today.toISOString().split('T')[0];
+        }
+        if (startDateInput) {
+            const twoYearsAgo = new Date();
+            twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
+            startDateInput.min = twoYearsAgo.toISOString().split('T')[0];
+            const oneMonthAgo = new Date();
+            oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+            startDateInput.value = oneMonthAgo.toISOString().split('T')[0];
+        }
+    },
+
+    handleDateRangeChange() {
+        const dateRangeSelect = document.getElementById('dateRange');
+        const startDateInput = document.getElementById('startDate');
+        const endDateInput = document.getElementById('endDate');
+
+        if (!dateRangeSelect || !startDateInput || !endDateInput) return;
+
+        const days = parseInt(dateRangeSelect.value);
+
+        if (!days) {
+            return;
+        }
+
+        const today = new Date();
+        const startDate = new Date();
+        startDate.setDate(today.getDate() - days);
+
+        endDateInput.value = today.toISOString().split('T')[0];
+        startDateInput.value = startDate.toISOString().split('T')[0];
     },
 
     initAgentGrid() {
@@ -219,7 +260,11 @@ const App = {
 
         if (result) {
             const actionText = Components.getActionText(result.action);
-            document.getElementById('resultPanel').style.display = 'block';
+            const resultPanel = document.getElementById('resultPanel');
+            resultPanel.style.display = 'block';
+            resultPanel.classList.remove('animate');
+            void resultPanel.offsetWidth;
+            resultPanel.classList.add('animate');
             document.getElementById('resultSummary').innerHTML = Components.createResultPanel(result);
             this.showToast(`分析完成: ${actionText}`, 'success');
         }
@@ -467,45 +512,24 @@ const App = {
 
         try {
             const flow = await Api.getRunFlow(runId);
-            const agents = await Api.getRunAgents(runId);
             
-            // 构建 Agent 状态用于显示
+            // 从result_data获取各模块信号
+            const resultData = flow.result_data || {};
+            const agentSignals = resultData.agent_signals || [];
+            
+            // 构建 Agent 状态
             const agentStates = {};
-            const agentLogs = {};
-            
-            for (const agent of agents) {
-                agentStates[agent.agent_name] = {
+            for (const sig of agentSignals) {
+                agentStates[sig.agent_name] = {
                     status: 'completed',
-                    signal: null,
-                    confidence: 0,
-                    message: `${agent.agent_name} 执行完成`
+                    signal: sig.signal,
+                    confidence: sig.confidence || 0,
+                    message: `${sig.agent_name} 执行完成`
                 };
-                agentLogs[agent.agent_name] = [];
             }
             
-            // 获取每个 Agent 的详情
-            for (const agent of agents) {
-                try {
-                    const agentDetail = await Api.getAgentDetail(runId, agent.agent_name);
-                    if (agentDetail.output_state) {
-                        const output = agentDetail.output_state;
-                        const messages = output.messages || [];
-                        if (messages.length > 0) {
-                            const lastMsg = messages[messages.length - 1];
-                            if (lastMsg && lastMsg.content) {
-                                try {
-                                    const content = JSON.parse(lastMsg.content);
-                                    agentStates[agent.agent_name].signal = content.signal;
-                                    agentStates[agent.agent_name].confidence = content.confidence || 0;
-                                } catch (e) {}
-                            }
-                        }
-                    }
-                } catch (e) {}
-            }
-            
-            // 渲染历史详情
-            detail.innerHTML = Components.createHistoryReplay(runId, flow, agentStates, agents);
+            // 渲染历史详情（包含完整决策结果）
+            detail.innerHTML = Components.createHistoryReplay(runId, flow, agentStates, agentSignals, resultData);
             modal.classList.add('active');
         } catch (error) {
             detail.innerHTML = '<div class="log-empty">加载详情失败: ' + error.message + '</div>';
@@ -536,6 +560,20 @@ const App = {
 
     closeHistoryModal() {
         const modal = document.getElementById('historyModal');
+        if (modal) {
+            modal.classList.remove('active');
+        }
+    },
+
+    showDisclaimer() {
+        const modal = document.getElementById('disclaimerModal');
+        if (modal) {
+            modal.classList.add('active');
+        }
+    },
+
+    closeDisclaimer() {
+        const modal = document.getElementById('disclaimerModal');
         if (modal) {
             modal.classList.remove('active');
         }

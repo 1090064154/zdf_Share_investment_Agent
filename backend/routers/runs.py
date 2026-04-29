@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Path
 from typing import List, Dict, Optional
 from datetime import datetime
+from pathlib import Path as FilePath
+import json
 
 from backend.schemas import RunSummary, AgentSummary, AgentDetail, WorkflowFlow
 from backend.storage.base import BaseLogStorage
@@ -11,6 +13,19 @@ router = APIRouter(
     prefix="/runs",
     tags=["Workflow Runs"]
 )
+
+
+def load_run_from_filesystem(run_id: str) -> Optional[dict]:
+    """从文件系统加载运行数据"""
+    base_dir = FilePath(__file__).parent.parent.parent
+    result_file = base_dir / "src" / "data" / "runs" / run_id / "result.json"
+    if result_file.exists():
+        try:
+            with open(result_file, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return None
 
 
 @router.get("/", response_model=List[RunSummary])
@@ -128,28 +143,41 @@ async def get_run_agents(
     try:
         # 获取该运行的所有Agent日志
         agent_logs = storage.get_agent_logs(run_id=run_id)
-        if not agent_logs:
-            raise HTTPException(
-                status_code=404,
-                detail=f"未找到ID为 {run_id} 的运行"
-            )
+        if agent_logs:
+            # 转换为AgentSummary对象
+            results = []
+            for log in agent_logs:
+                summary = AgentSummary(
+                    agent_name=log.agent_name,
+                    start_time=log.timestamp_start,
+                    end_time=log.timestamp_end,
+                    execution_time_seconds=(
+                        log.timestamp_end - log.timestamp_start).total_seconds(),
+                    status="completed"
+                )
+                results.append(summary)
+            results.sort(key=lambda x: x.start_time)
+            return results
 
-        # 转换为AgentSummary对象
-        results = []
-        for log in agent_logs:
-            summary = AgentSummary(
-                agent_name=log.agent_name,
-                start_time=log.timestamp_start,
-                end_time=log.timestamp_end,
-                execution_time_seconds=(
-                    log.timestamp_end - log.timestamp_start).total_seconds(),
-                status="completed"  # 默认状态，可以根据需要确定
-            )
-            results.append(summary)
+        # 回退：从文件系统读取
+        fs_data = load_run_from_filesystem(run_id)
+        if fs_data and "agent_signals" in fs_data:
+            results = []
+            for i, agent in enumerate(fs_data["agent_signals"]):
+                summary = AgentSummary(
+                    agent_name=agent.get("agent_name", f"Agent_{i}"),
+                    start_time=datetime.now(),
+                    end_time=datetime.now(),
+                    execution_time_seconds=0,
+                    status="completed"
+                )
+                results.append(summary)
+            return results
 
-        # 按开始时间排序
-        results.sort(key=lambda x: x.start_time)
-        return results
+        raise HTTPException(
+            status_code=404,
+            detail=f"未找到ID为 {run_id} 的运行"
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -235,69 +263,120 @@ async def get_workflow_flow(
     try:
         # 获取该运行的所有Agent日志
         agent_logs = storage.get_agent_logs(run_id=run_id)
-        if not agent_logs:
-            raise HTTPException(
-                status_code=404,
-                detail=f"未找到ID为 {run_id} 的运行"
+
+        if agent_logs:
+            # 计算开始和结束时间
+            start_time = min(log.timestamp_start for log in agent_logs)
+            end_time = max(log.timestamp_end for log in agent_logs)
+
+            # 构建Agent摘要
+            agents = {}
+            for log in agent_logs:
+                agents[log.agent_name] = AgentSummary(
+                    agent_name=log.agent_name,
+                    start_time=log.timestamp_start,
+                    end_time=log.timestamp_end,
+                    execution_time_seconds=(
+                        log.timestamp_end - log.timestamp_start).total_seconds(),
+                    status="completed"
+                )
+
+            # 构建状态转换列表
+            agent_logs_sorted = sorted(agent_logs, key=lambda x: x.timestamp_start)
+            state_transitions = []
+
+            for i, log in enumerate(agent_logs_sorted):
+                transition = {
+                    "from_agent": "start" if i == 0 else agent_logs_sorted[i-1].agent_name,
+                    "to_agent": log.agent_name,
+                    "state_size": len(str(log.input_state)) if log.input_state else 0,
+                    "timestamp": log.timestamp_start.isoformat()
+                }
+                state_transitions.append(transition)
+
+            # 添加最后一个转换到结束
+            if agent_logs_sorted:
+                state_transitions.append({
+                    "from_agent": agent_logs_sorted[-1].agent_name,
+                    "to_agent": "end",
+                    "state_size": len(str(agent_logs_sorted[-1].output_state)) if agent_logs_sorted[-1].output_state else 0,
+                    "timestamp": agent_logs_sorted[-1].timestamp_end.isoformat()
+                })
+
+            # 尝试提取最终决策
+            final_decision = None
+            if agent_logs_sorted:
+                last_log = agent_logs_sorted[-1]
+                if last_log.output_state and isinstance(last_log.output_state, dict):
+                    messages = last_log.output_state.get("messages", [])
+                    if messages and len(messages) > 0:
+                        last_message = messages[-1]
+                        if isinstance(last_message, dict) and "content" in last_message:
+                            final_decision = last_message["content"]
+
+            fs_result = load_run_from_filesystem(run_id)
+            return WorkflowFlow(
+                run_id=run_id,
+                start_time=start_time,
+                end_time=end_time,
+                agents=agents,
+                state_transitions=state_transitions,
+                final_decision=final_decision,
+                result_data=fs_result
             )
 
-        # 计算开始和结束时间
-        start_time = min(log.timestamp_start for log in agent_logs)
-        end_time = max(log.timestamp_end for log in agent_logs)
+        # 回退：从文件系统读取
+        fs_data = load_run_from_filesystem(run_id)
+        if fs_data:
+            now = datetime.now()
+            agents = {}
+            if "agent_signals" in fs_data:
+                for i, agent in enumerate(fs_data["agent_signals"]):
+                    agents[agent.get("agent_name", f"Agent_{i}")] = AgentSummary(
+                        agent_name=agent.get("agent_name", f"Agent_{i}"),
+                        start_time=now,
+                        end_time=now,
+                        execution_time_seconds=0,
+                        status="completed"
+                    )
 
-        # 构建Agent摘要
-        agents = {}
-        for log in agent_logs:
-            agents[log.agent_name] = AgentSummary(
-                agent_name=log.agent_name,
-                start_time=log.timestamp_start,
-                end_time=log.timestamp_end,
-                execution_time_seconds=(
-                    log.timestamp_end - log.timestamp_start).total_seconds(),
-                status="completed"
+            # 构建简单的状态转换
+            agent_names = list(agents.keys())
+            state_transitions = []
+            for i, name in enumerate(agent_names):
+                state_transitions.append({
+                    "from_agent": "start" if i == 0 else agent_names[i-1],
+                    "to_agent": name,
+                    "state_size": 0,
+                    "timestamp": now.isoformat()
+                })
+            if agent_names:
+                state_transitions.append({
+                    "from_agent": agent_names[-1],
+                    "to_agent": "end",
+                    "state_size": 0,
+                    "timestamp": now.isoformat()
+                })
+
+            final_decision = json.dumps({
+                "action": fs_data.get("action"),
+                "confidence": fs_data.get("confidence"),
+                "reasoning": fs_data.get("reasoning")
+            }) if fs_data.get("action") else None
+
+            return WorkflowFlow(
+                run_id=run_id,
+                start_time=now,
+                end_time=now,
+                agents=agents,
+                state_transitions=state_transitions,
+                final_decision=final_decision,
+                result_data=fs_data
             )
 
-        # 构建状态转换列表
-        agent_logs_sorted = sorted(agent_logs, key=lambda x: x.timestamp_start)
-        state_transitions = []
-
-        for i, log in enumerate(agent_logs_sorted):
-            transition = {
-                "from_agent": "start" if i == 0 else agent_logs_sorted[i-1].agent_name,
-                "to_agent": log.agent_name,
-                "state_size": len(str(log.input_state)) if log.input_state else 0,
-                "timestamp": log.timestamp_start.isoformat()
-            }
-            state_transitions.append(transition)
-
-        # 添加最后一个转换到结束
-        if agent_logs_sorted:
-            state_transitions.append({
-                "from_agent": agent_logs_sorted[-1].agent_name,
-                "to_agent": "end",
-                "state_size": len(str(agent_logs_sorted[-1].output_state)) if agent_logs_sorted[-1].output_state else 0,
-                "timestamp": agent_logs_sorted[-1].timestamp_end.isoformat()
-            })
-
-        # 尝试提取最终决策
-        final_decision = None
-        if agent_logs_sorted:
-            last_log = agent_logs_sorted[-1]
-            if last_log.output_state and isinstance(last_log.output_state, dict):
-                # 尝试从最后一个Agent的输出中提取最终结果
-                messages = last_log.output_state.get("messages", [])
-                if messages and len(messages) > 0:
-                    last_message = messages[-1]
-                    if isinstance(last_message, dict) and "content" in last_message:
-                        final_decision = last_message["content"]
-
-        return WorkflowFlow(
-            run_id=run_id,
-            start_time=start_time,
-            end_time=end_time,
-            agents=agents,
-            state_transitions=state_transitions,
-            final_decision=final_decision
+        raise HTTPException(
+            status_code=404,
+            detail=f"未找到ID为 {run_id} 的运行"
         )
     except HTTPException:
         raise

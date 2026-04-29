@@ -20,12 +20,11 @@
                 </div>
             </div>
             <div class="header-right">
-                <button class="btn-icon" onclick="App.showHistory()" title="执行历史">
+                <button class="btn-icon" onclick="App.showDisclaimer()" title="免责声明">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <polyline points="12,6 12,12 16,14"></polyline>
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
                     </svg>
-                    <span>历史</span>
+                    <span>免责声明</span>
                 </button>
             </div>
         </header>
@@ -102,31 +101,56 @@
                     </div>
 
                     <div class="form-row">
-<div class="form-group">
-                        <label for="startDate">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                                <line x1="16" y1="2" x2="16" y2="6"></line>
-                                <line x1="8" y1="2" x2="8" y2="6"></line>
-                            </svg>
-                            开始日期
-                            <span class="help-tip" data-tooltip="分析历史数据的开始日期">?</span>
-                        </label>
-                        <input type="date" id="startDate">
-                    </div>
+<div class="date-group">
+                        <div class="date-row">
+                            <div class="form-group">
+                                <label for="startDate">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                                    </svg>
+                                    开始日期
+                                    <span class="help-tip" data-tooltip="分析历史数据的开始日期">?</span>
+                                </label>
+                                <input type="date" id="startDate" class="date-input" placeholder="YYYY-MM-DD">
+                            </div>
 
-                    <div class="form-group">
-                        <label for="endDate">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                                <line x1="16" y1="2" x2="16" y2="6"></line>
-                                <line x1="8" y1="2" x2="8" y2="6"></line>
-                            </svg>
-                            结束日期
-                            <span class="help-tip" data-tooltip="分析历史数据的结束日期">?</span>
-                        </label>
-                        <input type="date" id="endDate">
-                    </div>
+                            <div class="form-group">
+                                <label for="dateRange">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <polyline points="12,6 12,12 16,14"></polyline>
+                                    </svg>
+                                    快速选择
+                                </label>
+                                <select id="dateRange" class="date-range-select" onchange="App.handleDateRangeChange()">
+                                    <option value="">自定义</option>
+                                    <option value="1">近一天</option>
+                                    <option value="3">近三天</option>
+                                    <option value="7">近一周</option>
+                                    <option value="30">近一月</option>
+                                    <option value="90">近三月</option>
+                                    <option value="180">近半年</option>
+                                    <option value="365">近一年</option>
+                                    <option value="1095">近三年</option>
+                                    <option value="1825">近五年</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="endDate">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                                </svg>
+                                结束日期
+                                <span class="help-tip" data-tooltip="分析历史数据的结束日期">?</span>
+                            </label>
+                            <input type="date" id="endDate" class="date-input" placeholder="YYYY-MM-DD">
+                        </div>
                     </div>
 
                     <div class="action-buttons">
@@ -174,6 +198,13 @@
                         <div class="agent-grid" id="agentGrid"></div>
                     </div>
 
+                    <div class="result-card" id="resultPanel" style="display: none;">
+                        <div class="card-header">
+                            <h2>决策结果</h2>
+                        </div>
+                        <div id="resultSummary"></div>
+                    </div>
+
                     <div class="logs-card">
                         <div class="card-header">
                             <h2>实时日志</h2>
@@ -196,12 +227,6 @@
                         <div id="agentDetailContent" class="agent-detail-empty">点击左侧 Agent 卡片查看详情</div>
                     </div>
 
-                    <div class="result-card" id="resultPanel" style="display: none;">
-                        <div class="card-header">
-                            <h2>决策结果</h2>
-                        </div>
-                        <div id="resultSummary"></div>
-                    </div>
                 </div>
             </main>
         </div>
@@ -220,6 +245,34 @@
                 </button>
             </div>
             <div class="modal-body" id="historyDetail"></div>
+        </div>
+    </div>
+
+    <div class="modal" id="disclaimerModal">
+        <div class="modal-backdrop" onclick="App.closeDisclaimer()"></div>
+        <div class="modal-container" style="max-width: 560px;">
+            <div class="modal-header">
+                <h3>免责声明</h3>
+                <button class="modal-close" onclick="App.closeDisclaimer()">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body" style="line-height: 1.8; font-size: 14px;">
+                <p style="color: var(--accent-warning); margin-bottom: 16px; font-weight: 600;">⚠️ 重要提示</p>
+                <p style="margin-bottom: 12px;">本系统是基于人工智能技术的辅助投资分析工具，仅供参考和学习使用，不构成任何投资建议。</p>
+                <p style="margin-bottom: 12px;"><strong>投资风险提示：</strong></p>
+                <ul style="margin-left: 20px; margin-bottom: 12px; color: var(--text-secondary);">
+                    <li style="margin-bottom: 8px;">股市有风险，投资需谨慎</li>
+                    <li style="margin-bottom: 8px;">过往业绩不代表未来表现</li>
+                    <li style="margin-bottom: 8px;">AI分析结果可能存在偏差，请独立判断</li>
+                    <li style="margin-bottom: 8px;">请勿将本系统分析结果作为唯一投资依据</li>
+                </ul>
+                <p style="margin-bottom: 12px;">本系统作者不对任何投资损失承担责任。使用本系统即表示您已阅读并同意上述条款。</p>
+                <p style="color: var(--text-muted); font-size: 12px; margin-top: 20px; text-align: center;">A股分析系统 · AI辅助决策工具</p>
+            </div>
         </div>
     </div>
 

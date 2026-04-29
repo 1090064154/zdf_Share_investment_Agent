@@ -513,6 +513,7 @@ def sentiment_agent(state: AgentState):
         logger.info("[新闻情绪] 开始分析...")
         news_sentiment_score = get_news_sentiment(recent_news, num_of_news=num_of_news)
         logger.info(f"[新闻情绪] 分析完成: score={news_sentiment_score:.3f}")
+        show_agent_reasoning({"components": {"news": {"score": news_sentiment_score, "news_count": len(recent_news), "contribution": news_sentiment_score * 0.35}}}, "情绪分析师")
     except Exception as exc:
         logger.exception("[新闻情绪] 分析失败: %s", exc)
         news_sentiment_score = 0.0
@@ -525,6 +526,7 @@ def sentiment_agent(state: AgentState):
     try:
         guba_result = get_guba_sentiment(symbol, max_posts=30)
         logger.info(f"[股吧情绪] 获取完成: score={guba_result.get('score', 0):.3f}, posts={guba_result.get('post_count', 0)}")
+        show_agent_reasoning({"components": {"guba": {"score": guba_result.get('score', 0), "adjusted_score": guba_result.get('adjusted_score', guba_result.get('score', 0)), "post_count": guba_result.get('post_count', 0), "contribution": guba_result.get('adjusted_score', 0) * 0.15}}}, "情绪分析师")
     except Exception as exc:
         logger.exception("[股吧情绪] 获取失败: %s", exc)
         guba_result = {'score': 0.0, 'post_count': 0, 'reverse_signal': 0.0}
@@ -537,6 +539,7 @@ def sentiment_agent(state: AgentState):
     try:
         quant_result = get_quant_sentiment(symbol)
         logger.info(f"[量化情绪] 获取完成: score={quant_result.get('score', 0):.3f}")
+        show_agent_reasoning({"components": {"quant": {"score": quant_result.get('score', 0), "contribution": quant_result.get('score', 0) * 0.35}}}, "情绪分析师")
     except Exception as exc:
         logger.exception("[量化情绪] 获取失败: %s", exc)
         quant_result = {'score': 0.0}
@@ -549,6 +552,7 @@ def sentiment_agent(state: AgentState):
     try:
         north_result = _get_north_money_data(symbol)
         logger.info(f"[北向资金] 获取完成: {north_result.get('reason', 'N/A')}")
+        show_agent_reasoning({"components": {"north_money": {"score": north_result.get('net_flow', 0), "signal": north_result.get('signal', 'neutral'), "contribution": 0.15 if north_result.get('signal') == 'bullish' else -0.15 if north_result.get('signal') == 'bearish' else 0}}}, "情绪分析师")
     except Exception as exc:
         logger.exception("[北向资金] 获取失败: %s", exc)
         north_result = {'signal': 'neutral', 'confidence': 0, 'net_flow': 0, 'reason': '数据获取失败'}
@@ -581,9 +585,55 @@ def sentiment_agent(state: AgentState):
 
     # 如果需要显示推理过程
     if show_reasoning:
-        show_agent_reasoning(message_content, "情绪分析Agent")
-        # 保存推理信息到metadata供API使用
         state["metadata"]["agent_reasoning"] = message_content
+
+    signal_cn = {'bullish': '看涨', 'bearish': '看跌', 'neutral': '中性'}.get(combined_result['signal'], combined_result['signal'])
+    weights = combined_result.get('weights', {})
+
+    logic_parts = []
+    if news_sentiment_score > 0.1:
+        logic_parts.append(f"新闻情绪偏多({news_sentiment_score:.2f})")
+    elif news_sentiment_score < -0.1:
+        logic_parts.append(f"新闻情绪偏空({news_sentiment_score:.2f})")
+    else:
+        logic_parts.append(f"新闻情绪中性({news_sentiment_score:.2f})")
+
+    guba_score = guba_result.get('adjusted_score', guba_result.get('score', 0))
+    if guba_score > 0.1:
+        logic_parts.append(f"股吧看多({guba_score:.2f})")
+    elif guba_score < -0.1:
+        logic_parts.append(f"股吧看空({guba_score:.2f})")
+    else:
+        logic_parts.append(f"股吧中性({guba_score:.2f})")
+
+    quant_score = quant_result.get('score', 0)
+    if quant_score > 0.1:
+        logic_parts.append(f"量化信号偏多({quant_score:.2f})")
+    elif quant_score < -0.1:
+        logic_parts.append(f"量化信号偏空({quant_score:.2f})")
+    else:
+        logic_parts.append(f"量化信号中性({quant_score:.2f})")
+
+    north_signal = north_result.get('signal', 'neutral')
+    if north_signal == 'bullish':
+        logic_parts.append(f"北向资金净流入")
+    elif north_signal == 'bearish':
+        logic_parts.append(f"北向资金净流出")
+    else:
+        logic_parts.append(f"北向资金持平")
+
+    decision_logic = "；".join(logic_parts)
+
+    show_agent_reasoning({
+        "最终信号": signal_cn,
+        "置信度": combined_result['confidence'],
+        "综合分数": f"{combined_result['combined_score']:.3f}",
+        "新闻": f"{news_sentiment_score:.2f}分",
+        "股吧": f"{guba_score:.2f}分",
+        "量化": f"{quant_score:.2f}分",
+        "北向": {'bullish': '流入', 'bearish': '流出', 'neutral': '持平'}.get(north_signal, '未知'),
+        "判断逻辑": decision_logic
+    }, "情绪分析师")
 
     # 创建消息
     message = HumanMessage(
@@ -592,11 +642,6 @@ def sentiment_agent(state: AgentState):
     )
 
     show_workflow_status("情绪分析师", "completed")
-
-    logger.info("=" * 50)
-    logger.info(f"[情绪分析Agent] 执行完成")
-    logger.info(f"[情绪分析Agent] 最终结果: signal={combined_result['signal']}, confidence={combined_result['confidence']}, score={combined_result['combined_score']:.3f}")
-    logger.info("=" * 50)
 
     return {
         "messages": [message],

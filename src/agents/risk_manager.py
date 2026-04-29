@@ -3,7 +3,7 @@ import akshare as ak
 
 from langchain_core.messages import HumanMessage
 
-from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status
+from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status, show_workflow_complete
 from src.tools.api import prices_to_df
 from src.utils.api_utils import agent_endpoint, log_llm_interaction
 
@@ -338,9 +338,21 @@ def risk_management_agent(state: AgentState):
             name="risk_management_agent",
         )
         if show_reasoning:
-            show_agent_reasoning(message_content, "Risk Management Agent")
             state["metadata"]["agent_reasoning"] = message_content
-        show_workflow_status("风险管理师", "completed")
+
+        show_agent_reasoning({
+            "最终信号": "中性",
+            "置信度": "0%",
+            "原因": "辩论结果不可用"
+        }, "风险管理师")
+
+        show_workflow_complete(
+            "风险管理师",
+            signal="neutral",
+            confidence=0.0,
+            details=message_content,
+            message="风险管理完成，辩论结果不可用，信号中性"
+        )
         return {
             "messages": state["messages"] + [message],
             "data": {
@@ -423,6 +435,19 @@ def risk_management_agent(state: AgentState):
     logger.info(f"大盘风险: {risk_result['components']['market_risk']}, "
                 f"个股风险: {risk_result['components']['stock_risk']}, "
                 f"相对风险: {risk_result['components']['relative_risk']}")
+
+    # 发送关键风险指标到前端
+    show_agent_reasoning({
+        "风险评分": risk_score,
+        "动态阈值": dynamic_threshold,
+        "大盘风险": risk_result['components']['market_risk'],
+        "个股风险": risk_result['components']['stock_risk'],
+        "相对风险": risk_result['components']['relative_risk'],
+        "波动率": float(volatility),
+        "VaR": float(var_95),
+        "最大回撤": float(max_drawdown),
+        "交易行动": trading_action
+    }, "风险管理师")
 
     # ==================== 5. 计算最大持仓规模 ====================
     current_stock_value = portfolio['stock'] * prices_df['close'].iloc[-1]
@@ -525,24 +550,63 @@ def risk_management_agent(state: AgentState):
     )
 
     if show_reasoning:
-        show_agent_reasoning(message_content, "Risk Management Agent")
         state["metadata"]["agent_reasoning"] = message_content
 
-    show_workflow_status("风险管理师", "completed")
+    action_cn = {'buy': '买入', 'sell': '卖出', 'hold': '持有'}.get(trading_action, trading_action)
 
-    # 打印最终分析结果
-    logger.info("────────────────────────────────────────────────────────")
-    logger.info("✅ 风险管理分析完成:")
-    logger.info(f"  ⚠️  风险评分: {risk_score}/10")
-    logger.info(f"  📊 大盘风险: {risk_result['components']['market_risk']}/10")
-    logger.info(f"  📊 个股风险: {risk_result['components']['stock_risk']}/10")
-    logger.info(f"  📉 波动率: {volatility:.2%}")
-    logger.info(f"  💰 VaR(95%): {var_95:.2%}")
-    logger.info(f"  💰 CVaR(95%): {cvar_95:.2%}")
-    logger.info(f"  📉 最大回撤: {max_drawdown:.2%}")
-    logger.info(f"  🎯 交易行动: {trading_action}")
-    logger.info(f"  📈 辩论室信号: {debate_signal} ({debate_confidence:.2%})")
-    logger.info("────────────────────────────────────────────────────────")
+    market_risk = risk_result['components'].get('market_risk', 0)
+    stock_risk = risk_result['components'].get('stock_risk', 0)
+    relative_risk = risk_result['components'].get('relative_risk', 0)
+
+    logic_parts = []
+    if market_risk >= 7:
+        logic_parts.append(f"大盘风险偏高({market_risk}分)")
+    elif market_risk <= 3:
+        logic_parts.append(f"大盘风险较低({market_risk}分)")
+    else:
+        logic_parts.append(f"大盘风险适中({market_risk}分)")
+
+    if stock_risk >= 7:
+        logic_parts.append(f"个股风险高({stock_risk}分)")
+    elif stock_risk <= 3:
+        logic_parts.append(f"个股风险低({stock_risk}分)")
+    else:
+        logic_parts.append(f"个股风险中等({stock_risk}分)")
+
+    if volatility > 0.3:
+        logic_parts.append(f"波动率较高({volatility:.1%})")
+    elif volatility < 0.15:
+        logic_parts.append(f"波动率较低({volatility:.1%})")
+
+    decision_logic = f"综合评分{risk_score}分：{'；'.join(logic_parts)}。"
+
+    if trading_action == 'buy':
+        decision_logic += f"风险可控，建议买入，最大持仓{int(max_position_size)}股"
+    elif trading_action == 'sell':
+        decision_logic += f"风险过高({risk_score}分>{dynamic_threshold}分)，建议卖出"
+    else:
+        decision_logic += f"风险中等({risk_score}分≈{dynamic_threshold}分)，建议持有观察"
+
+    show_agent_reasoning({
+        "风险评分": f"{risk_score}/10",
+        "动态阈值": f"{dynamic_threshold:.1f}",
+        "大盘风险": f"{market_risk}/10",
+        "个股风险": f"{stock_risk}/10",
+        "相对风险": f"{relative_risk}/10",
+        "波动率": f"{volatility:.2%}",
+        "VaR(95%)": f"{var_95:.2%}",
+        "最大回撤": f"{max_drawdown:.2%}",
+        "交易建议": action_cn,
+        "决策逻辑": decision_logic
+    }, "风险管理师")
+
+    show_workflow_complete(
+        "风险管理师",
+        signal=trading_action,
+        confidence=1.0 - risk_score / 10.0,
+        details=message_content,
+        message=f"风险管理完成，风险评分:{risk_score}/10，建议:{action_cn}"
+    )
 
     # 保存当前价格到portfolio（供后续决策使用）
     updated_portfolio = dict(portfolio)

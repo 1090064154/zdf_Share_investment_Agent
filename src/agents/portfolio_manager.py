@@ -7,7 +7,7 @@ from src.utils.decision_engine import DecisionEngine, create_decision_engine
 from src.utils.error_handler import resilient_agent
 from src.utils.decision_validator import create_decision_validator, DecisionPriority
 
-from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status
+from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status, show_workflow_complete
 from src.tools.openrouter_config import get_chat_completion
 from src.utils.api_utils import agent_endpoint, log_llm_interaction
 
@@ -294,6 +294,16 @@ def portfolio_management_agent(state: AgentState):
         _extract_signal_entry("预期差", _parse_message_json(expectation_diff_content) or {}),
     ]
 
+    # 发送各Agent信号汇总到前端
+    logger.info("  📊 各Agent信号汇总:")
+    for s in agent_signals:
+        logger.info(f"    {s['agent_name']}: {s['signal']} ({s['confidence']:.0%})")
+    show_agent_reasoning({"各分析模块信号": agent_signals}, "投资组合管理")
+
+    # 发送所有Agent信号汇总到前端
+    signals_summary = {s["agent_name"]: f"{s['signal']}({s['confidence']:.0%})" for s in agent_signals}
+    show_agent_reasoning({"各模块信号汇总": signals_summary}, agent_name)
+
     # ==================== 步骤5: 构建LLM决策上下文 ====================
     # 如果DecisionEngine不可用，则使用LLM进行决策
     # 构建system prompt和user message，提供完整的决策背景信息
@@ -577,6 +587,13 @@ def portfolio_management_agent(state: AgentState):
             "confidence": decision_json.get("confidence"),
             "reasoning_snippet": decision_json.get("reasoning", "")[:150] + "..."
         }
+        # 发送最终决策到前端
+        show_agent_reasoning({
+            "最终决策": decision_json.get("action"),
+            "数量": f"{decision_json.get('quantity')}股",
+            "置信度": f"{decision_json.get('confidence', 0):.0%}",
+            "推理": decision_json.get("reasoning", "")[:100]
+        }, agent_name)
     except json.JSONDecodeError:
         agent_decision_details_value = {
             "error": "Failed to parse LLM decision JSON from portfolio manager",
@@ -660,7 +677,13 @@ def portfolio_management_agent(state: AgentState):
     logger.info(f"  ✅ 置信度: {decision_json.get('confidence', 0)*100:.0f}%")
     logger.info("="*60)
 
-    show_workflow_status(agent_name, "completed")
+    show_workflow_complete(
+        agent_name,
+        signal=final_action,
+        confidence=validation_result.confidence,
+        details={"action": final_action, "quantity": final_quantity, "confidence": validation_result.confidence},
+        message=f"最终决策完成，动作:{final_action}，数量:{final_quantity}股，置信度:{validation_result.confidence*100:.0f}%"
+    )
 
     # ==================== 步骤13: 构造返回结果 ====================
     # 将最终决策消息添加到清理后的消息列表中
@@ -789,5 +812,6 @@ def format_decision(action: str, quantity: int, confidence: float, agent_signals
         "quantity": quantity,
         "confidence": confidence,
         "agent_signals": agent_signals,
-        "分析报告": detailed_analysis
+        "分析报告": detailed_analysis,
+        "prices": state["data"].get("prices", [])[-100:] if state["data"].get("prices") else []
     }

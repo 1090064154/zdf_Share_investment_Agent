@@ -1,5 +1,5 @@
 from langchain_core.messages import HumanMessage
-from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status
+from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status, show_workflow_complete
 from src.tools.openrouter_config import get_chat_completion
 from src.utils.api_utils import agent_endpoint, log_llm_interaction
 from src.utils.error_handler import resilient_agent
@@ -35,9 +35,10 @@ def _safe_parse_signal(message, default_signal: str = "neutral") -> dict:
 def _format_9agent_summary(signals_dict: dict, name: str) -> str:
     """格式化9个agent的分析结果为文本"""
     signal = signals_dict.get("signal", "neutral")
+    signal_cn = {'bullish': '看涨', 'bearish': '看跌', 'neutral': '中性'}.get(signal, signal)
     confidence = signals_dict.get("confidence", 0.0)
     reasoning = signals_dict.get("reasoning", "")
-    return f"{name}: 信号={signal}, 置信度={confidence}, 理由={reasoning}"
+    return f"{name}: 信号={signal_cn}, 置信度={confidence}, 理由={reasoning}"
 
 
 @resilient_agent
@@ -90,16 +91,33 @@ def researcher_bull_agent(state: AgentState):
     # 打印各Agent的信号汇总
     logger.info("────────────────────────────────────────────────────────")
     logger.info("📊 9个Agent信号汇总:")
-    logger.info(f"  1️⃣ 技术分析:    signal={technical_signals.get('signal')}, confidence={technical_signals.get('confidence')}")
-    logger.info(f"  2️⃣ 基本面:     signal={fundamental_signals.get('signal')}, confidence={fundamental_signals.get('confidence')}")
-    logger.info(f"  3️⃣ 情绪分析:   signal={sentiment_signals.get('signal')}, confidence={sentiment_signals.get('confidence')}")
-    logger.info(f"  4️⃣ 估值分析:   signal={valuation_signals.get('signal')}, confidence={valuation_signals.get('confidence')}")
-    logger.info(f"  5️⃣ 行业周期:   signal={industry_cycle_signals.get('signal')}, confidence={industry_cycle_signals.get('confidence')}")
-    logger.info(f"  6️⃣ 机构持仓:   signal={institutional_signals.get('signal')}, confidence={institutional_signals.get('confidence')}")
-    logger.info(f"  7️⃣ 预期差:     signal={expectation_diff_signals.get('signal')}, confidence={expectation_diff_signals.get('confidence')}")
-    logger.info(f"  8️⃣ 宏观新闻:   signal={macro_news_signals.get('signal')}, confidence={macro_news_signals.get('confidence')}")
-    logger.info(f"  9️⃣ 宏观分析:   signal={macro_analyst_signals.get('signal')}, confidence={macro_analyst_signals.get('confidence')}")
+    def signal_cn(s):
+        return {'bullish': '看涨', 'bearish': '看跌', 'neutral': '中性'}.get(s, s)
+    logger.info(f"  1️⃣ 技术分析:    信号={signal_cn(technical_signals.get('signal'))}, 置信度={technical_signals.get('confidence')}")
+    logger.info(f"  2️⃣ 基本面:     信号={signal_cn(fundamental_signals.get('signal'))}, 置信度={fundamental_signals.get('confidence')}")
+    logger.info(f"  3️⃣ 情绪分析:   信号={signal_cn(sentiment_signals.get('signal'))}, 置信度={sentiment_signals.get('confidence')}")
+    logger.info(f"  4️⃣ 估值分析:   信号={signal_cn(valuation_signals.get('signal'))}, 置信度={valuation_signals.get('confidence')}")
+    logger.info(f"  5️⃣ 行业周期:   信号={signal_cn(industry_cycle_signals.get('signal'))}, 置信度={industry_cycle_signals.get('confidence')}")
+    logger.info(f"  6️⃣ 机构持仓:   信号={signal_cn(institutional_signals.get('signal'))}, 置信度={institutional_signals.get('confidence')}")
+    logger.info(f"  7️⃣ 预期差:     信号={signal_cn(expectation_diff_signals.get('signal'))}, 置信度={expectation_diff_signals.get('confidence')}")
+    logger.info(f"  8️⃣ 宏观新闻:   信号={signal_cn(macro_news_signals.get('signal'))}, 置信度={macro_news_signals.get('confidence')}")
+    logger.info(f"  9️⃣ 宏观分析:   信号={signal_cn(macro_analyst_signals.get('signal'))}, 置信度={macro_analyst_signals.get('confidence')}")
     logger.info("────────────────────────────────────────────────────────")
+
+    # 发送9维度信号汇总到前端
+    show_agent_reasoning({
+        "9维度信号汇总": {
+            "技术分析": signal_cn(technical_signals.get('signal')),
+            "基本面": signal_cn(fundamental_signals.get('signal')),
+            "情绪分析": signal_cn(sentiment_signals.get('signal')),
+            "估值分析": signal_cn(valuation_signals.get('signal')),
+            "行业周期": signal_cn(industry_cycle_signals.get('signal')),
+            "机构持仓": signal_cn(institutional_signals.get('signal')),
+            "预期差": signal_cn(expectation_diff_signals.get('signal')),
+            "宏观新闻": signal_cn(macro_news_signals.get('signal')),
+            "宏观分析": signal_cn(macro_analyst_signals.get('signal'))
+        }
+    }, "看多研究员")
 
     # 统计信号分布
     bullish_count = sum(1 for s in [technical_signals, fundamental_signals, sentiment_signals,
@@ -108,7 +126,7 @@ def researcher_bull_agent(state: AgentState):
     neutral_count = sum(1 for s in [technical_signals, fundamental_signals, sentiment_signals,
                                   valuation_signals, industry_cycle_signals, institutional_signals,
                                   expectation_diff_signals] if s.get("signal") == "neutral")
-    logger.info(f"📈 信号统计: bullish={bullish_count}, neutral={neutral_count}, bearish={7-bullish_count-neutral_count}")
+    logger.info(f"📈 信号统计: 看涨={bullish_count}, 中性={neutral_count}, 看跌={7-bullish_count-neutral_count}")
 
     # ============================================================
     # Step 3: 构建prompt并调用LLM
@@ -196,6 +214,7 @@ def researcher_bull_agent(state: AgentState):
     logger.info("📤 Step 4: 构建返回消息...")
     message_content = {
         "perspective": "bullish",
+        "signal": "bullish",
         "confidence": llm_analysis.get("confidence", 0.5),
         "thesis_points": llm_analysis.get("thesis_points", []),
         "reasoning": llm_analysis.get("reasoning", "基于LLM分析得出看多观点"),
@@ -210,10 +229,24 @@ def researcher_bull_agent(state: AgentState):
     )
 
     if show_reasoning:
-        show_agent_reasoning(message_content, "看多研究员")
         state["metadata"]["agent_reasoning"] = message_content
 
-    show_workflow_status("看多研究员", "completed")
+    show_agent_reasoning({
+        "signal": "bullish",
+        "看涨信号数": bullish_count,
+        "最终信号": "看涨",
+        "置信度": message_content.get("confidence"),
+        "论点数量": len(message_content.get("thesis_points", [])),
+        "thesis_points": message_content.get("thesis_points", [])
+    }, "看多研究员")
+
+    show_workflow_complete(
+        "看多研究员",
+        signal="bullish",
+        confidence=message_content.get("confidence"),
+        details=message_content,
+        message=f"看多研究完成，置信度:{message_content.get('confidence')}，{len(message_content.get('thesis_points', []))}条论点"
+    )
     return {
         "messages": state["messages"] + [message],
         "data": state["data"],

@@ -224,11 +224,13 @@ def _build_agent_summary(agent_name: str, latest_payload: Dict[str, Any], reason
 
     if agent_name == "technical_analyst_agent":
         strategies = latest_payload.get("strategy_signals", {})
+        chinese_names = {"trend_following": "趋势跟踪", "mean_reversion": "均值回归", "momentum": "动量"}
         picked = []
         for key in ("trend_following", "mean_reversion", "momentum"):
             item = strategies.get(key, {})
             if item:
-                picked.append(f"{key}={item.get('signal', 'neutral')}")
+                chinese_name = chinese_names.get(key, key)
+                picked.append(f"{chinese_name}={item.get('signal', 'neutral')}")
         return f"技术面最终判断为 {latest_payload.get('signal', 'neutral')}，主要子策略结论：{', '.join(picked) or '暂无'}。"
 
     if agent_name == "fundamentals_agent":
@@ -244,6 +246,26 @@ def _build_agent_summary(agent_name: str, latest_payload: Dict[str, Any], reason
         max_pos = latest_payload.get("最大持仓规模", "N/A")
         return f"风险评分 {score}/10，建议动作为 {action}，允许的最大持仓约 {max_pos} 股。"
 
+    if agent_name == "valuation_agent":
+        signal = latest_payload.get("signal", "neutral") if isinstance(latest_payload, dict) else "neutral"
+        signal_cn = {"bullish": "看多", "bearish": "看空", "neutral": "中性"}.get(signal, signal)
+        conf = _normalize_confidence_value(latest_payload.get("confidence")) if isinstance(latest_payload, dict) else 0
+        cp = latest_payload.get("current_price") if isinstance(latest_payload, dict) else None
+        fv = latest_payload.get("fair_value") if isinstance(latest_payload, dict) else None
+        disc = latest_payload.get("discount") if isinstance(latest_payload, dict) else None
+        methods = latest_payload.get("methods", []) if isinstance(latest_payload, dict) else []
+        method_names = [m.get("name", "") for m in methods] if methods else []
+        price_part = ""
+        if cp and fv:
+            disc_pct = abs(disc * 100) if disc else 0
+            if disc and disc > 0.05:
+                price_part = f"，当前价{cp:.2f}元低于合理价{fv:.2f}元（低估{disc_pct:.1f}%）"
+            elif disc and disc < -0.05:
+                price_part = f"，当前价{cp:.2f}元高于合理价{fv:.2f}元（高估{disc_pct:.1f}%）"
+            else:
+                price_part = f"，当前价{cp:.2f}元接近合理价{fv:.2f}元"
+        return f"估值{signal_cn}（把握度{round(conf*100)}%）{price_part}。方法：{'、'.join(method_names) if method_names else '无'}"
+
     if agent_name == "portfolio_management_agent":
         action = latest_payload.get("action", "hold")
         quantity = latest_payload.get("quantity", 0)
@@ -254,6 +276,47 @@ def _build_agent_summary(agent_name: str, latest_payload: Dict[str, Any], reason
     if agent_name == "macro_news_agent":
         if isinstance(reasoning, str):
             return reasoning[:140] + ("..." if len(reasoning) > 140 else "")
+
+    if agent_name == "researcher_bull_agent":
+        points = latest_payload.get("thesis_points", []) if isinstance(latest_payload, dict) else []
+        conf = _normalize_confidence_value(latest_payload.get("confidence")) if isinstance(latest_payload, dict) else 0
+        preview = "；".join(p[:30] for p in points[:3]) if points else "暂无具体论点"
+        return f"看多研究：置信度{round(conf * 100)}%，共{len(points)}条看多论点。{preview}"
+
+    if agent_name == "researcher_bear_agent":
+        points = latest_payload.get("risk_points", []) if isinstance(latest_payload, dict) else []
+        conf = _normalize_confidence_value(latest_payload.get("confidence")) if isinstance(latest_payload, dict) else 0
+        preview = "；".join(p[:30] for p in points[:3]) if points else "暂无具体风险点"
+        return f"看空研究：置信度{round(conf * 100)}%，共{len(points)}条风险点。{preview}"
+
+    if agent_name == "industry_cycle_agent":
+        conf = _normalize_confidence_value(latest_payload.get("confidence")) if isinstance(latest_payload, dict) else 0
+        signal = latest_payload.get("signal", "neutral") if isinstance(latest_payload, dict) else "neutral"
+        signal_cn = {"bullish": "看多", "bearish": "看空", "neutral": "中性"}.get(signal, signal)
+        industry = latest_payload.get("industry", "") if isinstance(latest_payload, dict) else ""
+        cycle = latest_payload.get("cycle_type_cn") or latest_payload.get("cycle_type", "") if isinstance(latest_payload, dict) else ""
+        phase = latest_payload.get("phase", "") if isinstance(latest_payload, dict) else ""
+        logic = latest_payload.get("decision_logic", "") if isinstance(latest_payload, dict) else ""
+        return f"行业周期{signal_cn}（把握度{round(conf*100)}%），{industry}属{cycle}，{phase}。{logic}"
+
+    if agent_name == "institutional_agent":
+        conf = _normalize_confidence_value(latest_payload.get("confidence")) if isinstance(latest_payload, dict) else 0
+        signal = latest_payload.get("signal", "neutral") if isinstance(latest_payload, dict) else "neutral"
+        signal_cn = {"bullish": "看多", "bearish": "看空", "neutral": "中性"}.get(signal, signal)
+        details = latest_payload.get("details", []) if isinstance(latest_payload, dict) else []
+        preview = "；".join(f"{d.get('name','')}{d.get('signal_cn','')}" for d in details[:4]) if details else "无数据"
+        return f"机构持仓{signal_cn}（把握度{round(conf*100)}%）。{preview}"
+
+    if agent_name == "debate_room_agent":
+        signal = latest_payload.get("signal", "neutral") if isinstance(latest_payload, dict) else "neutral"
+        conf = _normalize_confidence_value(latest_payload.get("confidence")) if isinstance(latest_payload, dict) else 0
+        signal_cn = {"bullish": "看涨", "bearish": "看跌", "neutral": "中性"}.get(signal, signal)
+        llm_analysis = latest_payload.get("llm_analysis", "") if isinstance(latest_payload, dict) else ""
+        llm_reasoning = latest_payload.get("llm_reasoning", "") if isinstance(latest_payload, dict) else ""
+        analysis_text = llm_analysis or llm_reasoning or ""
+        if len(analysis_text) > 300:
+            analysis_text = analysis_text[:300] + "..."
+        return f"辩论结论：{signal_cn}（置信度{round(conf * 100)}%）。{analysis_text}" if analysis_text else f"辩论结论：{signal_cn}（置信度{round(conf * 100)}%）"
 
     if isinstance(reasoning, dict):
         for key in ("reasoning", "summary", "推理", "details"):
@@ -297,6 +360,7 @@ def extract_agent_completion_payload(
     if isinstance(latest_payload, dict):
         signal = _normalize_signal_value(
             latest_payload.get("signal")
+            or latest_payload.get("perspective")
             or latest_payload.get("impact_on_stock")
             or latest_payload.get("action")
             or latest_payload.get("交易行动")
@@ -310,6 +374,7 @@ def extract_agent_completion_payload(
     if (not signal or confidence == 0.0) and isinstance(reasoning, dict):
         signal = signal or _normalize_signal_value(
             reasoning.get("signal")
+            or reasoning.get("perspective")
             or reasoning.get("impact_on_stock")
             or reasoning.get("action")
             or reasoning.get("交易行动")
