@@ -5,6 +5,7 @@
 """
 
 from fastapi import APIRouter, Query
+from pathlib import Path
 from typing import Dict, List
 
 from ..models.api_models import ApiResponse, RunInfo
@@ -43,3 +44,39 @@ async def get_run_info(run_id: str):
             data=None
         )
     return ApiResponse(data=run)
+
+
+@router.delete("/{run_id}")
+async def delete_run(run_id: str):
+    """删除指定运行记录"""
+    from src.api.file_storage import file_storage
+    api_state.delete_run(run_id)
+    try:
+        runs_file = Path("src/data/runs/index.json")
+        if runs_file.exists():
+            import json
+            with open(runs_file, 'r') as f:
+                data = json.load(f)
+            data['runs'] = [r for r in data.get('runs', []) if r['run_id'] != run_id]
+            with open(runs_file, 'w') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+    return ApiResponse(success=True, message=f"已删除运行 {run_id}")
+
+
+@router.delete("/")
+async def clear_all_runs():
+    """清空所有运行记录"""
+    api_state.clear_all()
+    try:
+        import os
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        runs_file = Path(base_dir) / "src" / "data" / "runs" / "index.json"
+        if runs_file.exists():
+            import json
+            with open(runs_file, 'w') as f:
+                json.dump({"runs": []}, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"Clear error: {e}")
+    return ApiResponse(success=True, message="已清空所有运行记录")

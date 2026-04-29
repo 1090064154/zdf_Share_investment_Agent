@@ -145,6 +145,17 @@ class ApiState:
         with self._lock:
             return list(self._runs.values())
 
+    def delete_run(self, run_id: str):
+        """删除指定运行记录"""
+        with self._lock:
+            if run_id in self._runs:
+                del self._runs[run_id]
+
+    def clear_all(self):
+        """清空所有运行记录"""
+        with self._lock:
+            self._runs.clear()
+
     def register_analysis_task(self, run_id: str, future: Future):
         """注册分析任务"""
         with self._lock:

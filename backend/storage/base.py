@@ -41,3 +41,13 @@ class BaseLogStorage(ABC):
     def get_unique_run_ids(self) -> List[str]:
         """获取所有唯一的运行ID列表"""
         pass
+
+    @abstractmethod
+    def delete_run(self, run_id: str) -> bool:
+        """删除指定 run_id 的所有日志"""
+        pass
+
+    @abstractmethod
+    def clear_all(self) -> None:
+        """清空所有日志"""
+        pass

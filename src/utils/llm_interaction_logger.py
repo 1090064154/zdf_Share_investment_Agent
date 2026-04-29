@@ -2,6 +2,7 @@ import functools
 import io
 import sys
 import logging
+import math
 from contextvars import ContextVar
 from typing import Any, Callable, List, Optional, Dict, Tuple
 from datetime import datetime, UTC
@@ -39,17 +40,16 @@ current_run_id_context: ContextVar[Optional[str]] = ContextVar(
 # --- Output Capture Utility ---
 
 class OutputCapture:
-    """捕获标准输出和日志的工具类"""
+    """捕获标准输出和日志的工具类。
+    为保持前端简洁，关闭实时日志推送，只通过agent_start/agent_complete事件推送关键信息。
+    """
 
     class _LiveStream(io.TextIOBase):
-        """将输出同时写到原始流、缓存，并按行实时发送到 SSE。"""
+        """将输出写到原始流和缓存，不发送SSE日志（避免杂乱）"""
 
         def __init__(self, mirror, outputs, run_id=None, agent_name=None):
             self.mirror = mirror
             self.outputs = outputs
-            self.run_id = run_id
-            self.agent_name = agent_name
-            self._line_buffer = ""
 
         def write(self, text):
             if not text:
@@ -61,26 +61,11 @@ class OutputCapture:
                 self.mirror.write(text)
                 self.mirror.flush()
 
-            if HAS_LOG_HOOK and self.run_id and self.agent_name:
-                self._line_buffer += text
-                while "\n" in self._line_buffer:
-                    line, self._line_buffer = self._line_buffer.split("\n", 1)
-                    line = line.strip()
-                    if line:
-                        agent_log(self.run_id, self.agent_name, "info", line)
-
             return len(text)
 
         def flush(self):
             if self.mirror:
                 self.mirror.flush()
-
-        def flush_pending(self):
-            if HAS_LOG_HOOK and self.run_id and self.agent_name:
-                line = self._line_buffer.strip()
-                if line:
-                    agent_log(self.run_id, self.agent_name, "info", line)
-            self._line_buffer = ""
 
     def __init__(self, run_id: Optional[str] = None, agent_name: Optional[str] = None):
         self.outputs = []
@@ -113,8 +98,6 @@ class OutputCapture:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         sys.stdout = self.old_stdout
-        if self.live_stream:
-            self.live_stream.flush_pending()
 
         root_logger = logging.getLogger()
         root_logger.removeHandler(self.log_handler)
@@ -205,8 +188,11 @@ def _normalize_signal_value(value: Any) -> Optional[str]:
 
 
 def _compact_payload(value: Any, depth: int = 0) -> Any:
+    import math
     if depth > 3:
         return "..."
+    if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
+        return None
     if isinstance(value, dict):
         items = list(value.items())[:20]
         compacted = {str(k): _compact_payload(v, depth + 1) for k, v in items}
@@ -431,6 +417,18 @@ def log_agent_execution(agent_name: str):
                         f"{normalized_agent_name} 执行完成",
                         details=details,
                     )
+                    # 发送终端输出作为日志（更多关键行）
+                    if terminal_outputs:
+                        full_output = "".join(terminal_outputs)
+                        lines = full_output.split("\n")
+                        # 放宽过滤条件，捕捉更多有用的日志
+                        key_lines = [l.strip() for l in lines if l.strip() and (
+                            "开始" in l or "完成" in l or "获取" in l or "✅" in l or "❌" in l or 
+                            "错误" in l or "警告" in l or "正在" in l or "分析" in l or "处理" in l or
+                            "调用" in l or "成功" in l or "失败" in l or "返回" in l or "数据" in l
+                        )]
+                        for line in key_lines[:15]:  # 最多15条
+                            agent_log(run_id, normalized_agent_name, "info", line)
 
                 if storage and result_state:
                     # 提取推理详情（如果有）

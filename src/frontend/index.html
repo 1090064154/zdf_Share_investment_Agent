@@ -63,6 +63,7 @@
                                 <line x1="3" y1="10" x2="21" y2="10"></line>
                             </svg>
                             持仓周期
+                            <span class="help-tip" data-tooltip="选择投资时间范围：短线(1周-1月)、中线(1-3月)、长线(3月以上)">?</span>
                         </label>
                         <select id="horizon">
                             <option value="short">短线 (1周-1月)</option>
@@ -79,36 +80,53 @@
                                     <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
                                 </svg>
                                 初始资金
+                                <span class="help-tip" data-tooltip="模拟交易的起始资金金额(元)">?</span>
                             </label>
                             <input type="number" id="initialCapital" value="100000" min="1000">
                         </div>
                         <div class="form-group">
-                            <label for="initialPosition">初始持仓</label>
+                            <label for="initialPosition">
+                                初始持仓
+                                <span class="help-tip" data-tooltip="初始持有的股票数量(股数)">?</span>
+                            </label>
                             <input type="number" id="initialPosition" value="0" min="0">
                         </div>
                     </div>
 
                     <div class="form-group">
-                        <label for="numOfNews">新闻数量</label>
+                        <label for="numOfNews">
+                                新闻数量
+                                <span class="help-tip" data-tooltip="每次分析时获取的新闻数量(1-20条)">?</span>
+                            </label>
                         <input type="number" id="numOfNews" value="5" min="1" max="20">
                     </div>
 
                     <div class="form-row">
-                        <div class="form-group">
-                            <label for="startDate">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                                    <line x1="16" y1="2" x2="16" y2="6"></line>
-                                    <line x1="8" y1="2" x2="8" y2="6"></line>
-                                </svg>
-                                开始日期
-                            </label>
-                            <input type="date" id="startDate">
-                        </div>
-                        <div class="form-group">
-                            <label for="endDate">结束日期</label>
-                            <input type="date" id="endDate">
-                        </div>
+<div class="form-group">
+                        <label for="startDate">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                <line x1="16" y1="2" x2="16" y2="6"></line>
+                                <line x1="8" y1="2" x2="8" y2="6"></line>
+                            </svg>
+                            开始日期
+                            <span class="help-tip" data-tooltip="分析历史数据的开始日期">?</span>
+                        </label>
+                        <input type="date" id="startDate">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="endDate">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                <line x1="16" y1="2" x2="16" y2="6"></line>
+                                <line x1="8" y1="2" x2="8" y2="6"></line>
+                            </svg>
+                            结束日期
+                            <span class="help-tip" data-tooltip="分析历史数据的结束日期">?</span>
+                        </label>
+                        <input type="date" id="endDate">
+                    </div>
                     </div>
 
                     <div class="action-buttons">
@@ -131,87 +149,59 @@
                     </div>
                 </div>
 
-                <div class="history-panel" id="historyPanel" style="display: none;">
-                    <div class="card-header">
-                        <h2>
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <circle cx="12" cy="12" r="10"></circle>
-                                <polyline points="12,6 12,12 16,14"></polyline>
-                            </svg>
-                            执行历史
-                        </h2>
+                <div class="history-section">
+                    <div class="history-card">
+                        <div class="card-header">
+                            <h2>执行历史</h2>
+                        </div>
+                        <div id="historyList" class="history-list"></div>
                     </div>
-                    <div id="historyList" class="history-list"></div>
                 </div>
             </aside>
 
             <main class="main-panel">
-                <div class="agents-card">
-                    <div class="card-header">
-                        <h2>
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <circle cx="12" cy="12" r="3"></circle>
-                                <path d="M12 1v6m0 6v6m-7.07-3.93l4.24 4.24m5.66 0l4.24-4.24M1 12h6m6 0h6"></path>
-                            </svg>
-                            工作流进度
-                        </h2>
-                        <div class="progress-indicator">
-                            <span id="agentProgress">0/15</span>
-                            <div class="progress-bar">
-                                <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+                <div class="panel-left">
+                    <div class="agents-card">
+                        <div class="card-header">
+                            <h2>工作流进度</h2>
+                            <div class="progress-indicator">
+                                <span id="agentProgress">0/15</span>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+                                </div>
                             </div>
                         </div>
+                        <div class="agent-grid" id="agentGrid"></div>
                     </div>
-                    <div class="agent-grid" id="agentGrid"></div>
-                </div>
 
-                <div class="agents-card" id="agentDetailPanel">
-                    <div class="card-header">
-                        <h2>
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M9 12h6"></path>
-                                <path d="M9 16h6"></path>
-                                <path d="M9 8h6"></path>
-                                <path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5z"></path>
-                            </svg>
-                            Agent 详情
-                        </h2>
-                    </div>
-                    <div id="agentDetailContent" class="agent-detail-empty">点击上方任一 Agent 卡片，查看它的执行过程与结果。</div>
-                </div>
-
-                <div class="logs-card">
-                    <div class="card-header">
-                        <h2>
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <line x1="17" y1="10" x2="3" y2="10"></line>
-                                <line x1="21" y1="6" x2="3" y2="6"></line>
-                                <line x1="21" y1="14" x2="3" y2="14"></line>
-                                <line x1="17" y1="18" x2="3" y2="18"></line>
-                            </svg>
-                            实时日志
-                        </h2>
-                        <div class="live-indicator" id="liveIndicator">
-                            <span class="live-dot"></span>
-                            <span>连接中</span>
+                    <div class="logs-card">
+                        <div class="card-header">
+                            <h2>实时日志</h2>
+                            <div class="live-indicator" id="liveIndicator">
+                                <span class="live-dot"></span>
+                                <span>连接中</span>
+                            </div>
+                        </div>
+                        <div class="log-container" id="logContainer">
+                            <div class="log-empty">点击"执行分析"开始...</div>
                         </div>
                     </div>
-                    <div class="log-container" id="logContainer">
-                        <div class="log-empty">点击"执行分析"开始...</div>
-                    </div>
                 </div>
 
-                <div class="result-card" id="resultPanel" style="display: none;">
-                    <div class="card-header">
-                        <h2>
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                                <polyline points="22,4 12,14.01 9,11.01"></polyline>
-                            </svg>
-                            决策结果
-                        </h2>
+                <div class="panel-right">
+                    <div class="agent-detail-card" id="agentDetailPanel">
+                        <div class="card-header">
+                            <h2>步骤详情</h2>
+                        </div>
+                        <div id="agentDetailContent" class="agent-detail-empty">点击左侧 Agent 卡片查看详情</div>
                     </div>
-                    <div id="resultSummary"></div>
+
+                    <div class="result-card" id="resultPanel" style="display: none;">
+                        <div class="card-header">
+                            <h2>决策结果</h2>
+                        </div>
+                        <div id="resultSummary"></div>
+                    </div>
                 </div>
             </main>
         </div>

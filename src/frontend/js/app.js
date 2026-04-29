@@ -10,6 +10,7 @@ const App = {
     init() {
         this.initAgentGrid();
         this.bindEvents();
+        this.loadHistory();
     },
 
     initAgentGrid() {
@@ -407,14 +408,55 @@ const App = {
         if (!list) return;
 
         try {
-            const data = await Api.getRuns(1, 20);
-            if (data.items && data.items.length > 0) {
-                list.innerHTML = data.items.map(run => Components.createHistoryItem(run)).join('');
+            console.log('加载历史记录...');
+            const response = await Api.getRuns(1, 20);
+            const data = response.items || response;
+            console.log('历史记录数据:', data);
+            if (data && data.length > 0) {
+                list.innerHTML = Components.createHistoryHeader() + data.map(run => Components.createHistoryItem(run)).join('');
             } else {
                 list.innerHTML = '<div class="log-empty">暂无历史记录</div>';
             }
         } catch (error) {
+            console.error('加载历史失败:', error);
             list.innerHTML = '<div class="log-empty">加载失败</div>';
+        }
+    },
+
+    async deleteHistoryRun(runId, btn) {
+        if (!confirm('确定要删除这条记录吗？')) return;
+
+        btn.disabled = true;
+
+        try {
+            console.log('删除记录:', runId);
+            const result = await Api.deleteRun(runId);
+            console.log('删除结果:', result);
+            this.showToast('已删除', 'success');
+
+            setTimeout(async () => {
+                await this.loadHistory();
+            }, 100);
+        } catch (error) {
+            console.error('删除失败:', error);
+            this.showToast('删除失败: ' + error.message, 'error');
+            setTimeout(async () => {
+                await this.loadHistory();
+            }, 500);
+        } finally {
+            btn.disabled = false;
+        }
+    },
+
+    async clearAllHistory() {
+        if (!confirm('确定要清空所有历史记录吗？此操作不可恢复！')) return;
+        
+        try {
+            await Api.clearAllRuns();
+            this.showToast('已清空', 'success');
+            await this.loadHistory();
+        } catch (error) {
+            this.showToast('清空失败', 'error');
         }
     },
 
@@ -424,12 +466,71 @@ const App = {
         if (!modal || !detail) return;
 
         try {
-            const result = await Api.getResult(runId);
-            detail.innerHTML = Components.createHistoryDetail(runId, result);
+            const flow = await Api.getRunFlow(runId);
+            const agents = await Api.getRunAgents(runId);
+            
+            // 构建 Agent 状态用于显示
+            const agentStates = {};
+            const agentLogs = {};
+            
+            for (const agent of agents) {
+                agentStates[agent.agent_name] = {
+                    status: 'completed',
+                    signal: null,
+                    confidence: 0,
+                    message: `${agent.agent_name} 执行完成`
+                };
+                agentLogs[agent.agent_name] = [];
+            }
+            
+            // 获取每个 Agent 的详情
+            for (const agent of agents) {
+                try {
+                    const agentDetail = await Api.getAgentDetail(runId, agent.agent_name);
+                    if (agentDetail.output_state) {
+                        const output = agentDetail.output_state;
+                        const messages = output.messages || [];
+                        if (messages.length > 0) {
+                            const lastMsg = messages[messages.length - 1];
+                            if (lastMsg && lastMsg.content) {
+                                try {
+                                    const content = JSON.parse(lastMsg.content);
+                                    agentStates[agent.agent_name].signal = content.signal;
+                                    agentStates[agent.agent_name].confidence = content.confidence || 0;
+                                } catch (e) {}
+                            }
+                        }
+                    }
+                } catch (e) {}
+            }
+            
+            // 渲染历史详情
+            detail.innerHTML = Components.createHistoryReplay(runId, flow, agentStates, agents);
             modal.classList.add('active');
         } catch (error) {
-            detail.innerHTML = '<div class="log-empty">加载详情失败</div>';
+            detail.innerHTML = '<div class="log-empty">加载详情失败: ' + error.message + '</div>';
             modal.classList.add('active');
+        }
+    },
+
+    onHistorySelect(runId) {
+        // 可以在此处处理多选逻辑
+    },
+
+    toggleAllHistory(checked) {
+        const checks = document.querySelectorAll('.history-check');
+        checks.forEach(cb => cb.checked = checked);
+    },
+
+    async selectHistoryAgent(runId, agentName) {
+        const container = document.getElementById('historyAgentDetail');
+        if (!container) return;
+        
+        try {
+            const detail = await Api.getAgentDetail(runId, agentName);
+            container.innerHTML = Components.renderHistoryAgentDetail(agentName, detail);
+        } catch (error) {
+            container.innerHTML = '<div class="empty">加载失败</div>';
         }
     },
 

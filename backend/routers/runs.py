@@ -306,3 +306,43 @@ async def get_workflow_flow(
             status_code=500,
             detail=f"获取工作流程失败: {str(e)}"
         )
+
+
+@router.delete("/")
+async def clear_all_runs(
+    storage: BaseLogStorage = Depends(get_log_storage)
+):
+    """清空所有运行记录"""
+    try:
+        storage.clear_all()
+        return {"message": "已清空所有运行记录"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"清空运行记录失败: {str(e)}"
+        )
+
+
+@router.delete("/{run_id}")
+async def delete_run(
+    run_id: str = Path(..., description="要删除的运行ID"),
+    storage: BaseLogStorage = Depends(get_log_storage)
+):
+    """删除指定 run_id 的运行记录"""
+    print(f"[DELETE] 收到删除请求: {run_id}")
+    try:
+        success = storage.delete_run(run_id)
+        print(f"[DELETE] 删除结果: {run_id}, success: {success}")
+        if not success:
+            raise HTTPException(
+                status_code=404,
+                detail=f"未找到ID为 {run_id} 的运行"
+            )
+        return {"message": f"已删除运行记录 {run_id}"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"删除运行记录失败: {str(e)}"
+        )

@@ -110,10 +110,15 @@ const Api = {
     },
 
     async getRuns(page = 1, limit = 20) {
-        const response = await fetch(`${API_BASE}/runs?page=${page}&limit=${limit}`);
+        const response = await fetch(`${API_BASE}/runs?limit=${limit}`);
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.detail || '获取历史列表失败');
+            const errorText = await response.text();
+            try {
+                const error = JSON.parse(errorText);
+                throw new Error(error.detail || error.message || '获取历史列表失败');
+            } catch (e) {
+                throw new Error(errorText || '获取历史列表失败');
+            }
         }
         return response.json();
     },
@@ -132,6 +137,61 @@ const Api = {
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.detail || '获取Agent日志失败');
+        }
+        return response.json();
+    },
+
+    async deleteRun(runId) {
+        const response = await fetch(`${API_BASE}/runs/${runId}`, {
+            method: 'DELETE'
+        });
+        if (!response.ok) {
+            const errorText = await response.text();
+            try {
+                const error = JSON.parse(errorText);
+                throw new Error(error.detail || error.message || '删除失败');
+            } catch (e) {
+                throw new Error(errorText || '删除失败');
+            }
+        }
+        const text = await response.text();
+        return text ? JSON.parse(text) : { success: true };
+    },
+
+    async clearAllRuns() {
+        const response = await fetch(`${API_BASE}/runs/`, {
+            method: 'DELETE'
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || '清空失败');
+        }
+        return response.json();
+    },
+
+    async getRunFlow(runId) {
+        const response = await fetch(`${API_BASE}/runs/${runId}/flow`);
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || '获取流程失败');
+        }
+        return response.json();
+    },
+
+    async getRunAgents(runId) {
+        const response = await fetch(`${API_BASE}/runs/${runId}/agents`);
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || '获取Agent列表失败');
+        }
+        return response.json();
+    },
+
+    async getAgentDetail(runId, agentName) {
+        const response = await fetch(`${API_BASE}/runs/${runId}/agents/${agentName}?include_states=true`);
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || '获取详情失败');
         }
         return response.json();
     },

@@ -91,21 +91,21 @@
   },
   "600111": {
     "metrics": {
-      "return_on_equity": 0.0913,
-      "net_margin": 0.067166,
-      "operating_margin": 0.080279,
-      "revenue_growth": 0.29110800000000003,
-      "earnings_growth": 0.79976,
-      "book_value_growth": 0.095954,
-      "current_ratio": 2.7278,
-      "debt_to_equity": 0.35885100000000003,
-      "free_cash_flow_per_share": 0.3084,
-      "earnings_per_share": 0.6227,
-      "pe_ratio": 75.2,
-      "price_to_book": 5.49,
-      "price_to_sales": 4.3
+      "return_on_equity": 0.0359,
+      "net_margin": 0.088301,
+      "operating_margin": 0.106645,
+      "revenue_growth": 0.276936,
+      "earnings_growth": 0.812925,
+      "book_value_growth": 0.10783,
+      "current_ratio": 2.5747,
+      "debt_to_equity": 0.368313,
+      "free_cash_flow_per_share": -0.0752,
+      "earnings_per_share": 0.2539,
+      "pe_ratio": 182.43,
+      "price_to_book": 5.25,
+      "price_to_sales": 15.42
     },
-    "updated": "2026-04-28T13:09:34.425543"
+    "updated": "2026-04-29T11:06:43.656173"
   },
   "601127": {
     "metrics": {
@@ -160,5 +160,23 @@
       "price_to_sales": 8.9
     },
     "updated": "2026-04-28T17:00:11.648431"
+  },
+  "601828": {
+    "metrics": {
+      "return_on_equity": 0.21,
+      "net_margin": 0.035362,
+      "operating_margin": 0.10157500000000001,
+      "revenue_growth": -0.041459,
+      "earnings_growth": NaN,
+      "book_value_growth": -0.510293,
+      "current_ratio": 0.2219,
+      "debt_to_equity": 0.726234,
+      "free_cash_flow_per_share": 0.0948,
+      "earnings_per_share": NaN,
+      "pe_ratio": 0,
+      "price_to_book": 0.49,
+      "price_to_sales": 7.59
+    },
+    "updated": "2026-04-28T17:44:13.748233"
   }
 }

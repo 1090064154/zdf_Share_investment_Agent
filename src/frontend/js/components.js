@@ -1,3 +1,21 @@
+const AGENT_DESCRIPTIONS = {
+    'market_data_agent': '收集股票的历史价格数据、成交量、行业分类和市场整体状况，为后续分析提供基础数据支撑。',
+    'technical_analyst_agent': '基于价格和成交量数据，运用趋势跟踪、均值回归、动量策略等技术指标判断短期走势。',
+    'fundamentals_agent': '分析公司的盈利能力、成长性和财务健康状况，评估基本面质量。',
+    'sentiment_agent': '通过新闻、研报和社交媒体等渠道，分析市场参与者的情绪倾向。',
+    'valuation_agent': '评估股票当前价格与合理价值之间的关系，计算折扣率判断估值高低。',
+    'industry_cycle_agent': '分析所处行业的周期阶段和景气度，判断行业整体趋势。',
+    'institutional_agent': '追踪机构投资者的持仓变化和买卖动向，捕捉大资金的方向。',
+    'expectation_diff_agent': '比较市场预期与实际业绩表现，挖掘预期差带来的投资机会。',
+    'macro_news_agent': '收集影响市场的宏观新闻和政策动向，分析对股票的直接或间接影响。',
+    'macro_analyst_agent': '综合宏观环境分析，研判宏观经济对个股的影响程度。',
+    'researcher_bull_agent': '汇总九维分析中偏正向的信号，形成系统性的看多逻辑和投资依据。',
+    'researcher_bear_agent': '汇总九维分析中偏负向的信号，形成系统性的看空逻辑和风险提示。',
+    'debate_room_agent': '组织多空双方观点进行辩论，形成最终的市场判断结论。',
+    'risk_management_agent': '评估整体风险水平，确定最大持仓规模和风险控制建议。',
+    'portfolio_management_agent': '综合所有分析结果，给出最终的交易动作、数量和置信度。'
+};
+
 const AGENT_DISPLAY_NAMES = {
     'market_data_agent': '市场数据',
     'technical_analyst_agent': '技术分析',
@@ -328,67 +346,116 @@ const Components = {
         return lines;
     },
 
-    createAgentDetail(agentName, state = {}, logs = []) {
+createAgentDetail(agentName, state = {}, logs = []) {
         const displayName = AGENT_DISPLAY_NAMES[agentName] || agentName;
         const status = state.status || 'pending';
         const signal = state.signal || null;
         const confidence = state.confidence || 0;
-        const message = state.message || '该 Agent 暂无最新说明';
-        const recentLogs = logs.slice(-30);
         const details = state.details || {};
-        const signalText = signal ? this.getSignalText(signal) : (status === 'completed' ? '该节点无明确交易信号' : '待输出');
-        const confidenceText = confidence > 0 ? `${Math.round(confidence * 100)}%` : (status === 'completed' ? '未提供' : '等待执行');
+        const signalText = signal ? this.getSignalText(signal) : (status === 'completed' ? '无信号' : '等待中');
+        const confidenceText = confidence > 0 ? `${Math.round(confidence * 100)}%` : '-';
+        const summary = details.summary || '';
+        const resultData = details.result || {};
+
+        const resultText = this.buildResultText(agentName, resultData, signal);
+
+        const recentLogs = logs.slice(-20);
+        const logHtml = recentLogs.length 
+            ? recentLogs.map((log, i) => `<div class="log-line"><span class="log-num">${i+1}</span><span class="log-content">${this.escapeHtml(log.message || '')}</span></div>`).join('')
+            : '<div class="empty">暂无日志</div>';
+
+        const description = AGENT_DESCRIPTIONS[agentName] || '';
 
         return `
-            <div class="agent-detail-shell">
-                <div class="agent-detail-top">
-                    <div>
-                        <div class="agent-detail-name">${displayName}</div>
-                        <div class="agent-detail-subtitle">实时查看该 Agent 的执行状态、日志与结果。</div>
+            <div class="detail-shell">
+                <div class="detail-header">
+                    <div class="detail-title">
+                        <span class="detail-name">${displayName}</span>
+                        <span class="detail-badge ${status}">${status === 'completed' ? '✓' : status === 'running' ? '⟳' : '○'}</span>
                     </div>
-                    <span class="agent-status-badge ${status}">${this.getStatusText(status)}</span>
-                </div>
-
-                <div class="agent-detail-metrics">
-                    <div class="agent-detail-metric">
-                        <div class="agent-detail-label">当前状态</div>
-                        <div class="agent-detail-value">${this.getStatusText(status)}</div>
-                    </div>
-                    <div class="agent-detail-metric">
-                        <div class="agent-detail-label">信号判断</div>
-                        <div class="agent-detail-value ${signal || ''}">${signalText}</div>
-                    </div>
-                    <div class="agent-detail-metric">
-                        <div class="agent-detail-label">置信度</div>
-                        <div class="agent-detail-value">${confidenceText}</div>
+                    <div class="detail-meta">
+                        <span class="meta-signal ${signal || ''}">${signalText}</span>
+                        <span class="meta-confidence">置信度 ${confidenceText}</span>
                     </div>
                 </div>
-
-                <div class="agent-detail-block">
-                    <div class="agent-detail-block-title">最后消息</div>
-                    <div class="agent-detail-message">${this.escapeHtml(message)}</div>
-                </div>
-
-                ${details.summary ? `
-                    <div class="agent-detail-block">
-                        <div class="agent-detail-block-title">结果摘要</div>
-                        <div class="agent-detail-message">${this.escapeHtml(details.summary)}</div>
-                    </div>
-                ` : ''}
-
-                ${this.createDetailDataSection('输入摘要', details.input)}
-                ${this.createDetailDataSection('输出摘要', details.output)}
-                ${this.createDetailDataSection('推理结果', details.reasoning)}
-                ${this.createDetailDataSection('结构化结果', details.result)}
-
-                <div class="agent-detail-block">
-                    <div class="agent-detail-block-title">最近日志</div>
-                    <div class="agent-detail-log-list">
-                        ${recentLogs.length ? recentLogs.map((log) => this.createDetailLogEntry(log)).join('') : '<div class="agent-detail-empty-inline">该 Agent 还没有产生日志。</div>'}
-                    </div>
+                ${description ? `<div class="detail-description">
+                    <div class="detail-section-label">模块说明</div>
+                    <div class="detail-description-text">${description}</div>
+                </div>` : ''}
+                ${summary ? `<div class="detail-summary">${this.escapeHtml(summary)}</div>` : ''}
+                ${resultText ? `<div class="detail-result">${resultText}</div>` : ''}
+                <div class="detail-logs">
+                    <div class="logs-title">执行过程</div>
+                    <div class="logs-box">${logHtml}</div>
                 </div>
             </div>
         `;
+    },
+
+    buildResultText(agentName, data, signal) {
+        if (!data || Object.keys(data).length === 0) return '';
+        
+        const d = data;
+        if (agentName === 'technical_analyst_agent') {
+            const signals = d.strategy_signals || {};
+            const trend = signals.trend_following?.signal || '-';
+            const mean = signals.mean_reversion?.signal || '-';
+            const mom = signals.momentum?.signal || '-';
+            return `技术面：趋势跟踪[${trend}]，均值回归[${mean}]，动量策略[${mom}]`;
+        }
+        if (agentName === 'fundamentals_agent') {
+            const r = d.reasoning || {};
+            const profit = r.profitability_signal?.signal || '-';
+            const growth = r.growth_signal?.signal || '-';
+            const health = r.financial_health_signal?.signal || '-';
+            return `基本面：盈利能力[${profit}]，成长性[${growth}]，财务健康[${health}]`;
+        }
+        if (agentName === 'sentiment_agent') {
+            return d.reasoning ? d.reasoning.slice(0, 100) : '情绪分析暂无详情';
+        }
+        if (agentName === 'valuation_agent') {
+            const price = d.current_price || '-';
+            const fair = d.fair_value || '-';
+            const discount = d.discount_rate || '-';
+            return `估值：当前价${price}元，合理价${fair}元，折扣率${discount}`;
+        }
+        if (agentName === 'macro_analyst_agent') {
+            return `���观环境：${d.macro_environment || '-'}，对股票影响：${d.impact_on_stock || '-'}`;
+        }
+        if (agentName === 'macro_news_agent') {
+            return d.reasoning ? d.reasoning.slice(0, 120) : '暂无宏观新闻分析';
+        }
+        if (agentName === 'risk_management_agent') {
+            return `风险评分：${d.风险评分 || '-'}，建议：${d.交易行动 || 'hold'}，最大持仓：${d.最大持仓规模 || '-'}`;
+        }
+        if (agentName === 'portfolio_management_agent') {
+            return `最终决策：${this.getActionText(d.action || 'hold')} ${d.quantity || 0}股`;
+        }
+        if (agentName === 'industry_cycle_agent') {
+            return `行业周期：${d.行业周期 || '-'}，阶段：${d.周期阶段 || '-'}`;
+        }
+        if (agentName === 'institutional_agent') {
+            const holders = d机构持仓变化 || '-';
+            return `机构持仓：${holders}`;
+        }
+        if (agentName === 'expectation_diff_agent') {
+            return `预期差：${d.预期差 || '-'}，方向：${d.方向 || '-'}`;
+        }
+        if (agentName === 'researcher_bull_agent') {
+            return d.综合结论 ? d.综合结论.slice(0, 100) : '看多研究结论';
+        }
+        if (agentName === 'researcher_bear_agent') {
+            return d.综合结论 ? d.综合结论.slice(0, 100) : '看空研究结论';
+        }
+        if (agentName === 'debate_room_agent') {
+            return `辩论结论：${d.辩论结果 || '-'}，胜负：${d.胜方 || '-'}`;
+        }
+        if (agentName === 'market_data_agent') {
+            const prices = d.prices || [];
+            return `获取数据：${prices.length}条价格记录，行业：${d.industry || '-'}`;
+        }
+        
+        return JSON.stringify(data).slice(0, 150);
     },
 
     createDetailDataSection(title, data) {
@@ -453,13 +520,28 @@ const Components = {
         const createdAt = run.created_at ? this.formatDate(run.created_at) : '';
 
         return `
-            <div class="history-item" onclick="App.showHistoryDetail('${run.run_id}')">
-                <div class="history-ticker">${ticker}</div>
-                <div class="history-meta">
-                    <span>${createdAt}</span>
-                    <span>置信度: ${Math.round(confidence * 100)}%</span>
+            <div class="history-item-wrap">
+                <input type="checkbox" class="history-check" data-run="${run.run_id}" onchange="App.onHistorySelect('${run.run_id}')">
+                <div class="history-item" onclick="App.showHistoryDetail('${run.run_id}')">
+                    <div class="history-ticker">${ticker}</div>
+                    <div class="history-meta">
+                        <span>${createdAt}</span>
+                        <span>置信度: ${Math.round(confidence * 100)}%</span>
+                    </div>
+                    ${action ? `<span class="history-action ${action}">${this.getActionText(action)}</span>` : ''}
                 </div>
-                ${action ? `<span class="history-action ${action}">${this.getActionText(action)}</span>` : ''}
+                <button class="history-delete" onclick="App.deleteHistoryRun('${run.run_id}', this)" title="删除">×</button>
+            </div>
+        `;
+    },
+
+    createHistoryHeader() {
+        return `
+            <div class="history-header-bar">
+                <label class="history-select-all">
+                    <input type="checkbox" onchange="App.toggleAllHistory(this.checked)">全选
+                </label>
+                <button class="btn-clear" onclick="App.clearAllHistory()">清空历史</button>
             </div>
         `;
     },
@@ -492,6 +574,67 @@ const Components = {
                     <p>行动: ${this.getActionText(result.action)} | 数量: ${result.quantity || 0}股 | 置信度: ${Math.round((result.confidence || 0) * 100)}%</p>
                 </div>
             ` : ''}
+        `;
+    },
+
+    createHistoryReplay(runId, flow, agentStates, agents) {
+        const startTime = flow.start_time ? this.formatDate(flow.start_time) : '';
+        const endTime = flow.end_time ? this.formatDate(flow.end_time) : '';
+        
+        // 构建 Agent 卡片
+        const agentCards = Object.keys(agentStates).map(name => {
+            const state = agentStates[name];
+            const signalText = state.signal ? this.getSignalText(state.signal) : '-';
+            const conf = state.confidence ? `${Math.round(state.confidence * 100)}%` : '-';
+            return `
+                <div class="agent-card status-completed" data-agent="${name}" onclick="App.selectHistoryAgent('${runId}', '${name}')">
+                    <div class="agent-header">
+                        <span class="agent-name">${AGENT_DISPLAY_NAMES[name] || name}</span>
+                        <span class="agent-status-badge completed">✓</span>
+                    </div>
+                    <div class="agent-signal ${state.signal || ''}">信号: ${signalText}</div>
+                    <div class="agent-confidence">置信度: ${conf}</div>
+                </div>
+            `;
+        }).join('');
+
+        return `
+            <div class="history-replay">
+                <div class="replay-header">
+                    <div class="replay-title">历史回放: ${runId}</div>
+                    <div class="replay-time">${startTime} - ${endTime}</div>
+                </div>
+                <div class="replay-agents">${agentCards}</div>
+                <div class="replay-detail" id="historyAgentDetail">
+                    <div class="empty">点击左侧卡片查看详情</div>
+                </div>
+            </div>
+        `;
+    },
+
+    renderHistoryAgentDetail(runId, agentName, agentDetail) {
+        if (!agentDetail) return '<div class="empty">暂无详情</div>';
+        
+        const input = agentDetail.input_state || {};
+        const output = agentDetail.output_state || {};
+        const reasoning = agentDetail.reasoning || {};
+        
+        return `
+            <div class="detail-shell">
+                <div class="detail-header">
+                    <span class="detail-name">${AGENT_DISPLAY_NAMES[agentName] || agentName}</span>
+                    <span class="detail-badge completed">✓</span>
+                </div>
+                <div class="detail-result">
+                    执行时间: ${agentDetail.execution_time_seconds?.toFixed(2) || 0}s
+                </div>
+                ${output.messages && output.messages.length ? `
+                    <div class="detail-messages">
+                        <div class="detail-section-title">输出消息</div>
+                        <pre class="detail-json">${this.escapeHtml(JSON.stringify(output.messages.slice(-2), null, 2))}</pre>
+                    </div>
+                ` : ''}
+            </div>
         `;
     },
 

@@ -100,3 +100,20 @@ class InMemoryLogStorage(BaseLogStorage):
 
         # 按时间顺序返回（这里简化为字母顺序）
         return sorted(list(run_ids))
+
+    def delete_run(self, run_id: str) -> bool:
+        """删除指定 run_id 的所有日志"""
+        deleted = False
+        with self._logs_lock:
+            self._logs = deque([log for log in self._logs if log.run_id != run_id], maxlen=MAX_LOG_SIZE)
+            deleted = True
+        with self._agent_logs_lock:
+            self._agent_logs = deque([log for log in self._agent_logs if log.run_id != run_id], maxlen=MAX_LOG_SIZE)
+        return deleted
+
+    def clear_all(self) -> None:
+        """清空所有日志"""
+        with self._logs_lock:
+            self._logs.clear()
+        with self._agent_logs_lock:
+            self._agent_logs.clear()
