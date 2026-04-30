@@ -456,6 +456,54 @@ body {
     transform: none;
 }
 
+.stock-input-group {
+    position: relative;
+}
+
+.stock-suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 100;
+    display: none;
+    box-shadow: var(--shadow);
+}
+
+.stock-suggestions.active {
+    display: block;
+}
+
+.stock-suggestion-item {
+    padding: 10px 14px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border-color);
+    transition: var(--transition);
+}
+
+.stock-suggestion-item:last-child {
+    border-bottom: none;
+}
+
+.stock-suggestion-item:hover {
+    background: var(--bg-card-hover);
+}
+
+.stock-suggestion-code {
+    color: var(--accent-info);
+    font-weight: 600;
+    margin-right: 8px;
+}
+
+.stock-suggestion-name {
+    color: var(--text-primary);
+}
+
 .progress-indicator {
     display: flex;
     align-items: center;
@@ -646,6 +694,56 @@ body {
 .agent-card.status-running::before {
     background: linear-gradient(180deg, var(--accent-info) 0%, rgba(56, 189, 248, 0.4) 100%);
     animation: running-glow 2s ease-in-out infinite;
+}
+
+.agent-card.status-running .progress-indicator-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent-info), var(--accent-success), var(--accent-info));
+    background-size: 200% 100%;
+    animation: progress-slide 3s linear infinite;
+    border-radius: 0 0 0 0;
+}
+
+@keyframes progress-slide {
+    0% {
+        width: 0%;
+        background-position: 100% 0;
+    }
+    50% {
+        width: 100%;
+        background-position: 0 0;
+    }
+    100% {
+        width: 0%;
+        margin-left: 100%;
+        background-position: 100% 0;
+    }
+}
+
+.agent-card.status-completed .progress-indicator-bar {
+    display: none;
+}
+
+.agent-card.status-running.complete-animation::before {
+    animation: none;
+    width: 100%;
+    transition: width 0.5s ease-out;
+}
+
+.agent-card.status-running.complete-animation {
+    animation: complete-sweep 0.5s ease-out forwards;
+}
+
+@keyframes complete-sweep {
+    0% {
+        box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.3), 0 8px 32px rgba(56, 189, 248, 0.2);
+    }
+    100% {
+        box-shadow: 0 0 0 1px var(--accent-success), 0 4px 16px rgba(16, 185, 129, 0.3);
+    }
 }
 
 .agent-card.status-running .agent-name {
@@ -1533,6 +1631,240 @@ body {
 .modal-header h3 {
     font-size: 16px;
     font-weight: 600;
+}
+
+.modal-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+}
+
+/* 导出PDF按钮 */
+.btn-export-pdf {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    background: linear-gradient(135deg, #e74c3c, #c0392b);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.btn-export-pdf:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(231, 76, 60, 0.35);
+}
+
+.btn-export-pdf:active {
+    transform: translateY(0);
+}
+
+/* PDF渲染容器(隐藏但保持在视口内以确保html2canvas正确渲染) */
+#pdf-render-container {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 794px;
+    height: auto;
+    background: #fff;
+    font-family: 'PingFang SC', 'Microsoft YaHei', 'SimHei', 'Heiti SC', sans-serif;
+    color: #1a1a2e;
+    line-height: 1.7;
+    visibility: hidden;
+    z-index: -1;
+}
+
+.pdf-report {
+    padding: 32px 30px;
+}
+
+.pdf-report * { box-sizing: border-box; }
+
+.pdf-header {
+    text-align: center;
+    padding-bottom: 20px;
+    margin-bottom: 20px;
+    border-bottom: 3px solid #6366f1;
+    page-break-after: avoid;
+    page-break-inside: avoid;
+}
+
+.pdf-header .pdf-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin-bottom: 6px;
+    letter-spacing: 1px;
+}
+
+.pdf-header .pdf-subtitle {
+    font-size: 14px;
+    color: #6366f1;
+    font-weight: 500;
+}
+
+.pdf-meta-row {
+    display: block;
+    text-align: center;
+    margin-top: 16px;
+}
+
+.pdf-meta-item {
+    display: inline-block;
+    font-size: 13px;
+    color: #555;
+    background: #f0f0f5;
+    padding: 5px 14px;
+    border-radius: 4px;
+    margin: 0 8px 4px;
+}
+
+.pdf-decision-box {
+    background: #f0f4ff;
+    border-left: 5px solid #6366f1;
+    border-radius: 6px;
+    padding: 18px 22px;
+    margin-bottom: 20px;
+    page-break-inside: avoid;
+}
+
+.pdf-decision-box.action-buy {
+    border-left-color: #10b981;
+    background: #f0fdf4;
+}
+
+.pdf-decision-box.action-sell {
+    border-left-color: #ef4444;
+    background: #fef2f2;
+}
+
+.pdf-decision-box.action-hold {
+    border-left-color: #f59e0b;
+    background: #fffbeb;
+}
+
+.pdf-decision-row {
+    display: block;
+}
+
+.pdf-decision-action {
+    display: inline-block;
+    font-size: 22px;
+    font-weight: 700;
+    padding: 8px 20px;
+    border-radius: 6px;
+    color: #fff;
+    margin-right: 20px;
+    margin-bottom: 10px;
+    vertical-align: middle;
+}
+
+.pdf-decision-action.buy { background: #10b981; }
+.pdf-decision-action.sell { background: #ef4444; }
+.pdf-decision-action.hold { background: #f59e0b; }
+
+.pdf-decision-info {
+    display: inline-block;
+    font-size: 14px;
+    color: #333;
+    vertical-align: middle;
+}
+
+.pdf-decision-info span { margin-right: 20px; }
+
+.pdf-section-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin: 24px 0 14px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #6366f1;
+    page-break-after: avoid;
+}
+
+.pdf-agent-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin-bottom: 16px;
+    page-break-inside: avoid;
+}
+
+.pdf-agent-table th {
+    background: #6366f1;
+    color: #fff;
+    padding: 10px 12px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 13px;
+}
+
+.pdf-agent-table th:first-child { border-radius: 4px 0 0 0; }
+.pdf-agent-table th:last-child { border-radius: 0 4px 0 0; }
+
+.pdf-agent-table td {
+    padding: 9px 12px;
+    border-bottom: 1px solid #e8e8f0;
+    vertical-align: middle;
+    font-size: 13px;
+}
+
+.pdf-agent-table tbody tr:nth-child(even) td { background: #f8f8fc; }
+
+.pdf-agent-table .sig-bullish { color: #10b981; font-weight: 700; }
+.pdf-agent-table .sig-bearish { color: #ef4444; font-weight: 700; }
+.pdf-agent-table .sig-neutral { color: #f59e0b; font-weight: 700; }
+
+.pdf-reasoning {
+    background: #f8f8fc;
+    border-left: 4px solid #6366f1;
+    border-radius: 6px;
+    padding: 16px 18px;
+    font-size: 13px;
+    color: #333;
+    white-space: pre-wrap;
+    margin-bottom: 16px;
+    line-height: 1.8;
+    page-break-inside: avoid;
+}
+
+.pdf-decision-logic {
+    font-size: 13px;
+    color: #444;
+    padding: 12px 16px;
+    background: #fffbe6;
+    border-left: 4px solid #f59e0b;
+    border-radius: 4px;
+    margin-bottom: 10px;
+    page-break-inside: avoid;
+}
+
+.pdf-agent-log {
+    font-size: 12px;
+    color: #555;
+    padding: 8px 12px;
+    background: #f8f8fc;
+    border-radius: 4px;
+    margin-bottom: 6px;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.pdf-footer {
+    text-align: center;
+    font-size: 11px;
+    color: #888;
+    margin-top: 32px;
+    padding-top: 18px;
+    border-top: 2px solid #6366f1;
+    page-break-before: avoid;
 }
 
 .modal-close {

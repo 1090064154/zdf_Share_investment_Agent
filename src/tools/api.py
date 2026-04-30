@@ -11,6 +11,42 @@ from src.utils.logging_config import setup_logger
 logger = setup_logger('api')
 
 
+def get_stock_name(symbol: str) -> str:
+    """根据股票代码获取股票名称"""
+    cache_file = "src/data/stock_name_cache.json"
+    try:
+        if os.path.exists(cache_file):
+            with open(cache_file, 'r', encoding='utf-8') as f:
+                cache = json.load(f)
+            if symbol in cache:
+                return cache[symbol].get('name', '')
+    except:
+        pass
+    
+    try:
+        stock_info = ak.stock_info_a_code_name()
+        if stock_info is not None and not stock_info.empty:
+            match = stock_info[stock_info['code'] == symbol]
+            if not match.empty:
+                name = str(match.iloc[0].get('name', ''))
+                if name:
+                    try:
+                        cache = {}
+                        if os.path.exists(cache_file):
+                            with open(cache_file, 'r', encoding='utf-8') as f:
+                                cache = json.load(f)
+                        cache[symbol] = {"name": name, "updated": datetime.now().isoformat()}
+                        os.makedirs(os.path.dirname(cache_file), exist_ok=True)
+                        with open(cache_file, 'w', encoding='utf-8') as f:
+                            json.dump(cache, f, ensure_ascii=False)
+                    except:
+                        pass
+                    return name
+    except Exception as e:
+        logger.debug(f"获取股票名称失败: {e}")
+    return ''
+
+
 def _get_stock_prefix(symbol: str) -> str:
     """根据股票代码判断交易所前缀"""
     ticker_int = int(symbol)

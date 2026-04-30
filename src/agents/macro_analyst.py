@@ -7,9 +7,111 @@ from src.utils.error_handler import resilient_agent
 import json
 from datetime import datetime, timedelta
 from src.tools.openrouter_config import get_chat_completion
+from concurrent.futures import ThreadPoolExecutor
 
 # 设置日志记录
 logger = setup_logger('macro_analyst_agent')
+
+
+# [NEW] 获取宏观数据指标
+def _get_macro_indicators() -> dict:
+    """
+    获取关键宏观指标：GDP、CPI、PMI、利率等
+    """
+    indicators = {'gdp': None, 'cpi': None, 'pmi': None, 'interest_rate': None}
+    
+    try:
+        import akshare as ak
+        try:
+            # GDP数据
+            gdp_df = ak.macro_china_gdp()
+            if gdp_df is not None and len(gdp_df) > 0:
+                indicators['gdp'] = float(gdp_df.iloc[0].get('gdp', 0) or 0)
+        except:
+            pass
+        
+        try:
+            # CPI数据
+            cpi_df = ak.macro_china_cpi()
+            if cpi_df is not None and len(cpi_df) > 0:
+                indicators['cpi'] = float(cpi_df.iloc[0].get('cpi', 0) or 0)
+        except:
+            pass
+        
+        try:
+            # PMI数据
+            pmi_df = ak.cn_pmi()
+            if pmi_df is not None and len(pmi_df) > 0:
+                indicators['pmi'] = float(pmi_df.iloc[0].get('pmi', 50) or 50)
+        except:
+            pass
+            
+    except ImportError:
+        pass
+    
+    return indicators
+
+
+# [NEW] 筛选宏观相关新闻
+def _filter_macro_relevant_news(news_list: list) -> list:
+    """
+    筛选与宏观相关的新闻
+    """
+    macro_keywords = [
+        '宏观', '经济', 'GDP', 'CPI', 'PPI', 'PMI', '降准', '加息', '降息',
+        '财政', '货币', '政策', '国务院', '央行', '证监会', '财政部',
+        'GDP', '增长', '数据', '经济指标', '通胀', '流动性', '利率',
+        '实体经济', '消费', '投资', '出口', '进口', '贸易', '关税',
+        '房地产', '基建', '制造业', 'A股', '股市', '大盘', '指数'
+    ]
+    
+    relevant_news = []
+    for news in news_list:
+        title = news.get('title', '') + news.get('content', '')
+        if any(kw in title for kw in macro_keywords):
+            relevant_news.append(news)
+    
+    return relevant_news[:50]  # 保留最多50条宏观相关新闻
+
+
+# [NEW] 并行获取多源新闻
+def _get_multi_source_news(symbol: str, end_date: str = None) -> list:
+    """
+    获取目标股票+宏观指数的新闻
+    """
+    all_news = []
+    seen_titles = set()
+    
+    def fetch_news(ticker):
+        try:
+            return get_stock_news(ticker, max_news=30, date=end_date) or []
+        except:
+            return []
+    
+    # 并行获取
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        future_stock = executor.submit(fetch_news, symbol)
+        future_hs300 = executor.submit(fetch_news, "000300")
+        future_sh = executor.submit(fetch_news, "000001")
+        future_sz = executor.submit(fetch_news, "399001")
+        
+        results = [
+            future_stock.result(),
+            future_hs300.result(),
+            future_sh.result(),
+            future_sz.result()
+        ]
+    
+    # 合并去重
+    for news_list in results:
+        for news in news_list:
+            title = news.get('title', '')
+            if title and title not in seen_titles:
+                seen_titles.add(title)
+                all_news.append(news)
+    
+    # 筛选宏观相关
+    return _filter_macro_relevant_news(all_news)
 
 
 def _resolve_news_window_end(end_date: str | None) -> datetime:
@@ -40,17 +142,19 @@ def macro_analyst_agent(state: AgentState):
     symbol = data["ticker"]
     logger.info(f"  股票代码: {symbol}")
 
-    # 获取 end_date 并传递给 get_stock_news
-    end_date = data.get("end_date")  # 从 run_hedge_fund 传递来的 end_date
+    # 获取 end_date
+    end_date = data.get("end_date")
 
-    # 获取大量新闻数据（最多100条），传递正确的日期参数
-    try:
-        news_list = get_stock_news(symbol, max_news=100, date=end_date)
-    except Exception as exc:
-        logger.exception("获取宏观分析新闻失败，将回退为空新闻集: %s", exc)
-        news_list = []
+    # [NEW] 获取宏观数据指标
+    logger.info("  获取宏观数据指标...")
+    macro_indicators = _get_macro_indicators()
+    logger.info(f"  宏观指标: GDP={macro_indicators.get('gdp')}%, CPI={macro_indicators.get('cpi')}%, PMI={macro_indicators.get('pmi')}")
 
-    # 过滤七天前的新闻（只对有publish_time字段的新闻进行过滤）
+    # [NEW] 并行获取多源新闻
+    logger.info("  获取多源新闻...")
+    news_list = _get_multi_source_news(symbol, end_date)
+
+    # 过滤七天前的新闻
     reference_time = _resolve_news_window_end(end_date)
     cutoff_date = reference_time - timedelta(days=7)
     recent_news = []
@@ -62,13 +166,11 @@ def macro_analyst_agent(state: AgentState):
                 if cutoff_date < news_date <= reference_time:
                     recent_news.append(news)
             except ValueError:
-                # 如果时间格式无法解析，默认包含这条新闻
                 recent_news.append(news)
         else:
-            # 如果没有publish_time字段，默认包含这条新闻
             recent_news.append(news)
 
-    logger.info(f"获取到 {len(recent_news)} 条七天内的新闻")
+    logger.info(f"获取到 {len(recent_news)} 条宏观相关新闻")
 
     # 如果没有获取到新闻，返回默认结果
     if not recent_news:
@@ -105,8 +207,36 @@ def macro_analyst_agent(state: AgentState):
         signal = 'neutral'
     signal_cn = {'bullish': '看多', 'bearish': '看空', 'neutral': '中性'}.get(signal, signal)
 
-    # 估算置信度（基于关键因素数量和分析详细程度）
-    confidence = min(0.5 + len(key_factors) * 0.1 + (0.1 if len(reasoning) > 200 else 0), 0.9)
+    # [NEW] 估算置信度（基于关键因素数量、宏观指标有效性、新闻数量）
+    base_confidence = 0.4
+    
+    # 新闻数量加分
+    if len(recent_news) > 20:
+        base_confidence += 0.15
+    elif len(recent_news) > 10:
+        base_confidence += 0.1
+    
+    # 宏观指标加分
+    valid_indicators = sum(1 for v in macro_indicators.values() if v is not None)
+    base_confidence += valid_indicators * 0.05
+    
+    # 关键因素加分
+    base_confidence += min(len(key_factors) * 0.08, 0.2)
+    
+    # 推理详细程度加分
+    if len(reasoning) > 300:
+        base_confidence += 0.1
+    elif len(reasoning) > 150:
+        base_confidence += 0.05
+    
+    confidence = min(base_confidence, 0.9)
+    
+    # [NEW] 引用行业周期分析
+    industry_cycle_analysis = data.get("industry_cycle_analysis", {})
+    industry = data.get("industry", "")
+    cycle_phase = industry_cycle_analysis.get('phase', '未知')
+    cycle_signal = industry_cycle_analysis.get('signal', 'neutral')
+    cycle_type = industry_cycle_analysis.get('cycle_type_cn', industry_cycle_analysis.get('cycle_type', '未知'))
 
     # 构建决策逻辑（详细）
     factor_text = "；".join(key_factors[:5]) if key_factors else "无明显关键因素"
@@ -114,19 +244,41 @@ def macro_analyst_agent(state: AgentState):
     # 生成详细决策逻辑
     env_score = {"有利": "+1", "中性": "0", "不利": "-1"}.get(env_cn, "0")
     impact_score = {"正面": "+1", "中性": "0", "负面": "-1"}.get(impact_cn, "0")
+    
+    # 行业周期信息
+    cycle_text = f"，该行业处于{cycle_type}{cycle_phase}" if cycle_type != '未知' else ""
+    
+    # 行业周期与宏观的交互判断
+    if cycle_signal == 'bullish' and raw_env in ('positive', 'favorable'):
+        combined_assessment = "宏观有利+行业上行，双重利好"
+        final_recommendation = "积极做多"
+    elif cycle_signal == 'bearish' and raw_env in ('negative', 'unfavorable'):
+        combined_assessment = "宏观利空+行业下行，风险叠加"
+        final_recommendation = "建议减仓或观望"
+    elif cycle_signal == 'bullish' and raw_env in ('negative', 'unfavorable'):
+        combined_assessment = "行业逆势上行，可关注结构性机会"
+        final_recommendation = "关注行业龙头"
+    elif cycle_signal == 'bearish' and raw_env in ('positive', 'favorable'):
+        combined_assessment = "宏观有利但行业下行，注意风格切换"
+        final_recommendation = "可考虑行业切换"
+    else:
+        combined_assessment = f"宏观{env_cn}，行业{cycle_signal}"
+        final_recommendation = "保持中性，关注方向"
 
     decision_logic = f"""【宏观环境评估】{env_cn}（得分：{env_score}）
 - 环境判断依据：{reasoning[:200] + '...' if reasoning and len(reasoning) > 200 else reasoning or '基于新闻数据分析'}
 
+【行业周期参考】{industry}属于{cycle_type}，当前{cycle_phase}{cycle_text}
+
 【对个股影响评估】{impact_cn}（得分：{impact_score}）
-- 影响路径：宏观环境变化 → 行业层面传导 → 个股基本面影响
+- 影响路径：宏观环境变化 → 行业周期传导 → 个股基本面影响
 - 关键因素包括：{factor_text}
 
 【综合决策逻辑】
 1. 宏观环境：当前{env_cn}，{('流动性收紧，风险偏好下降' if env_cn == '不利' else '经济运行平稳' if env_cn == '中性' else '政策支持力度加大，经济活跃度提升')}
-2. 行业传导：{('下游需求承压' if impact_cn == '负面' else '需求相对稳定' if impact_cn == '中性' else '需求端受益')}
-3. 估值影响：{('估值面临下修压力' if impact_cn == '负面' else '估值支撑中性' if impact_cn == '中性' else '估值有望提升')}
-4. 最终结论：宏观层面{'不支持' if impact_cn == '负面' else '对' if impact_cn == '中性' else '支持'}股价表现"""
+2. 行业周期：{industry}行业当前{cycle_phase}，{('下游需求强劲' if cycle_signal == 'bullish' else '下游需求承压' if cycle_signal == 'bearish' else '需求平稳')}
+3. 综合判断：{combined_assessment}
+4. 最终结论：{final_recommendation}"""
 
     # 决策结果
     decision_result = {
@@ -160,7 +312,15 @@ def macro_analyst_agent(state: AgentState):
         "reasoning": reasoning,
         "decision_logic": decision_logic,
         "decision_result": decision_result,
-        "summary": f"宏观分析{signal_cn}（置信度{confidence*100:.0f}%），环境{env_cn}，对个股影响{impact_cn}，{len(key_factors)}个关键因素"
+        "macro_indicators": macro_indicators,
+        "news_count": len(recent_news),
+        "industry": industry,
+        "industry_cycle": {
+            "cycle_type": cycle_type,
+            "phase": cycle_phase,
+            "signal": cycle_signal
+        },
+        "summary": f"宏观分析{signal_cn}（置信度{confidence*100:.0f}%），环境{env_cn}，{industry}行业{cycle_phase}，对个股影响{impact_cn}"
     }
 
     # 如果需要显示推理过程

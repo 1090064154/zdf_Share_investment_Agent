@@ -313,3 +313,56 @@ async def get_run_result(run_id: str):
 async def cancel_run(run_id: str):
     """取消任务（暂不支持）"""
     raise HTTPException(status_code=501, detail="Cancellation not yet supported")
+
+
+# 股票搜索缓存
+_stock_cache = None
+_cache_time = 0
+_CACHE_TTL = 300  # 缓存5分钟
+
+def _get_stock_list():
+    """获取股票列表（带缓存）"""
+    global _stock_cache, _cache_time
+    import time
+    
+    now = time.time()
+    if _stock_cache is not None and (now - _cache_time) < _CACHE_TTL:
+        return _stock_cache
+    
+    try:
+        import akshare as ak
+        stock_info = ak.stock_info_a_code_name()
+        if stock_info is not None and not stock_info.empty:
+            _stock_cache = stock_info
+            _cache_time = now
+            logger.info(f"股票列表缓存更新: {len(stock_info)}条")
+        return _stock_cache
+    except Exception as e:
+        logger.error(f"获取股票列表失败: {e}")
+        return _stock_cache
+
+
+@router.get("/stocks/search")
+async def search_stocks(q: str = "", limit: int = 10):
+    """搜索股票（代码或名称）"""
+    if not q or len(q) < 1:
+        return {"results": []}
+    
+    try:
+        stock_info = _get_stock_list()
+        if stock_info is None or stock_info.empty:
+            return {"results": []}
+        
+        mask = stock_info['code'].str.contains(q, na=False) | stock_info['name'].str.contains(q, na=False)
+        matches = stock_info[mask].head(limit)
+        
+        results = []
+        for _, row in matches.iterrows():
+            results.append({
+                "code": row['code'],
+                "name": row['name']
+            })
+        return {"results": results}
+    except Exception as e:
+        logger.error(f"股票搜索失败: {e}")
+        return {"results": []}

@@ -19,11 +19,11 @@ const AGENT_DESCRIPTIONS = {
 
 【结果输出】各策略信号列表、综合信号(看多/中性/看空)、置信度`,
 
-    'fundamentals_agent': `【当前任务】评估公司盈利能力和财务健康状况
+    'fundamentals_agent': `【当前任务】评估公司盈利能力、财务健康和估值水平
 
-【执行逻辑】三维评估：盈利能力(ROE大于15%看涨、小于5%看跌)、成长性(营收增长大于10%看涨、小于0%看跌)、财务健康(流动比率大于2低风险、小于1高风险)。
+【执行逻辑】八维加权评估：盈利能力(ROE/净利率/营业利润率，权重25%)、成长性(营收/盈利增长，权重20%)、财务健康(流动比率/负债权益比/利息保障倍数，权重25%)、估值比率(P/E/P/B/P/S，行业差异化阈值，权重15%)、PB-ROE分位点(权重10%)、盈利质量(经营现金流/净利润，权重10%)、营收质量(应收款占比，权重5%)。周期股识别通过行业因子调节各维度阈值。
 
-【结果输出】盈利能力信号、成长性信号、财务健康信号、综合信号`,
+【结果输出】8个子维度信号、加权置信度、行业上下文、阈值调整因子`,
 
     'sentiment_agent': `【当前任务】量化市场情绪和资金动向
 
@@ -79,23 +79,22 @@ const AGENT_DESCRIPTIONS = {
 
 【结果输出】风险点列表、置信度、看空信号`,
 
-    'debate_room_agent': `【当前任务】多空辩论，形成最终倾向
+    'debate_room_agent': `【当前任务】多空辩论，综合研究员观点与LLM第三方分析形成最终倾向
 
-【执行逻辑】比较看多/看空研究员论点数量和置信度。LLM分析判断。一致时增强置信度，分歧时降低置信度。
+【执行逻辑】五步决策：① 获取多空研究员论点与置信度；② 守门检查：双方置信度均<40%则跳过LLM、输出低置信度中性；③ 调用LLM进行独立第三方分析（补全股票/周期/9维度原始信号上下文）；④ 加权融合：研究员差异(70%)+LLM评分(30%)+分级一致性奖金(±3%~15%)；⑤ 混合差异>8%判方向。
 
-【结果输出】辩论结论、调整后置信度、多空信号`,
-
+【结果输出】辩论结论、混合置信度、一致性评估(看多主导/看空主导/均衡/不确定)、LLM第三方分析`,
     'risk_management_agent': `【当前任务】评估风险约束，确定仓位上限
 
 【执行逻辑】综合评分：大盘风险(权重40%)加个股风险(权重40%)加相对风险(权重20%)。结合波动率、VaR、最大回撤计算动态风险评分。高于阈值减仓。
 
 【结果输出】风险评分、风险指标详情、最大持仓规模、仓位建议`,
 
-    'portfolio_management_agent': `【当前任务】综合所有输入，给出最终交易决策
+    'portfolio_management_agent': `【当前任务】综合所有Agent分析结果，给出最终交易决策
 
-【执行逻辑】综合辩论结论(权重50%)加风险评估(权重30%)加估值水平(权重20%)。LLM最终推理。输出动作、数量、置信度。
+【执行逻辑】六步决策：① 收集解析11个Agent信号(技术/基本面/情绪/估值/宏观/新闻/辩论/行业周期/机构/预期差/风控)；② 按投资期限调整维度权重(短线重技术动量、长线重基本面估值)；③ 优先使用DecisionEngine规则引擎，不可用时回退LLM；④ LLM接收摘要化信号(非原始JSON)减少token消耗；⑤ DecisionValidator统一校验(风控硬约束+交易规则)；⑥ 仓位规模遵循置信度分级方法。
 
-【结果输出】最终动作(买入/卖出/持有)、建议数量、置信度、决策理由`
+【结果输出】最终动作(买入/卖出/持有)、建议数量、置信度、风控覆盖标记、11个Agent信号汇总`
 };
 
 const AGENT_DISPLAY_NAMES = {
@@ -231,6 +230,7 @@ const Components = {
 
         return `
             <div class="agent-card status-${status} ${isActive}" data-agent="${agentName}">
+                ${status === 'running' ? '<div class="progress-indicator-bar"></div>' : ''}
                 <div class="agent-header">
                     <span class="agent-name">${displayName}</span>
                     <span class="agent-status-badge ${status}">${this.getStatusText(status)}</span>
@@ -480,6 +480,7 @@ createAgentDetail(agentName, state = {}, logs = []) {
         const d = data;
         if (agentName === 'technical_analyst_agent') {
             const signals = d.strategy_signals || {};
+            const indicators = d.technical_indicators || {};
             const strategyNames = {
                 'trend_following': '趋势跟踪',
                 'mean_reversion': '均值回归',
@@ -487,12 +488,23 @@ createAgentDetail(agentName, state = {}, logs = []) {
                 'volatility': '波动率',
                 'statistical_arbitrage': '统计套利'
             };
+            
+            let summary = `技术面：${this.getSignalText(d.signal)}`;
+            
+            if (indicators.rsi) {
+                summary += ` RSI${indicators.rsi.value?.toFixed(0) || '-'}`;
+            }
+            if (indicators.kdj) {
+                summary += ` KDJ(${indicators.kdj.k?.toFixed(0) || '-'})`;
+            }
+            
             const parts = Object.keys(signals).map(key => {
                 const signal = signals[key]?.signal || '-';
                 const name = strategyNames[key] || key;
                 return `${name}[${this.getSignalText(signal)}]`;
             });
-            return parts.length > 0 ? `技术面：${parts.join('，')}` : '技术分析暂无数据';
+            
+            return parts.length > 0 ? `${summary} | ${parts.join('，')}` : '技术分析暂无数据';
         }
         if (agentName === 'fundamentals_agent') {
             const r = d.reasoning || {};
@@ -500,17 +512,37 @@ createAgentDetail(agentName, state = {}, logs = []) {
             const profit = d.profitability_signal?.signal || r.profitability_signal?.signal || r.fallback?.signal || '-';
             const growth = d.growth_signal?.signal || r.growth_signal?.signal || r.fallback?.signal || '-';
             const health = d.financial_health_signal?.signal || r.financial_health_signal?.signal || r.fallback?.signal || '-';
+            const eq = d.earnings_quality?.signal || r.earnings_quality?.signal || '-';
+            const pbRoe = d.pb_roe_analysis?.signal || r.pb_roe_analysis?.signal || '-';
             const profitText = this.getSignalText(profit);
             const growthText = this.getSignalText(growth);
             const healthText = this.getSignalText(health);
+            const eqText = this.getSignalText(eq);
+            const pbRoeText = this.getSignalText(pbRoe);
             const status = hasFallback ? '(数据不足)' : '';
-            return `基本面${status}：盈利能力[${profitText}]，成长性[${growthText}]，财务健康[${healthText}]`;
+            const industry = d.industry || '';
+            const cyclical = d.is_cyclical ? '(周期股)' : '';
+            return `基本面${status}：盈利[${profitText}] 成长[${growthText}] 财务[${healthText}] 盈利质量[${eqText}] PB-ROE[${pbRoeText}]${industry ? ' ' + industry + cyclical : ''}`;
         }
         if (agentName === 'sentiment_agent') {
             const signalText = this.getSignalText(d.signal);
             const confidence = d.confidence || '-';
             const score = d.combined_score !== undefined ? d.combined_score.toFixed(3) : '-';
-            return `情绪分析：${signalText}（置信度${confidence}），综合分数${score}`;
+            const components = d.components || {};
+            
+            let details = '';
+            if (components.margin) {
+                const marginChange = components.margin.change_pct || 0;
+                const marginSign = marginChange > 3 ? '↑' : (marginChange < -3 ? '↓' : '-');
+                details += ` 融资${marginSign}${marginChange.toFixed(1)}%`;
+            }
+            if (components.north_money) {
+                const northSignal = components.north_money.signal || 'neutral';
+                const northSign = northSignal === 'bullish' ? '流入' : (northSignal === 'bearish' ? '流出' : '-');
+                details += ` 北向${northSign}`;
+            }
+            
+            return `情绪分析：${signalText}（置信度${confidence}），综合分数${score}${details}`;
         }
         if (agentName === 'valuation_agent') {
             const signalText = this.getSignalText(d.signal);
@@ -520,45 +552,93 @@ createAgentDetail(agentName, state = {}, logs = []) {
             const fair = d.fair_value != null ? Number(d.fair_value).toFixed(2) + '元' : '-';
             const discount = d.discount != null ? (Number(d.discount) * 100).toFixed(1) + '%' : '-';
             const methodNames = d.methods ? d.methods.map(m => m.name).join('、') : (d.reasoning ? Object.keys(d.reasoning).join('、') : '-');
-            return `估值：${signalText}（置信度${confPct}），当前价${price}，合理价${fair}，折扣率${discount}，方法：${methodNames}`;
+            
+            let extras = '';
+            if (d.peg_ratio != null) extras += ` PEG=${d.peg_ratio}`;
+            if (d.dividend_yield != null) extras += ` 股息率${d.dividend_yield}%`;
+            
+            return `估值：${signalText}（置信度${confPct}），当前价${price}，合理价${fair}，${discount}，方法：${methodNames}${extras}`;
         }
         if (agentName === 'macro_analyst_agent') {
             const envMap = {'favorable': '有利', 'unfavorable': '不利', 'neutral': '中性', '有利': '有利', '不利': '不利', '中性': '中性'};
             const impactMap = {'positive': '正面', 'negative': '负面', 'neutral': '中性', '正面': '正面', '负面': '负面', '中性': '中性'};
             const env = envMap[d.macro_environment] || d.macro_environment || '-';
             const impact = impactMap[d.impact_on_stock] || d.impact_on_stock || '-';
-            const decisionResult = d.decision_result || {};
-            const action = decisionResult.action || '';
-            const recommendation = decisionResult.recommendation || '';
-            const summary = recommendation || action ? `，建议${recommendation || action}` : '';
-            return `宏观分析：环境${env}，对股票${impact}，置信度${normalizeConfidence(d.confidence)}${summary}`;
+            const indicators = d.macro_indicators || {};
+            const newsCount = d.news_count || 0;
+            const industry = d.industry || '';
+            const cycleData = d.industry_cycle || {};
+            const cyclePhase = cycleData.phase || '';
+            
+            let extras = '';
+            if (indicators.pmi) extras += ` PMI${indicators.pmi.toFixed(1)}`;
+            if (indicators.gdp) extras += ` GDP${indicators.gdp}%`;
+            if (indicators.cpi) extras += ` CPI${indicators.cpi}%`;
+            
+            const cycleText = industry && cyclePhase ? ` | ${industry}${cyclePhase}` : '';
+            
+            return `宏观分析：${env}→${impact}（${normalizeConfidence(d.confidence)}）${extras} 新闻${newsCount}条${cycleText}`;
         }
         if (agentName === 'macro_news_agent') {
             const newsResult = d.macro_news_analysis_result || d;
             const newsCount = newsResult.retrieved_news_count || newsResult.获取新闻数 || 0;
             const summary = newsResult.summary_content || newsResult.新闻摘要 || newsResult.summary || newsResult.最终输出 || newsResult.reasoning || '';
-            if (summary) {
-                return `宏观新闻：获取${newsCount}条，${summary.slice(0, 80)}...`;
+            const sentiment = newsResult.sentiment_distribution || {};
+            const hotspots = newsResult.sector_hotspots || [];
+            
+            let extras = '';
+            if (sentiment.total > 0) {
+                const pos = sentiment.positive || 0;
+                const neg = sentiment.negative || 0;
+                if (pos > neg * 2) extras += '偏多';
+                else if (neg > pos * 2) extras += '偏空';
+                else extras += '中性';
             }
-            return `宏观新闻：暂无数据`;
+            if (hotspots.length > 0) {
+                extras += ` 热点${hotspots.slice(0, 2).map(s => s.sector).join(',')}`;
+            }
+            
+            // 简化摘要显示，只取关键信息
+            let summaryText = '';
+            if (summary) {
+                // 提取关键句（第一句或前50字）
+                const firstSentence = summary.split(/[。；！\n]/)[0];
+                summaryText = firstSentence.length > 50 ? firstSentence.slice(0, 50) + '...' : firstSentence;
+            }
+            
+            const display = summaryText || '暂无摘要';
+            return `宏观新闻：${newsCount}条 ${extras}，${display}`;
         }
         if (agentName === 'risk_management_agent') {
             const riskScore = d.风险评分 || d.risk_score || '-';
+            const confidence = d.置信度 || d.confidence || 0;
             const action = d.交易行动 || d.trading_action || 'hold';
             const maxPos = d.最大持仓规模 || d.max_position_size || '-';
             const marketRisk = d.风险指标?.大盘风险评分 || d.components?.market_risk || '-';
             const stockRisk = d.风险指标?.个股风险评分 || d.components?.stock_risk || '-';
             const volatility = d.风险指标?.波动率 || d.metrics?.stock_volatility || 0;
             const var95 = d.风险指标?.['95%风险价值(VaR)'] || d.metrics?.stock_var || 0;
+            const industry = d.行业 || '';
+            const industryRisk = d.行业风险系数 || 1.0;
+            const liquidity = d.流动性评分 || 5;
+            const stopLoss = d.止损建议?.建议止损 || d.止损建议?.稳健止损 || null;
             const actionMap = {buy: '买入', sell: '卖出', hold: '持有'};
             const actionText = actionMap[action] || action;
-            return `风险评分：${riskScore}/10（大盘${marketRisk}分/个股${stockRisk}分），波动率${(volatility*100).toFixed(1)}%，VaR${(var95*100).toFixed(1)}%，建议：${actionText}，最大持仓：${typeof maxPos === 'number' ? Math.round(maxPos) : maxPos}`;
+            
+            let extras = '';
+            if (industry && industryRisk !== 1.0) extras += ` 行业${industryRisk}x`;
+            if (liquidity > 7) extras += ' ⚠️流动性';
+            if (stopLoss != null) extras += ` 止损${parseFloat(stopLoss).toFixed(2)}`;
+            
+            return `风险评分：${riskScore}/10（置信度${(confidence*100).toFixed(0)}%，大盘${marketRisk}分/个股${stockRisk}分），波动率${(volatility*100).toFixed(1)}%，VaR${(var95*100).toFixed(1)}%，建议：${actionText}，最大持仓：${typeof maxPos === 'number' ? Math.round(maxPos) : maxPos}${extras}`;
         }
         if (agentName === 'portfolio_management_agent') {
             const confNum = typeof d.confidence === 'number' ? d.confidence : parseFloat(d.confidence);
             const confPct = !isNaN(confNum) ? Math.round(confNum * 100) + '%' : '-';
             const reason = d.reasoning ? d.reasoning.slice(0, 80) + (d.reasoning.length > 80 ? '...' : '') : '';
-            return `最终决策：${this.getActionText(d.action || 'hold')} ${d.quantity || 0}股，置信度${confPct}${reason ? ' — ' + reason : ''}`;
+            const overridden = d.validation_overridden ? ' ⚡(风控覆盖)' : '';
+            const engine = d.reasoning && d.reasoning.startsWith('[DecisionEngine]') ? '[规则引擎] ' : '';
+            return `最终决策：${engine}${this.getActionText(d.action || 'hold')} ${d.quantity || 0}股，置信度${confPct}${overridden}${reason ? ' — ' + reason : ''}`;
         }
         if (agentName === 'industry_cycle_agent') {
             const signalText = this.getSignalText(d.signal);
@@ -566,7 +646,19 @@ createAgentDetail(agentName, state = {}, logs = []) {
             const confPct = !isNaN(confNum) ? Math.round(confNum * 100) + '%' : (d.confidence || '-');
             const cycle = d.cycle_type_cn || d.cycle_type || '-';
             const phase = d.phase || '-';
-            return `行业周期：${signalText}（置信度${confPct}），${cycle}，${phase}`;
+            
+            let extras = '';
+            const inv = d.inventory_cycle || {};
+            if (inv.phase && inv.phase !== '未知') {
+                extras += ` 库存${inv.phase}`;
+            }
+            const comm = d.commodity || {};
+            if (comm.change !== undefined && comm.change !== null) {
+                const changeSign = comm.change > 0 ? '↑' : (comm.change < 0 ? '↓' : '-');
+                extras += ` 商品${changeSign}${comm.change}%`;
+            }
+            
+            return `行业周期：${signalText}（置信度${confPct}），${cycle}，${phase}${extras}`;
         }
         if (agentName === 'institutional_agent') {
             const signalText = this.getSignalText(d.signal);
@@ -574,38 +666,97 @@ createAgentDetail(agentName, state = {}, logs = []) {
             const confPct = !isNaN(confNum) ? Math.round(confNum * 100) + '%' : (d.confidence || '-');
             const details = d.details || [];
             const preview = details.map(di => `${di.name}${di.signal_cn}`).join('，') || '-';
-            return `机构持仓：${signalText}（置信度${confPct}），${preview}`;
+            
+            // 获取各维度关键数据
+            let extras = [];
+            const trend = d.trend || {};
+            if (trend.avg_inflow !== undefined && trend.avg_inflow !== null) {
+                const trendSign = trend.avg_inflow > 0 ? '↑' : (trend.avg_inflow < 0 ? '↓' : '-');
+                extras.push(`${trendSign}趋势${Math.abs(trend.avg_inflow).toFixed(0)}万`);
+            }
+            const north = d.north_money || {};
+            if (north.signal) extras.push(`北向${north.signal === 'bullish' ? '流入' : north.signal === 'bearish' ? '流出' : '观望'}`);
+            const fund = d.fund_holding || {};
+            if (fund.change_pct !== undefined) extras.push(`基金${fund.change_pct > 0 ? '增持' : fund.change_pct < 0 ? '减持' : '持平'}`);
+            const holder = d.shareholder || {};
+            if (holder.change_pct !== undefined && holder.change_pct !== null) {
+                const holderSign = holder.change_pct < 0 ? '集中' : (holder.change_pct > 0 ? '分散' : '');
+                if (holderSign) extras.push(`筹码${holderSign}`);
+            }
+            
+            const extrasStr = extras.length > 0 ? ' ' + extras.join(' ') : '';
+            return `机构持仓：${signalText}（${confPct}），${preview}${extrasStr}`;
         }
         if (agentName === 'expectation_diff_agent') {
             const signalText = this.getSignalText(d.signal);
-            const forecast = d.earnings_forecast || d.业绩预告 || {};
-            const rating = d.research_rating || d.研报评级 || {};
-            const forecastText = this.getSignalText(forecast.signal);
-            const ratingText = this.getSignalText(rating.signal);
-            return `预期差分析：${signalText}，预告${forecastText}，评级${ratingText}`;
+            let confNum = typeof d.confidence === 'number' ? d.confidence : parseFloat(d.confidence);
+            // 如果数值大于1，说明已经是百分比格式
+            if (confNum > 1) confNum = confNum / 100;
+            const confPct = !isNaN(confNum) && confNum > 0 ? Math.round(confNum * 100) + '%' : '-';
+            
+            const ann = d.earnings_announcement || {};
+            const rating = d.research_rating || {};
+            const target = d.target_price || {};
+            const adj = d.forecast_adjustment || {};
+            
+            let parts = [];
+            if (ann.signal && ann.signal !== 'neutral') parts.push(`${ann.signal === 'bullish' ? '预增' : '预减'}`);
+            if (rating.signal && rating.signal !== 'neutral') parts.push(`评级${rating.signal === 'bullish' ? '看多' : '看空'}`);
+            if (target.signal && target.signal !== 'neutral') parts.push(`目标价${target.signal === 'bullish' ? '高' : '低'}`);
+            if (adj.signal && adj.signal !== 'neutral') parts.push(`预测${adj.signal === 'bullish' ? '上调' : '下调'}`);
+            
+            const preview = parts.length > 0 ? parts.join('，') : '数据不足';
+            return `预期差：${signalText}（${confPct}），${preview}`;
         }
         if (agentName === 'researcher_bull_agent') {
             const points = d.thesis_points || [];
             const preview = points.length > 0 ? points.slice(0, 2).join('；') : '无具体论点';
-            return `看多研究：置信度${d.confidence ?? '-'}，论点${points.length}条：${preview}`;
+            const dist = d.signal_distribution || {};
+            const signalInfo = dist.bullish !== undefined ? `看涨${dist.bullish}/看跌${dist.bearish || 0}` : '';
+            const risk = d.risk_factors?.length > 0 ? ` ⚠️${d.risk_factors.length}风险` : '';
+            return `看多研究：置信度${d.confidence ?? '-'}，${signalInfo}，论点${points.length}条${risk}：${preview}`;
         }
         if (agentName === 'researcher_bear_agent') {
             const points = d.risk_points || [];
             const preview = points.length > 0 ? points.slice(0, 2).join('；') : '无具体风险点';
-            return `看空研究：置信度${d.confidence ?? '-'}，风险点${points.length}条：${preview}`;
+            const dist = d.signal_distribution || {};
+            const signalInfo = dist.bearish !== undefined ? `看跌${dist.bearish}/看涨${dist.bullish || 0}` : '';
+            const counter = d.counter_factors?.length > 0 ? ` ↔对冲${d.counter_factors.length}` : '';
+            return `看空研究：置信度${d.confidence ?? '-'}，${signalInfo}，风险点${points.length}条${counter}：${preview}`;
         }
         if (agentName === 'debate_room_agent') {
             const signalText = this.getSignalText(d.signal);
             const summary = d.debate_summary || [];
-            return `辩论结论：${signalText}（置信度${d.confidence ?? '-'}），论辩点${summary.length}条`;
+            const consistency = d.consistency || '';
+            const consistencyMap = {
+                'bullish_dominant': '看多主导', 'bearish_dominant': '看空主导',
+                'balanced': '均衡', 'uncertain': '不确定'
+            };
+            const consistencyText = consistencyMap[consistency] || consistency;
+            const skipLLM = d.跳过LLM ? '(跳过LLM)' : '';
+            const bonus = d.consistency_bonus != null ? (d.consistency_bonus > 0 ? '+'+d.consistency_bonus.toFixed(2) : d.consistency_bonus.toFixed(2)) : '';
+            return `辩论结论：${signalText}（置信度${d.confidence ?? '-'}），一致性${consistencyText}${bonus ? '(' + bonus + ')' : ''}，论辩点${summary.length}条${skipLLM}`;
         }
         if (agentName === 'market_data_agent') {
             const ticker = d.ticker || '-';
+            const stockName = d.stock_name || '';
+            const tickerDisplay = stockName ? `${stockName}(${ticker})` : ticker;
             const count = d.prices_count != null ? d.prices_count + '条' : '-';
             const industry = d.industry || '-';
             const price = d.latest_price != null ? d.latest_price.toFixed(2) + '元' : '-';
             const cap = d.market_cap ? (d.market_cap / 1e8).toFixed(1) + '亿' : '-';
-            return `${ticker}：${count}价格记录，最新价${price}，市值${cap}，行业${industry}`;
+            
+            // 新增实时数据
+            let realtimeInfo = '';
+            if (d.change_pct !== undefined && d.change_pct !== null) {
+                const changeColor = d.change_pct >= 0 ? '↑' : '↓';
+                realtimeInfo += ` ${changeColor}${d.change_pct.toFixed(2)}%`;
+            }
+            if (d.current_position !== undefined && d.current_position !== null) {
+                realtimeInfo += ` 位置${d.current_position.toFixed(0)}%`;
+            }
+            
+            return `${tickerDisplay}：${count}价格记录，最新价${price}${realtimeInfo}，市值${cap}，行业${industry}`;
         }
         
         return JSON.stringify(data).slice(0, 150);
@@ -616,44 +767,172 @@ createAgentDetail(agentName, state = {}, logs = []) {
 
         if (agentName === 'researcher_bull_agent') {
             const points = resultData.thesis_points || [];
-            if (points.length === 0) return '';
-            const items = points.map((p, i) => `<div class="detail-point"><span class="point-num">${i + 1}.</span>${this.escapeHtml(p)}</div>`).join('');
-            return `<div class="detail-section"><div class="detail-section-title">看多论点 (${points.length}条)</div>${items}</div>`;
+            const dist = resultData.signal_distribution || {};
+            const riskFactors = resultData.risk_factors || [];
+            const stopLoss = resultData.stop_loss || '';
+            let html = '';
+            
+            // 信号分布
+            html += `<div class="detail-section"><div class="detail-section-title">信号分布</div>`;
+            html += `<div class="detail-point"><strong>看涨：</strong>${dist.bullish || 0}个</div>`;
+            html += `<div class="detail-point"><strong>中性：</strong>${dist.neutral || 0}个</div>`;
+            html += `<div class="detail-point"><strong>看跌：</strong>${dist.bearish || 0}个</div>`;
+            html += `<div class="detail-point"><strong>置信度：</strong>${(resultData.confidence * 100).toFixed(1)}%</div>`;
+            if (resultData.base_confidence !== undefined) {
+                html += `<div class="detail-point"><strong>基础置信度：</strong>${(resultData.base_confidence * 100).toFixed(1)}%</div>`;
+            }
+            html += `</div>`;
+            
+            // 看多论点
+            if (points.length > 0) {
+                html += `<div class="detail-section"><div class="detail-section-title">看多论点 (${points.length}条)</div>`;
+                html += points.map((p, i) => `<div class="detail-point"><span class="point-num">${i + 1}.</span>${this.escapeHtml(p)}</div>`).join('');
+                html += `</div>`;
+            }
+            
+            // 风险因素
+            if (riskFactors.length > 0) {
+                html += `<div class="detail-section"><div class="detail-section-title">风险因素 (${riskFactors.length}条)</div>`;
+                html += riskFactors.map(r => `<div class="detail-point" style="color:#d9534f;">⚠️ ${this.escapeHtml(r)}</div>`).join('');
+                html += `</div>`;
+            }
+            
+            // 止损建议
+            if (stopLoss) {
+                html += `<div class="detail-section"><div class="detail-section-title">止损建议</div>`;
+                html += `<div class="detail-point" style="color:#d9534f;">${this.escapeHtml(stopLoss)}</div>`;
+                html += `</div>`;
+            }
+            
+            return html;
         }
 
         if (agentName === 'researcher_bear_agent') {
             const points = resultData.risk_points || [];
-            if (points.length === 0) return '';
-            const items = points.map((p, i) => `<div class="detail-point"><span class="point-num">${i + 1}.</span>${this.escapeHtml(p)}</div>`).join('');
-            return `<div class="detail-section"><div class="detail-section-title">风险点 (${points.length}条)</div>${items}</div>`;
+            const dist = resultData.signal_distribution || {};
+            const counterFactors = resultData.counter_factors || [];
+            const riskMitigation = resultData.risk_mitigation || '';
+            let html = '';
+            
+            // 信号分布
+            html += `<div class="detail-section"><div class="detail-section-title">信号分布</div>`;
+            html += `<div class="detail-point"><strong>看跌：</strong>${dist.bearish || 0}个</div>`;
+            html += `<div class="detail-point"><strong>中性：</strong>${dist.neutral || 0}个</div>`;
+            html += `<div class="detail-point"><strong>看涨：</strong>${dist.bullish || 0}个</div>`;
+            html += `<div class="detail-point"><strong>置信度：</strong>${(resultData.confidence * 100).toFixed(1)}%</div>`;
+            if (resultData.base_confidence !== undefined) {
+                html += `<div class="detail-point"><strong>基础置信度：</strong>${(resultData.base_confidence * 100).toFixed(1)}%</div>`;
+            }
+            html += `</div>`;
+            
+            // 风险点
+            if (points.length > 0) {
+                html += `<div class="detail-section"><div class="detail-section-title">风险点 (${points.length}条)</div>`;
+                html += points.map((p, i) => `<div class="detail-point"><span class="point-num">${i + 1}.</span>${this.escapeHtml(p)}</div>`).join('');
+                html += `</div>`;
+            }
+            
+            // 对冲因素
+            if (counterFactors.length > 0) {
+                html += `<div class="detail-section"><div class="detail-section-title">对冲因素 (${counterFactors.length}条)</div>`;
+                html += counterFactors.map(c => `<div class="detail-point" style="color:#5bc0de;">↔ ${this.escapeHtml(c)}</div>`).join('');
+                html += `</div>`;
+            }
+            
+            // 风险缓解建议
+            if (riskMitigation) {
+                html += `<div class="detail-section"><div class="detail-section-title">风险缓解建议</div>`;
+                html += `<div class="detail-point">${this.escapeHtml(riskMitigation)}</div>`;
+                html += `</div>`;
+            }
+            
+            return html;
         }
 
         if (agentName === 'debate_room_agent') {
             const summary = resultData.debate_summary || [];
             const llmAnalysis = resultData.llm_analysis || '';
+            const llmReasoning = resultData.llm_reasoning || '';
+            const bullConf = resultData.bull_confidence;
+            const bearConf = resultData.bear_confidence;
+            const confidenceDiff = resultData.confidence_diff;
+            const llmScore = resultData.llm_score;
+            const llmWeight = resultData.llm_weight;
+            const mixedDiff = resultData.mixed_confidence_diff;
+            const consistencyBonus = resultData.consistency_bonus;
+            const consistency = resultData.consistency || '';
+            const skipLLM = resultData.跳过LLM;
             let html = '';
+
+            // 决策逻辑与置信度对比
+            html += `<div class="detail-section"><div class="detail-section-title">置信度对比</div>`;
+            html += `<div class="valuation-metrics">`;
+            html += `<div class="val-metric"><span class="val-label">看多置信度</span><span class="val-value" style="color:var(--accent-success)">${bullConf != null ? (bullConf * 100).toFixed(0) + '%' : '-'}</span></div>`;
+            html += `<div class="val-metric"><span class="val-label">看空置信度</span><span class="val-value" style="color:var(--accent-danger)">${bearConf != null ? (bearConf * 100).toFixed(0) + '%' : '-'}</span></div>`;
+            html += `<div class="val-metric"><span class="val-label">原始差异</span><span class="val-value">${confidenceDiff != null ? (confidenceDiff > 0 ? '+' : '') + (confidenceDiff * 100).toFixed(1) + '%' : '-'}</span></div>`;
+            html += `</div></div>`;
+
+            // LLM第三方评估
+            html += `<div class="detail-section"><div class="detail-section-title">LLM第三方评估</div>`;
+            if (skipLLM) {
+                html += `<div class="detail-point" style="color:var(--accent-warning)">⚠️ 双方置信度过低，跳过LLM辩论</div>`;
+            } else {
+                html += `<div class="detail-point"><strong>LLM评分：</strong>${llmScore != null ? (llmScore > 0 ? '+' : '') + (llmScore * 100).toFixed(1) + '%' : '不可用'}</div>`;
+                html += `<div class="detail-point"><strong>LLM权重：</strong>${llmWeight != null ? (llmWeight * 100).toFixed(0) + '%' : '-'} / 研究员权重：${resultData.researcher_weight != null ? (resultData.researcher_weight * 100).toFixed(0) + '%' : '70%'}</div>`;
+            }
+            html += `</div>`;
+
+            // 混合置信度计算
+            html += `<div class="detail-section"><div class="detail-section-title">混合置信度计算</div>`;
+            html += `<div class="detail-point"><strong>混合差异：</strong>${mixedDiff != null ? (mixedDiff > 0 ? '+' : '') + (mixedDiff * 100).toFixed(1) + '%' : '-'}</div>`;
+            html += `<div class="detail-point"><strong>一致性奖金：</strong>${consistencyBonus != null ? (consistencyBonus > 0 ? '+' : '') + (consistencyBonus * 100).toFixed(1) + '%' : '-'}</div>`;
+            const consistencyMap = {bullish_dominant: '看多主导', bearish_dominant: '看空主导', balanced: '均衡', uncertain: '不确定'};
+            html += `<div class="detail-point"><strong>一致性：</strong>${consistencyMap[consistency] || consistency || '-'}</div>`;
+            html += `</div>`;
+
+            // 辩论总结
             if (summary.length > 0) {
                 const items = summary.map(s => `<div class="detail-point">${this.escapeHtml(s)}</div>`).join('');
                 html += `<div class="detail-section"><div class="detail-section-title">辩论总结</div>${items}</div>`;
             }
+
+            // LLM详细分析
             if (llmAnalysis) {
-                html += `<div class="detail-section"><div class="detail-section-title">LLM分析</div><div class="detail-point">${this.escapeHtml(llmAnalysis)}</div></div>`;
+                html += `<div class="detail-section"><div class="detail-section-title">LLM分析详情</div><div class="detail-point" style="white-space:pre-wrap">${this.escapeHtml(llmAnalysis)}</div></div>`;
             }
+            if (llmReasoning) {
+                html += `<div class="detail-section"><div class="detail-section-title">LLM评分理由</div><div class="detail-point">${this.escapeHtml(llmReasoning)}</div></div>`;
+            }
+
             return html;
         }
 
-        if (agentName === 'risk_management_agent') {
+if (agentName === 'risk_management_agent') {
             const riskMetrics = resultData.风险指标 || resultData.metrics || {};
             const debateAnalysis = resultData.辩论分析 || resultData.debate_analysis || {};
             const components = resultData.风险指标?.components || resultData.components || {};
             const actionMap = {buy: '买入', sell: '卖出', hold: '持有'};
             const action = resultData.交易行动 || resultData.trading_action || 'hold';
             const actionText = actionMap[action] || action;
+            const confidence = resultData.置信度 || resultData.confidence || 0;
+            const industry = resultData.行业 || '';
+            const industryRisk = resultData.行业风险系数 || 1.0;
+            const liquidity = resultData.流动性评分 || 5;
+            const stopLoss = resultData.止损建议 || {};
             let html = '';
 
-            html += `<div class="detail-section"><div class="detail-section-title">决策逻辑</div>`;
-            html += `<div class="detail-point"><strong>风险评分：</strong>${resultData.风险评分 || resultData.risk_score || '-'}/10，动态阈值：${(resultData.动态阈值 || resultData.dynamic_threshold || 0).toFixed(1)}</div>`;
-            html += `<div class="detail-point"><strong>评分构成：</strong>大盘风险${components.market_risk || riskMetrics.大盘风险评分 || 0}分 + 个股风险${components.stock_risk || riskMetrics.个股风险评分 || 0}分 + 相对风险${components.relative_risk || riskMetrics.相对风险评分 || 0}分</div>`;
+            // 新增字段
+            html += `<div class="detail-section"><div class="detail-section-title">风险评估</div>`;
+            html += `<div class="detail-point"><strong>风险评分：</strong>${resultData.风险评分 || resultData.risk_score || '-'}/10（置信度${(confidence*100).toFixed(0)}%）</div>`;
+            html += `<div class="detail-point"><strong>动态阈值：</strong>${(resultData.动态阈值 || resultData.dynamic_threshold || 0).toFixed(1)}</div>`;
+            if (industry) {
+                html += `<div class="detail-point"><strong>行业风险：</strong>${industry}（系数${industryRisk}）</div>`;
+            }
+            html += `<div class="detail-point"><strong>流动性风险：</strong>${liquidity}/10 ${liquidity > 7 ? '⚠️高' : liquidity > 5 ? '⚡中' : '✅低'}</div>`;
+            html += `</div>`;
+
+            html += `<div class="detail-section"><div class="detail-section-title">评分构成</div>`;
+            html += `<div class="detail-point">大盘风险${components.market_risk || riskMetrics.大盘风险评分 || 0}分 + 个股风险${components.stock_risk || riskMetrics.个股风险评分 || 0}分 + 相对风险${components.relative_risk || riskMetrics.相对风险评分 || 0}分 + 流动性${components.liquidity_risk || riskMetrics.流动性风险评分 || 5}分</div>`;
             html += `<div class="detail-point"><strong>决策依据：</strong>${resultData.推理 || resultData.reasoning || '综合评估得出'}</div>`;
             html += `<div class="detail-point"><strong>最终建议：</strong>${actionText}（${action === 'hold' ? '风险评分高于阈值或辩论信号不明确' : action === 'buy' ? '风险可控，建议买入' : '风险过高，建议卖出'}）</div>`;
             html += `</div>`;
@@ -664,6 +943,16 @@ createAgentDetail(agentName, state = {}, logs = []) {
             html += `<div class="detail-point"><strong>CVaR(95%)：</strong>${((riskMetrics['95%条件风险价值(CVaR)'] || riskMetrics.stock_cvar || 0) * 100).toFixed(2)}% （极端损失情况）</div>`;
             html += `<div class="detail-point"><strong>最大回撤：</strong>${((riskMetrics.最大回撤 || riskMetrics.stock_drawdown || 0) * 100).toFixed(2)}%</div>`;
             html += `</div>`;
+
+            // 止损建议
+            if (stopLoss && Object.keys(stopLoss).length > 0) {
+                html += `<div class="detail-section"><div class="detail-section-title">止损建议</div>`;
+                html += `<div class="detail-point" style="color:#d9534f;"><strong>激进止损：</strong>${stopLoss.激进止损 || '-'}</div>`;
+                html += `<div class="detail-point" style="color:#d9534f;"><strong>稳健止损：</strong>${stopLoss.稳健止损 || '-'}</div>`;
+                html += `<div class="detail-point" style="color:#d9534f;"><strong>保守止损：</strong>${stopLoss.保守止损 || '-'}</div>`;
+                html += `<div class="detail-point"><strong>建议止损：</strong>${stopLoss.建议止损 || '-'}</div>`;
+                html += `</div>`;
+            }
 
             html += `<div class="detail-section"><div class="detail-section-title">大盘风险对比</div>`;
             html += `<div class="detail-point"><strong>大盘波动率：</strong>${((riskMetrics.大盘波动率 || riskMetrics.market_volatility || 0) * 100).toFixed(2)}%</div>`;
@@ -694,16 +983,9 @@ createAgentDetail(agentName, state = {}, logs = []) {
                 html += `</div>`;
             }
 
-            html += `<div class="detail-section"><div class="detail-section-title">仓位建议</div>`;
-            html += `<div class="detail-point"><strong>最大持仓规模：</strong>${Math.round(resultData.最大持仓规模 || resultData.max_position_size || 0)}元</div>`;
-            html += `<div class="detail-point"><strong>基础仓位：</strong>25%</div>`;
-            const riskScore = resultData.风险评分 || resultData.risk_score || 0;
-            const threshold = resultData.动态阈值 || resultData.dynamic_threshold || 5;
-            let positionAdj = '基准';
-            if (riskScore >= 8) positionAdj = '降至7.5%';
-            else if (riskScore >= threshold) positionAdj = '降至12.5%';
-            else if (riskScore >= 4) positionAdj = '降至18.75%';
-            html += `<div class="detail-point"><strong>风险调整：</strong>${positionAdj}</div>`;
+            html += `<div class="detail-section"><div class="detail-section-title">交易建议</div>`;
+            html += `<div class="detail-point"><strong>建议操作：</strong>${actionText}</div>`;
+            html += `<div class="detail-point"><strong>最大持仓规模：</strong>${typeof resultData.最大持仓规模 === 'number' ? Math.round(resultData.最大持仓规模) : resultData.最大持仓规模 || '-'}股</div>`;
             html += `</div>`;
 
             return html;
@@ -733,11 +1015,18 @@ createAgentDetail(agentName, state = {}, logs = []) {
             if (resultData.pe_ratio != null || resultData.pb_ratio != null) {
                 const pe = resultData.pe_ratio != null ? resultData.pe_ratio.toFixed(1) : '-';
                 const pb = resultData.pb_ratio != null ? resultData.pb_ratio.toFixed(1) : '-';
+                const peg = resultData.peg_ratio != null ? resultData.peg_ratio.toFixed(2) : '-';
+                const div = resultData.dividend_yield != null ? resultData.dividend_yield.toFixed(2) + '%' : '-';
+                const growth = resultData.growth_rate != null ? resultData.growth_rate.toFixed(1) + '%' : '-';
+                
                 html += `<div class="detail-section">
                     <div class="detail-section-title">估值指标</div>
                     <div class="valuation-metrics">
                         <div class="val-metric"><span class="val-label">PE</span><span class="val-value">${pe}</span></div>
                         <div class="val-metric"><span class="val-label">PB</span><span class="val-value">${pb}</span></div>
+                        <div class="val-metric"><span class="val-label">PEG</span><span class="val-value">${peg}</span></div>
+                        <div class="val-metric"><span class="val-label">股息率</span><span class="val-value">${div}</span></div>
+                        <div class="val-metric"><span class="val-label">增长率</span><span class="val-value">${growth}</span></div>
                         <div class="val-metric"><span class="val-label">股票类型</span><span class="val-value">${resultData.stock_type || '-'}</span></div>
                     </div>
                 </div>`;
@@ -785,8 +1074,11 @@ createAgentDetail(agentName, state = {}, logs = []) {
             const phase = resultData.phase || '-';
             const logic = resultData.decision_logic || resultData.reason || '';
             const wf = resultData.weight_factor != null ? (resultData.weight_factor * 100).toFixed(0) + '%' : '-';
-
-            return `<div class="detail-section">
+            
+            const inv = resultData.inventory_cycle || {};
+            const comm = resultData.commodity || {};
+            
+            let html = `<div class="detail-section">
                 <div class="detail-section-title">周期判断</div>
                 <div class="valuation-metrics">
                     <div class="val-metric"><span class="val-label">行业</span><span class="val-value">${resultData.industry || '-'}</span></div>
@@ -794,15 +1086,46 @@ createAgentDetail(agentName, state = {}, logs = []) {
                     <div class="val-metric"><span class="val-label">当前阶段</span><span class="val-value">${phase}</span></div>
                     <div class="val-metric"><span class="val-label">配置权重</span><span class="val-value">${wf}</span></div>
                 </div>
-            </div>
-            <div class="detail-section">
+            </div>`;
+            
+            if (inv.phase && inv.phase !== '未知') {
+                const invSignal = this.getSignalText(inv.signal);
+                html += `<div class="detail-section">
+                    <div class="detail-section-title">库存周期</div>
+                    <div class="valuation-metrics">
+                        <div class="val-metric"><span class="val-label">阶段</span><span class="val-value">${inv.phase || '-'}</span></div>
+                        <div class="val-metric"><span class="val-label">PMI</span><span class="val-value">${inv.pmi?.toFixed(1) || '-'}</span></div>
+                        <div class="val-metric"><span class="val-label">PPI变化</span><span class="val-value">${inv.ppi_change != null ? inv.ppi_change.toFixed(1) + '%' : '-'}</span></div>
+                        <div class="val-metric"><span class="val-label">信号</span><span class="val-value">${invSignal}</span></div>
+                    </div>
+                </div>`;
+            }
+            
+            if (comm.price && comm.price !== null) {
+                const commSignal = this.getSignalText(comm.signal);
+                html += `<div class="detail-section">
+                    <div class="detail-section-title">大宗商品价格</div>
+                    <div class="valuation-metrics">
+                        <div class="val-metric"><span class="val-label">价格</span><span class="val-value">${comm.price || '-'}</span></div>
+                        <div class="val-metric"><span class="val-label">涨跌幅</span><span class="val-value">${comm.change != null ? comm.change.toFixed(1) + '%' : '-'}</span></div>
+                        <div class="val-metric"><span class="val-label">信号</span><span class="val-value">${commSignal}</span></div>
+                    </div>
+                </div>`;
+            }
+            
+            html += `<div class="detail-section">
                 <div class="detail-section-title">决策结果</div>
                 <div class="detail-point"><span class="point-num sig-${resultData.signal || 'neutral'}">${signalText}</span>置信度 ${confPct}</div>
-            </div>
-            ${logic ? `<div class="detail-section">
-                <div class="detail-section-title">决策逻辑</div>
-                <div class="detail-point">${this.escapeHtml(logic)}</div>
-            </div>` : ''}`;
+            </div>`;
+            
+            if (logic) {
+                html += `<div class="detail-section">
+                    <div class="detail-section-title">决策逻辑</div>
+                    <div class="detail-point">${this.escapeHtml(logic)}</div>
+                </div>`;
+            }
+            
+            return html;
         }
 
         if (agentName === 'institutional_agent') {
@@ -911,35 +1234,69 @@ createAgentDetail(agentName, state = {}, logs = []) {
 
         if (agentName === 'fundamentals_agent') {
             const r = resultData.reasoning || {};
-            const details = resultData.details || {};
             let html = '';
 
             html += `<div class="detail-section"><div class="detail-section-title">决策逻辑</div>`;
             html += `<div class="detail-point"><strong>综合信号：</strong>${this.getSignalText(resultData.signal)}</div>`;
             const conf = typeof resultData.confidence === 'number' ? resultData.confidence : parseFloat(resultData.confidence || 0);
             html += `<div class="detail-point"><strong>置信度：</strong>${normalizeConfidence(conf)}</div>`;
-            if (r.decision_logic) {
-                html += `<div class="detail-point">${this.escapeHtml(r.decision_logic)}</div>`;
-            }
             html += `</div>`;
 
-            html += `<div class="detail-section"><div class="detail-section-title">基本面三维度</div>`;
+            // 核心三维度
+            html += `<div class="detail-section"><div class="detail-section-title">核心三维度</div>`;
             const profit = resultData.profitability_signal?.signal || r.profitability_signal?.signal || '-';
             const profitDetails = resultData.profitability_signal?.details || r.profitability_signal?.details || '';
-            html += `<div class="detail-point"><strong>盈利能力：</strong>${this.getSignalText(profit)} ${profitDetails ? '(' + profitDetails + ')' : ''}</div>`;
+            html += `<div class="detail-point"><strong>盈利能力：</strong>${this.getSignalText(profit)} ${profitDetails ? '<span style="color:var(--text-muted);font-size:11px">' + this.escapeHtml(profitDetails) + '</span>' : ''}</div>`;
 
             const growth = resultData.growth_signal?.signal || r.growth_signal?.signal || '-';
             const growthDetails = resultData.growth_signal?.details || r.growth_signal?.details || '';
-            html += `<div class="detail-point"><strong>成长性：</strong>${this.getSignalText(growth)} ${growthDetails ? '(' + growthDetails + ')' : ''}</div>`;
+            html += `<div class="detail-point"><strong>成长性：</strong>${this.getSignalText(growth)} ${growthDetails ? '<span style="color:var(--text-muted);font-size:11px">' + this.escapeHtml(growthDetails) + '</span>' : ''}</div>`;
 
             const health = resultData.financial_health_signal?.signal || r.financial_health_signal?.signal || '-';
             const healthDetails = resultData.financial_health_signal?.details || r.financial_health_signal?.details || '';
-            html += `<div class="detail-point"><strong>财务健康：</strong>${this.getSignalText(health)} ${healthDetails ? '(' + healthDetails + ')' : ''}</div>`;
+            html += `<div class="detail-point"><strong>财务健康：</strong>${this.getSignalText(health)} ${healthDetails ? '<span style="color:var(--text-muted);font-size:11px">' + this.escapeHtml(healthDetails) + '</span>' : ''}</div>`;
             html += `</div>`;
 
-            if (details.price_ratios) {
-                html += `<div class="detail-section"><div class="detail-section-title">估值指标</div>`;
-                html += `<div class="detail-point">${details.price_ratios.details || ''}</div>`;
+            // 估值与质量维度
+            html += `<div class="detail-section"><div class="detail-section-title">估值与质量维度</div>`;
+            const price = resultData.price_ratios_signal?.signal || r.price_ratios_signal?.signal || '-';
+            const priceDetails = resultData.price_ratios_signal?.details || r.price_ratios_signal?.details || '';
+            html += `<div class="detail-point"><strong>估值比率：</strong>${this.getSignalText(price)} ${priceDetails ? '<span style="color:var(--text-muted);font-size:11px">' + this.escapeHtml(priceDetails) + '</span>' : ''}</div>`;
+
+            const pbRoe = resultData.pb_roe_analysis?.signal || r.pb_roe_analysis?.signal || '-';
+            const pbRoeDet = resultData.pb_roe_analysis?.reasoning || r.pb_roe_analysis?.reasoning || r.pb_roe_analysis?.details || '';
+            html += `<div class="detail-point"><strong>PB-ROE：</strong>${this.getSignalText(pbRoe)} ${pbRoeDet ? '<span style="color:var(--text-muted);font-size:11px">' + this.escapeHtml(pbRoeDet) + '</span>' : ''}</div>`;
+
+            const eq = resultData.earnings_quality?.signal || r.earnings_quality?.signal || '-';
+            const eqDet = resultData.earnings_quality?.details || r.earnings_quality?.details || '';
+            const eqRatio = resultData.earnings_quality?.ocf_ni_ratio || r.earnings_quality?.ocf_ni_ratio;
+            html += `<div class="detail-point"><strong>盈利质量：</strong>${this.getSignalText(eq)} ${eqRatio != null ? '<span style="color:var(--text-muted);font-size:11px">(OCF/NI=' + eqRatio.toFixed(1) + 'x)</span>' : ''} ${eqDet ? '<span style="color:var(--text-muted);font-size:11px">' + this.escapeHtml(eqDet) + '</span>' : ''}</div>`;
+
+            const rq = resultData.revenue_quality_analysis?.signal || r.revenue_quality_analysis?.signal || '-';
+            const rqDet = resultData.revenue_quality_analysis?.reasoning || r.revenue_quality_analysis?.details || '';
+            html += `<div class="detail-point"><strong>营收质量：</strong>${this.getSignalText(rq)} ${rqDet ? '<span style="color:var(--text-muted);font-size:11px">' + this.escapeHtml(rqDet) + '</span>' : ''}</div>`;
+            html += `</div>`;
+
+            // 信号权重分配
+            const weights = resultData.signal_weights;
+            if (weights) {
+                html += `<div class="detail-section"><div class="detail-section-title">信号权重分配</div>`;
+                html += `<div class="detail-point">`;
+                html += `<span style="color:var(--accent-success)">看多权重: ${(weights.bullish_weight * 100).toFixed(0)}%</span> &nbsp;`;
+                html += `<span style="color:var(--accent-danger)">看空权重: ${(weights.bearish_weight * 100).toFixed(0)}%</span> &nbsp;`;
+                html += `<span style="color:var(--accent-warning)">中性权重: ${(weights.neutral_weight * 100).toFixed(0)}%</span>`;
+                html += `</div></div>`;
+            }
+
+            // 行业上下文
+            if (resultData.industry) {
+                const cyclical = resultData.is_cyclical;
+                const adj = r.cyclical_analysis?.adjustments_applied;
+                html += `<div class="detail-section"><div class="detail-section-title">行业上下文</div>`;
+                html += `<div class="detail-point"><strong>行业：</strong>${this.escapeHtml(resultData.industry)} ${cyclical ? '<span style="color:var(--accent-warning)">(周期股)</span>' : ''}</div>`;
+                if (adj && Object.keys(adj).length > 0) {
+                    html += `<div class="detail-point"><strong>阈值调整因子：</strong>${this.escapeHtml(JSON.stringify(adj))}</div>`;
+                }
                 html += `</div>`;
             }
 
@@ -949,6 +1306,8 @@ createAgentDetail(agentName, state = {}, logs = []) {
         if (agentName === 'technical_analyst_agent') {
             const signals = resultData.strategy_signals || {};
             const prices = resultData.prices || [];
+            const indicators = resultData.technical_indicators || {};
+            const sr = resultData.support_resistance || {};
             let html = '';
 
             html += `<div class="detail-section"><div class="detail-section-title">决策逻辑</div>`;
@@ -959,6 +1318,42 @@ createAgentDetail(agentName, state = {}, logs = []) {
                 html += `<div class="detail-point">${this.escapeHtml(resultData.decision_logic)}</div>`;
             }
             html += `</div>`;
+
+            // 技术指标
+            html += `<div class="detail-section"><div class="detail-section-title">技术指标</div>`;
+            if (indicators.macd) {
+                const macdSig = this.getSignalText(indicators.macd.signal);
+                html += `<div class="detail-point"><strong>MACD：</strong>${indicators.macd.value?.toFixed(4) || '-'} [${macdSig}]</div>`;
+            }
+            if (indicators.rsi) {
+                const rsiSig = this.getSignalText(indicators.rsi.signal);
+                html += `<div class="detail-point"><strong>RSI(14)：</strong>${indicators.rsi.value?.toFixed(2) || '-'} [${rsiSig}]</div>`;
+            }
+            if (indicators.kdj) {
+                const kdjSig = this.getSignalText(indicators.kdj.signal);
+                html += `<div class="detail-point"><strong>KDJ：</strong>K=${indicators.kdj.k?.toFixed(1) || '-'} D=${indicators.kdj.d?.toFixed(1) || '-'} J=${indicators.kdj.j?.toFixed(1) || '-'} [${kdjSig}]</div>`;
+            }
+            if (indicators.bollinger) {
+                const bbSig = this.getSignalText(indicators.bollinger.signal);
+                html += `<div class="detail-point"><strong>布林带：</strong>上轨${indicators.bollinger.upper?.toFixed(2) || '-'} 下轨${indicators.bollinger.lower?.toFixed(2) || '-'} [${bbSig}]</div>`;
+            }
+            if (indicators.volume_change_rate !== undefined) {
+                const volSig = indicators.volume_change_rate > 30 ? '放量' : (indicators.volume_change_rate < -30 ? '缩量' : '持平');
+                html += `<div class="detail-point"><strong>成交量变化：</strong>${(indicators.volume_change_rate * 100).toFixed(1)}% [${volSig}]</div>`;
+            }
+            html += `</div>`;
+
+            // 支撑阻力位
+            if (sr.nearest_resistance || sr.nearest_support) {
+                html += `<div class="detail-section"><div class="detail-section-title">支撑/阻力位</div>`;
+                if (sr.nearest_resistance) {
+                    html += `<div class="detail-point"><strong>最近阻力：</strong>${sr.nearest_resistance.toFixed(2)} (距当前${sr.resistance_distance_pct?.toFixed(1) || '-'}%)</div>`;
+                }
+                if (sr.nearest_support) {
+                    html += `<div class="detail-point"><strong>最近支撑：</strong>${sr.nearest_support.toFixed(2)} (距当前${sr.support_distance_pct?.toFixed(1) || '-'}%)</div>`;
+                }
+                html += `</div>`;
+            }
 
             const strategyNames = {
                 'trend_following': '趋势跟踪',
@@ -977,16 +1372,63 @@ createAgentDetail(agentName, state = {}, logs = []) {
             }
             html += `</div>`;
 
-            if (resultData.macd_value != null || resultData.rsi_value != null) {
-                html += `<div class="detail-section"><div class="detail-section-title">技术指标</div>`;
-                if (resultData.macd_value != null) html += `<div class="detail-point"><strong>MACD：</strong>${resultData.macd_value.toFixed(4)}</div>`;
-                if (resultData.rsi_value != null) html += `<div class="detail-point"><strong>RSI(14)：</strong>${resultData.rsi_value.toFixed(2)}</div>`;
-                html += `</div>`;
-            }
-
             if (prices.length > 0) {
                 html += this.createKlineChart(prices, 'technical-kline');
             }
+
+            return html;
+        }
+
+        if (agentName === 'sentiment_agent') {
+            const components = resultData.components || {};
+            const weights = resultData.weights || {};
+            let html = '';
+
+            html += `<div class="detail-section"><div class="detail-section-title">综合判断</div>`;
+            html += `<div class="detail-point"><strong>信号：</strong>${this.getSignalText(resultData.signal)}</div>`;
+            const conf = typeof resultData.confidence === 'number' ? resultData.confidence : parseFloat(resultData.confidence || 0);
+            html += `<div class="detail-point"><strong>置信度：</strong>${normalizeConfidence(conf)}</div>`;
+            html += `<div class="detail-point"><strong>综合分数：</strong>${resultData.combined_score?.toFixed(3) || '-'}</div>`;
+            html += `</div>`;
+
+            html += `<div class="detail-section"><div class="detail-section-title">各数据源</div>`;
+            
+            // 新闻
+            const news = components.news || {};
+            if (news.count > 0) {
+                html += `<div class="detail-point"><strong>新闻情绪：</strong>${news.original_score?.toFixed(3) || '-'} → ${news.weighted_score?.toFixed(3) || '-'} (权重${(news.weight * 100).toFixed(0)}%)</div>`;
+            }
+            
+            // 股吧
+            const guba = components.guba || {};
+            if (guba.post_count > 0) {
+                html += `<div class="detail-point"><strong>股吧情绪：</strong>原始${guba.original_score?.toFixed(3) || '-'} → 反向${guba.adjusted_score?.toFixed(3) || '-'} (权重${(guba.weight * 100).toFixed(0)}%)</div>`;
+                html += `<div class="detail-point">帖子${guba.post_count}条，看多${((guba.bull_ratio || 0) * 100).toFixed(0)}%，看空${((guba.bear_ratio || 0) * 100).toFixed(0)}%</div>`;
+            }
+            
+            // 量化
+            const quant = components.quant || {};
+            if (quant.score !== undefined && quant.score !== 0) {
+                const trendMap = {'up': '↑', 'down': '↓', 'stable': '→'};
+                html += `<div class="detail-point"><strong>量化指标：</strong>${quant.score?.toFixed(3) || '-'} (权重${(quant.weight * 100).toFixed(0)}%)</div>`;
+                html += `<div class="detail-point">评分${quant.rating || '-'} 趋势${trendMap[quant.rating_trend] || '-'} 机构参与${quant.institution || '-'}</div>`;
+            }
+            
+            // 北向资金
+            const north = components.north_money || {};
+            if (north.signal && north.signal !== 'neutral') {
+                const northSign = north.signal === 'bullish' ? '净流入' : '净流出';
+                html += `<div class="detail-point"><strong>北向资金：</strong>${northSign} ${(north.net_flow || 0).toFixed(2)}亿</div>`;
+            }
+            
+            // 融资融券
+            const margin = components.margin || {};
+            if (margin.balance > 0) {
+                const marginSignal = margin.signal === 'bullish' ? '增长' : (margin.signal === 'bearish' ? '下降' : '平稳');
+                html += `<div class="detail-point"><strong>融资融券：</strong>余额${margin.balance?.toFixed(2) || '-'}亿，变化${margin.change_pct?.toFixed(1) || '-'}% (${marginSignal})</div>`;
+            }
+            
+            html += `</div>`;
 
             return html;
         }
@@ -1036,6 +1478,10 @@ createAgentDetail(agentName, state = {}, logs = []) {
             html += `<div class="detail-section"><div class="detail-section-title">分析结论</div>`;
             html += `<div class="detail-point"><strong>宏观环境：</strong>${envMap[resultData.macro_environment] || resultData.macro_environment || '-'}</div>`;
             html += `<div class="detail-point"><strong>对股票影响：</strong>${impactMap[resultData.impact_on_stock] || resultData.impact_on_stock || '-'}</div>`;
+            const cycleData = resultData.industry_cycle || {};
+            if (resultData.industry && cycleData.phase) {
+                html += `<div class="detail-point"><strong>行业周期：</strong>${resultData.industry}（${cycleData.phase}）</div>`;
+            }
             html += `<div class="detail-point"><strong>信号：</strong>${this.getSignalText(resultData.signal)}</div>`;
             const conf = typeof resultData.confidence === 'number' ? resultData.confidence : parseFloat(resultData.confidence || 0);
             html += `<div class="detail-point"><strong>置信度：</strong>${normalizeConfidence(conf)}</div>`;
@@ -1101,9 +1547,14 @@ createAgentDetail(agentName, state = {}, logs = []) {
             html += `</div>`;
 
             const newsList = resultData.news_list || d.news_list || newsResult.news_list || newsResult.新闻列表 || [];
+            const totalNews = newsList.length;
+            const displayNews = newsList.slice(0, 15); // 显示15条
             if (newsList.length > 0) {
-                html += `<div class="detail-section"><div class="detail-section-title">📰 新闻列表</div>`;
-                newsList.slice(0, 10).forEach((item, idx) => {
+                html += `<div class="detail-section"><div class="detail-section-title">📰 新闻列表 (${totalNews}条)</div>`;
+                if (totalNews > 15) {
+                    html += `<div class="detail-point" style="color: var(--text-muted); font-size: 12px;">* 显示前15条，更多请查看完整数据</div>`;
+                }
+                displayNews.forEach((item, idx) => {
                     const title = item.title || item.标题 || '无标题';
                     const date = item.date || item.发布日期 || '';
                     const source = item.source || item.来源 || '';
@@ -1606,6 +2057,144 @@ createAgentDetail(agentName, state = {}, logs = []) {
                 ` : ''}
             </div>
         `;
+    },
+
+    // ==================== PDF报告生成 ====================
+    buildPDFReport(opts) {
+        const { ticker, horizon, agentStates, agentLogs, result } = opts;
+        const now = new Date().toLocaleString('zh-CN');
+        const action = result.action || 'hold';
+        const quantity = result.quantity || 0;
+        const confidence = result.confidence || 0;
+        const reasoning = result.reasoning || '';
+        const agentSignals = Array.isArray(result.agent_signals) ? result.agent_signals : [];
+        const signalSummary = result.signal_summary || result.各模块信号汇总 || {};
+
+        const actionMap = { buy: '买入', sell: '卖出', hold: '持有' };
+        const actionText = actionMap[action] || '持有';
+        const actionClass = action;
+        const signalMap = { bullish: '看多', bearish: '看空', neutral: '中性', buy: '买入', sell: '卖出', hold: '持有' };
+        const sigText = (s) => signalMap[s] || s || '-';
+        const esc = (s) => { if (!s) return ''; const d = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }; return String(s).replace(/[&<>"]/g, c => d[c]); };
+
+        // 构建Agent表格行
+        const agentRows = [];
+        const workflowOrder = [
+            'market_data_agent', 'technical_analyst_agent', 'fundamentals_agent',
+            'sentiment_agent', 'valuation_agent', 'industry_cycle_agent',
+            'institutional_agent', 'expectation_diff_agent', 'macro_news_agent',
+            'macro_analyst_agent', 'researcher_bull_agent', 'researcher_bear_agent',
+            'debate_room_agent', 'risk_management_agent', 'portfolio_management_agent'
+        ];
+
+        for (const agentName of workflowOrder) {
+            const state = agentStates[agentName] || {};
+            const signal = state.signal || (agentSignals.find(s => s.agent_name === agentName) || {}).signal || '';
+            const conf = state.confidence || (agentSignals.find(s => s.agent_name === agentName) || {}).confidence || 0;
+            const displayName = AGENT_DISPLAY_NAMES[agentName] || agentName;
+            const status = state.status === 'completed' ? '✓' : state.status === 'running' ? '⟳' : '○';
+
+            // 获取关键日志
+            const logs = agentLogs[agentName] || [];
+            const keyLogs = logs.filter(l => l.message && (
+                l.message.includes('信号') || l.message.includes('决策') || l.message.includes('完成') ||
+                l.message.includes('评分') || l.message.includes('结论') || l.message.includes('策略') ||
+                l.message.includes('周期') || l.message.includes('分析')
+            )).slice(0, 3);
+            const logText = keyLogs.map(l => esc(l.message)).join('<br>');
+
+            const sigClass = signal === 'bullish' ? 'sig-bullish' : signal === 'bearish' ? 'sig-bearish' : 'sig-neutral';
+            const confPct = conf > 0 ? (conf > 1 ? Math.round(conf) : Math.round(conf * 100)) + '%' : '-';
+
+            agentRows.push('<tr>' +
+                '<td><strong>' + esc(displayName) + '</strong></td>' +
+                '<td>' + status + '</td>' +
+                '<td class="' + sigClass + '">' + sigText(signal) + '</td>' +
+                '<td>' + confPct + '</td>' +
+                '<td style="font-size:11px;color:#555;line-height:1.5">' + logText + '</td>' +
+                '</tr>');
+        }
+
+        // 构建信号分布
+        let bullishCount = 0, bearishCount = 0, neutralCount = 0;
+        if (Array.isArray(agentSignals) && agentSignals.length > 0) {
+            agentSignals.forEach(s => {
+                const sig = (s.signal || '').toLowerCase();
+                if (sig === 'bullish' || sig === 'buy' || sig === 'positive') bullishCount++;
+                else if (sig === 'bearish' || sig === 'sell' || sig === 'negative') bearishCount++;
+                else neutralCount++;
+            });
+        }
+        const signalDistHtml = agentSignals.length > 0
+            ? agentSignals.map(s => {
+                const sigClass = (s.signal === 'bullish' ? 'sig-bullish' : s.signal === 'bearish' ? 'sig-bearish' : 'sig-neutral');
+                return '<span style="display:inline-block;margin:4px 6px;padding:4px 12px;border-radius:4px;font-size:12px;background:#f0f0f5;border-left:3px solid ' + (s.signal === 'bullish' ? '#10b981' : s.signal === 'bearish' ? '#ef4444' : '#f59e0b') + '" class="' + sigClass + '">' + esc(s.agent_name || s.agent || '') + ': ' + sigText(s.signal) + '</span>';
+            }).join('')
+            : '无信号数据';
+
+        const confPct = Math.round((confidence > 1 ? confidence / 100 : confidence) * 100);
+
+        // 解析reasoning中的行(将换行转为<br>以兼容html2canvas)
+        const reasoningLines = String(reasoning).split('\n').filter(l => l.trim());
+        const headline = reasoningLines[0] || '系统已生成最终决策';
+        const keyBasis = reasoningLines.slice(1, 8);
+        const reasoningHtml = esc(String(reasoning)).replace(/\n/g, '<br>');
+
+        return '<div class="pdf-report">' +
+            // 报告头
+            '<div class="pdf-header">' +
+                '<div class="pdf-title">A股投资分析报告</div>' +
+                '<div class="pdf-subtitle">Multi-Agent Investment Analysis Report</div>' +
+                '<div class="pdf-meta-row">' +
+                    '<span class="pdf-meta-item">股票代码: ' + esc(ticker) + '</span>' +
+                    '<span class="pdf-meta-item">持仓周期: ' + esc(horizon) + '</span>' +
+                    '<span class="pdf-meta-item">生成时间: ' + now + '</span>' +
+                '</div>' +
+            '</div>' +
+
+            // 最终决策
+            '<div class="pdf-section-title">最终决策</div>' +
+            '<div class="pdf-decision-box action-' + actionClass + '">' +
+                '<div class="pdf-decision-row">' +
+                    '<div class="pdf-decision-action ' + actionClass + '">' + actionText + '</div>' +
+                    '<div class="pdf-decision-info">' +
+                        '<span>建议数量: <strong>' + quantity + ' 股</strong></span>' +
+                        '<span>置信度: <strong>' + confPct + '%</strong></span>' +
+                        '<span>信号分布: <strong style="color:#22c55e">' + bullishCount + '多</strong> / <strong style="color:#ef4444">' + bearishCount + '空</strong> / <strong style="color:#f59e0b">' + neutralCount + '中</strong></span>' +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
+
+            // 结论摘要
+            '<div class="pdf-reasoning">' +
+                '<strong>结论摘要：</strong>' + esc(headline) +
+            '</div>' +
+
+            // 关键依据
+            (keyBasis.length > 0 ? '<div class="pdf-section-title">关键依据</div>' +
+            keyBasis.map((line, i) => '<div class="pdf-decision-logic">' + (i + 1) + '. ' + esc(line) + '</div>').join('') : '') +
+
+            // 各模块决策信号
+            '<div class="pdf-section-title">各模块决策信号 (' + workflowOrder.length + '个步骤)</div>' +
+            '<table class="pdf-agent-table">' +
+                '<thead><tr><th style="width:14%">分析模块</th><th style="width:8%">状态</th><th style="width:10%">信号</th><th style="width:10%">置信度</th><th>关键决策/输出</th></tr></thead>' +
+                '<tbody>' + agentRows.join('') + '</tbody>' +
+            '</table>' +
+
+            // 信号分布详情
+            '<div class="pdf-section-title">信号分布</div>' +
+            '<div style="padding:10px;font-size:13px;line-height:2">' + signalDistHtml + '</div>' +
+
+            // 完整决策说明
+            (reasoning ? '<div class="pdf-section-title">完整决策说明</div>' +
+            '<div class="pdf-reasoning">' + reasoningHtml + '</div>' : '') +
+
+            // 免责声明
+            '<div class="pdf-footer">' +
+                '<p>本报告由A股分析系统(Multi-Agent Investment Analysis)自动生成，仅供参考，不构成投资建议。</p>' +
+                '<p>股市有风险，投资需谨慎。AI分析结果可能存在偏差，请独立判断。</p>' +
+            '</div>' +
+        '</div>';
     }
 };
 

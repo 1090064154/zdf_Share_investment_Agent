@@ -14,8 +14,15 @@ import numpy as np
 
 from src.tools.api import prices_to_df
 
-# 初始化 logger
+# 初始化 logger (必须在任何日志调用之前)
 logger = setup_logger('technical_analyst_agent')
+
+try:
+    from scipy.signal import find_peaks
+    SCIPY_AVAILABLE = True
+except ImportError:
+    SCIPY_AVAILABLE = False
+    logger.warning("scipy未安装，支撑阻力位计算将使用简化方法")
 
 
 # 策略名称中英文映射
@@ -24,20 +31,31 @@ STRATEGY_NAME_CN = {
     "mean_reversion": "均值回归",
     "momentum": "动量策略",
     "volatility": "波动率分析",
-    "statistical_arbitrage": "统计套利"
+    "statistical_arbitrage": "统计套利",
+    "kdj": "KDJ指标"
+}
+
+# 技术指标权重配置
+TECHNICAL_WEIGHTS = {
+    "macd": 0.25,
+    "rsi": 0.20,
+    "bollinger": 0.15,
+    "obv": 0.10,
+    "kdj": 0.20,
+    "volume_change": 0.10
 }
 
 
 def _build_fallback_analysis(reason: str) -> dict:
     return {
         "signal": "neutral",
-        "confidence": "0%",
+        "confidence": 0.0,
         "strategy_signals": {
-            "trend_following": {"signal": "neutral", "confidence": "0%", "metrics": {}},
-            "mean_reversion": {"signal": "neutral", "confidence": "0%", "metrics": {}},
-            "momentum": {"signal": "neutral", "confidence": "0%", "metrics": {}},
-            "volatility": {"signal": "neutral", "confidence": "0%", "metrics": {}},
-            "statistical_arbitrage": {"signal": "neutral", "confidence": "0%", "metrics": {}}
+            "trend_following": {"signal": "neutral", "confidence": 0.0, "metrics": {}},
+            "mean_reversion": {"signal": "neutral", "confidence": 0.0, "metrics": {}},
+            "momentum": {"signal": "neutral", "confidence": 0.0, "metrics": {}},
+            "volatility": {"signal": "neutral", "confidence": 0.0, "metrics": {}},
+            "statistical_arbitrage": {"signal": "neutral", "confidence": 0.0, "metrics": {}}
         },
         "reasoning": {
             "fallback": {
@@ -100,111 +118,131 @@ def technical_analyst_agent(state: AgentState):
     confidence = 0.0
 
     # Calculate indicators
-    # 1. MACD (Moving Average Convergence Divergence)
     macd_line, signal_line = calculate_macd(prices_df)
     macd_val = macd_line.iloc[-1] if len(macd_line) > 0 else 0
     signal_val = signal_line.iloc[-1] if len(signal_line) > 0 else 0
 
-    # 2. RSI (Relative Strength Index)
     rsi = calculate_rsi(prices_df)
     rsi_val = rsi.iloc[-1] if len(rsi) > 0 else 50
 
-    # 3. Bollinger Bands (Bollinger Bands)
     upper_band, lower_band = calculate_bollinger_bands(prices_df)
 
-    # 4. OBV (On-Balance Volume)
     obv = calculate_obv(prices_df)
 
-    show_agent_reasoning({"MACD": f"{macd_val:.4f}", "RSI": f"{rsi_val:.2f}"}, "技术分析师")
+    # [NEW] KDJ指标
+    kdj = calculate_kdj(prices_df)
+    kdj_k = kdj['k'].iloc[-1] if len(kdj) > 0 else 50
+    kdj_d = kdj['d'].iloc[-1] if len(kdj) > 0 else 50
+    kdj_j = kdj['j'].iloc[-1] if len(kdj) > 0 else 50
 
-    # Generate individual signals
-    signals = []
+    # [NEW] 成交量变化率
+    volume_ma5 = prices_df['volume'].rolling(5).mean()
+    volume_ma20 = prices_df['volume'].rolling(20).mean()
+    volume_change_rate = ((volume_ma5.iloc[-1] - volume_ma20.iloc[-1]) / volume_ma20.iloc[-1]) if volume_ma20.iloc[-1] > 0 else 0
+
+    # [NEW] 支撑阻力位
+    try:
+        support_resistance = calculate_support_resistance(prices_df)
+    except Exception as e:
+        logger.warning(f"支撑阻力位计算失败: {e}")
+        support_resistance = {'nearest_resistance': None, 'nearest_support': None, 'resistance_distance_pct': None, 'support_distance_pct': None}
+
+    show_agent_reasoning({
+        "MACD": f"{macd_val:.4f}", 
+        "RSI": f"{rsi_val:.2f}",
+        "KDJ": f"K:{kdj_k:.1f} D:{kdj_d:.1f} J:{kdj_j:.1f}",
+        "量价变化": f"{volume_change_rate*100:+.1f}%"
+    }, "技术分析师")
+
+    # Generate individual signals with weighted approach
+    signal_scores = {}
 
     # MACD signal
-    if macd_line.iloc[-2] < signal_line.iloc[-2] and macd_line.iloc[-1] > signal_line.iloc[-1]:
-        signals.append('bullish')
-    elif macd_line.iloc[-2] > signal_line.iloc[-2] and macd_line.iloc[-1] < signal_line.iloc[-1]:
-        signals.append('bearish')
+    if len(macd_line) >= 2 and len(signal_line) >= 2:
+        if macd_line.iloc[-2] < signal_line.iloc[-2] and macd_line.iloc[-1] > signal_line.iloc[-1]:
+            signal_scores['macd'] = 1
+        elif macd_line.iloc[-2] > signal_line.iloc[-2] and macd_line.iloc[-1] < signal_line.iloc[-1]:
+            signal_scores['macd'] = -1
+        else:
+            signal_scores['macd'] = 0
     else:
-        signals.append('neutral')
+        signal_scores['macd'] = 0
 
     # RSI signal
-    if rsi.iloc[-1] < 30:
-        signals.append('bullish')
-    elif rsi.iloc[-1] > 70:
-        signals.append('bearish')
+    if rsi_val < 30:
+        signal_scores['rsi'] = 1
+    elif rsi_val > 70:
+        signal_scores['rsi'] = -1
     else:
-        signals.append('neutral')
+        signal_scores['rsi'] = 0
 
     # Bollinger Bands signal
     current_price = prices_df['close'].iloc[-1]
     if current_price < lower_band.iloc[-1]:
-        signals.append('bullish')
+        signal_scores['bollinger'] = 1
     elif current_price > upper_band.iloc[-1]:
-        signals.append('bearish')
+        signal_scores['bollinger'] = -1
     else:
-        signals.append('neutral')
+        signal_scores['bollinger'] = 0
 
     # OBV signal
     obv_slope = obv.diff().iloc[-5:].mean()
     if obv_slope > 0:
-        signals.append('bullish')
+        signal_scores['obv'] = 1
     elif obv_slope < 0:
-        signals.append('bearish')
+        signal_scores['obv'] = -1
     else:
-        signals.append('neutral')
+        signal_scores['obv'] = 0
 
-    # Calculate price drop
-    price_drop = (prices_df['close'].iloc[-1] -
-                  prices_df['close'].iloc[-5]) / prices_df['close'].iloc[-5]
+    # [NEW] KDJ signal
+    if kdj_k < 20 or kdj_j < 0:
+        signal_scores['kdj'] = 1
+    elif kdj_k > 80 or kdj_j > 100:
+        signal_scores['kdj'] = -1
+    else:
+        signal_scores['kdj'] = 0
 
-    # Add price drop signal
-    if price_drop < -0.05 and rsi.iloc[-1] < 40:  # 5% drop and RSI below 40
-        signals.append('bullish')
-        confidence += 0.2  # Increase confidence for oversold conditions
-    elif price_drop < -0.03 and rsi.iloc[-1] < 45:  # 3% drop and RSI below 45
-        signals.append('bullish')
-        confidence += 0.1
+    # [NEW] Volume change signal
+    if volume_change_rate > 0.3:
+        signal_scores['volume_change'] = 1
+    elif volume_change_rate < -0.3:
+        signal_scores['volume_change'] = -1
+    else:
+        signal_scores['volume_change'] = 0
 
-    # Add reasoning collection
-    reasoning = {
-        "MACD": {
-            "signal": signals[0],
-            "details": f"MACD Line crossed {'above' if signals[0] == 'bullish' else 'below' if signals[0] == 'bearish' else 'neither above nor below'} Signal Line"
-        },
-        "RSI": {
-            "signal": signals[1],
-            "details": f"RSI is {rsi.iloc[-1]:.2f} ({'oversold' if signals[1] == 'bullish' else 'overbought' if signals[1] == 'bearish' else 'neutral'})"
-        },
-        "Bollinger": {
-            "signal": signals[2],
-            "details": f"Price is {'below lower band' if signals[2] == 'bullish' else 'above upper band' if signals[2] == 'bearish' else 'within bands'}"
-        },
-        "OBV": {
-            "signal": signals[3],
-            "details": f"OBV slope is {obv_slope:.2f} ({signals[3]})"
-        }
-    }
-
-    # Determine overall signal
-    bullish_signals = signals.count('bullish')
-    bearish_signals = signals.count('bearish')
-
-    if bullish_signals > bearish_signals:
+    # Weighted signal combination
+    total_weight = sum(TECHNICAL_WEIGHTS.values())
+    weighted_score = sum(signal_scores.get(key, 0) * TECHNICAL_WEIGHTS.get(key, 0) for key in TECHNICAL_WEIGHTS.keys())
+    
+    if weighted_score > 0.2:
         overall_signal = 'bullish'
-    elif bearish_signals > bullish_signals:
+    elif weighted_score < -0.2:
         overall_signal = 'bearish'
     else:
         overall_signal = 'neutral'
 
-    # Calculate confidence level based on the proportion of indicators agreeing
-    total_signals = len(signals)
-    confidence = max(bullish_signals, bearish_signals) / total_signals
+    confidence = min(abs(weighted_score) / total_weight * 2, 1.0)
+
+    # 兼容性：保留旧的signals列表用于展示
+    signals = []
+    for key in ['macd', 'rsi', 'bollinger', 'obv', 'kdj', 'volume_change']:
+        val = signal_scores.get(key, 0)
+        signals.append('bullish' if val == 1 else ('bearish' if val == -1 else 'neutral'))
+
+    # Reasoning collection
+    reasoning = {
+        "MACD": {"signal": signals[0], "details": f"MACD交叉{'金叉' if signals[0]=='bullish' else '死叉' if signals[0]=='bearish' else '中性'}"},
+        "RSI": {"signal": signals[1], "details": f"RSI={rsi_val:.2f}，{'超卖' if signals[1]=='bullish' else '超买' if signals[1]=='bearish' else '中性'}"},
+        "Bollinger": {"signal": signals[2], "details": f"价格{'低于下轨' if signals[2]=='bullish' else '高于上轨' if signals[2]=='bearish' else '带内'}"},
+        "OBV": {"signal": signals[3], "details": f"OBV斜率{'正' if signals[3]=='bullish' else '负' if signals[3]=='bearish' else '平'}"},
+        "KDJ": {"signal": signals[4], "details": f"K={kdj_k:.1f} D={kdj_d:.1f} J={kdj_j:.1f}，{'超卖' if signals[4]=='bullish' else '超买' if signals[4]=='bearish' else '中性'}"},
+        "Volume": {"signal": signals[5], "details": f"成交量变化率{volume_change_rate*100:+.1f}%，{'放量' if signals[5]=='bullish' else '缩量' if signals[5]=='bearish' else '持平'}"}
+    }
 
     # Generate the message content
     message_content = {
         "signal": overall_signal,
-        "confidence": f"{round(confidence * 100)}%",
+        "confidence": round(confidence, 4),
         "reasoning": {
             "MACD": reasoning["MACD"],
             "RSI": reasoning["RSI"],
@@ -259,31 +297,43 @@ def technical_analyst_agent(state: AgentState):
     # Generate detailed analysis report
     analysis_report = {
         "signal": combined_signal['signal'],
-        "confidence": f"{round(combined_signal['confidence'] * 100)}%",
+        "confidence": combined_signal['confidence'],
+        "technical_indicators": {
+            "macd": {"value": float(macd_val), "signal": signals[0]},
+            "rsi": {"value": float(rsi_val), "signal": signals[1]},
+            "bollinger": {"upper": float(upper_band.iloc[-1]) if len(upper_band) > 0 else None, 
+                        "lower": float(lower_band.iloc[-1]) if len(lower_band) > 0 else None,
+                        "signal": signals[2]},
+            "obv_slope": float(obv_slope) if not pd.isna(obv_slope) else 0,
+            "kdj": {"k": float(kdj_k), "d": float(kdj_d), "j": float(kdj_j), "signal": signals[4]},
+            "volume_change_rate": float(volume_change_rate) if not pd.isna(volume_change_rate) else 0
+        },
+        "support_resistance": support_resistance,
+        "reasoning": reasoning,
         "strategy_signals": {
             "trend_following": {
                 "signal": trend_signals['signal'],
-                "confidence": f"{round(trend_signals['confidence'] * 100)}%",
+                "confidence": trend_signals['confidence'],
                 "metrics": normalize_pandas(trend_signals['metrics'])
             },
             "mean_reversion": {
                 "signal": mean_reversion_signals['signal'],
-                "confidence": f"{round(mean_reversion_signals['confidence'] * 100)}%",
+                "confidence": mean_reversion_signals['confidence'],
                 "metrics": normalize_pandas(mean_reversion_signals['metrics'])
             },
             "momentum": {
                 "signal": momentum_signals['signal'],
-                "confidence": f"{round(momentum_signals['confidence'] * 100)}%",
+                "confidence": momentum_signals['confidence'],
                 "metrics": normalize_pandas(momentum_signals['metrics'])
             },
             "volatility": {
                 "signal": volatility_signals['signal'],
-                "confidence": f"{round(volatility_signals['confidence'] * 100)}%",
+                "confidence": volatility_signals['confidence'],
                 "metrics": normalize_pandas(volatility_signals['metrics'])
             },
             "statistical_arbitrage": {
                 "signal": stat_arb_signals['signal'],
-                "confidence": f"{round(stat_arb_signals['confidence'] * 100)}%",
+                "confidence": stat_arb_signals['confidence'],
                 "metrics": normalize_pandas(stat_arb_signals['metrics'])
             }
         }
@@ -331,28 +381,28 @@ def calculate_trend_signals(prices_df):
     Advanced trend following strategy using multiple timeframes and indicators
     [OPTIMIZED] 添加A股特色：量价配合、均线多头排列
     """
-    # Calculate EMAs for multiple timeframes
     ema_8 = calculate_ema(prices_df, 8)
     ema_21 = calculate_ema(prices_df, 21)
     ema_55 = calculate_ema(prices_df, 55)
+    ema_120 = calculate_ema(prices_df, 120)
 
-    # Calculate ADX for trend strength
     adx = calculate_adx(prices_df, 14)
 
-    # Determine trend direction and strength
     short_trend = ema_8 > ema_21
     medium_trend = ema_21 > ema_55
 
-    # [OPTIMIZED] 新增：均线多头排列识别
     ma5_above_ma10 = ema_8.iloc[-1] > ema_21.iloc[-1]
-    ma10_above_ma20 = ema_21.iloc[-1] > calculate_ema(prices_df, 55).iloc[-1]
+    ma10_above_ma20 = ema_21.iloc[-1] > ema_55.iloc[-1]
+    ma20_above_ma60 = ema_55.iloc[-1] > ema_120.iloc[-1] if len(ema_120) > 0 else False
 
-    # [OPTIMIZED] 新增：量价配合指标
     volume_ma20 = prices_df['volume'].rolling(20).mean()
     current_price = prices_df['close'].iloc[-1]
     prev_price = prices_df['close'].iloc[-2]
     price_up = current_price > prev_price
     volume_confirmation = (prices_df['volume'].iloc[-1] / volume_ma20.iloc[-1]) > 1.2 if volume_ma20.iloc[-1] > 0 else False
+
+    volume_change_rate = ((prices_df['volume'].iloc[-1] - prices_df['volume'].iloc[-5]) / 
+                          prices_df['volume'].iloc[-5]) if prices_df['volume'].iloc[-5] > 0 else 0
 
     # Combine signals with confidence weighting
     trend_strength = adx['adx'].iloc[-1] / 100.0
@@ -376,22 +426,20 @@ def calculate_trend_signals(prices_df):
         if base_signal == 'bearish':
             base_confidence = min(base_confidence * 1.1, 1.0)
 
-    # 构建均线形态描述
-    if ma5_above_ma10 and ma10_above_ma20:
-        ma_alignment = 'bullish'
-    elif not ma5_above_ma10 and not ma10_above_ma20:
-        ma_alignment = 'bearish'
-    else:
-        ma_alignment = 'neutral'
+    ma_alignment = 'bullish' if (ma5_above_ma10 and ma10_above_ma20) else ('bearish' if (not ma5_above_ma10 and not ma10_above_ma20) else 'neutral')
 
     return {
         'signal': base_signal,
         'confidence': base_confidence,
         'metrics': {
-            'adx': float(adx['adx'].iloc[-1]),
+            'adx': float(adx['adx'].iloc[-1]) if len(adx) > 0 else 0,
             'trend_strength': float(trend_strength),
-            'volume_confirmation': float(volume_confirmation),
-            'ma_alignment': ma_alignment
+            'volume_confirmation': float(volume_confirmation) if volume_confirmation else 0,
+            'volume_change_rate': float(volume_change_rate) if not pd.isna(volume_change_rate) else 0,
+            'ma_alignment': ma_alignment,
+            'ema_8': float(ema_8.iloc[-1]) if len(ema_8) > 0 else 0,
+            'ema_21': float(ema_21.iloc[-1]) if len(ema_21) > 0 else 0,
+            'ema_55': float(ema_55.iloc[-1]) if len(ema_55) > 0 else 0
         }
     }
 
@@ -660,6 +708,23 @@ def calculate_rsi(prices_df: pd.DataFrame, period: int = 14) -> pd.Series:
     return rsi
 
 
+def calculate_kdj(prices_df: pd.DataFrame, period: int = 9) -> pd.DataFrame:
+    """
+    Calculate KDJ indicator (Stochastic)
+    """
+    low_min = prices_df['low'].rolling(window=period).min()
+    high_max = prices_df['high'].rolling(window=period).max()
+    
+    rsv = (prices_df['close'] - low_min) / (high_max - low_min) * 100
+    rsv = rsv.fillna(50)
+    
+    k = rsv.ewm(alpha=1/3, adjust=False).mean()
+    d = k.ewm(alpha=1/3, adjust=False).mean()
+    j = 3 * k - 2 * d
+    
+    return pd.DataFrame({'k': k, 'd': d, 'j': j})
+
+
 def calculate_bollinger_bands(
     prices_df: pd.DataFrame,
     window: int = 20
@@ -840,3 +905,48 @@ def calculate_obv(prices_df: pd.DataFrame) -> pd.Series:
             obv.append(obv[-1])
     prices_df['OBV'] = obv
     return prices_df['OBV']
+
+
+def calculate_support_resistance(prices_df: pd.DataFrame, lookback: int = 60) -> dict:
+    """
+    Calculate support and resistance levels
+    """
+    recent = prices_df.tail(lookback)
+    current_price = prices_df['close'].iloc[-1]
+    
+    if not SCIPY_AVAILABLE:
+        high_max = recent['high'].max()
+        low_min = recent['low'].min()
+        return {
+            'resistance_levels': [float(high_max)],
+            'support_levels': [float(low_min)],
+            'nearest_resistance': float(high_max),
+            'nearest_support': float(low_min),
+            'resistance_distance_pct': ((high_max - current_price) / current_price * 100),
+            'support_distance_pct': ((current_price - low_min) / current_price * 100)
+        }
+    
+    high_prices = recent['high'].values
+    low_prices = recent['low'].values
+    
+    from scipy.signal import find_peaks
+    peaks, _ = find_peaks(high_prices, distance=5)
+    troughs, _ = find_peaks(-low_prices, distance=5)
+    
+    resistance_levels = high_prices[peaks].tolist() if len(peaks) > 0 else []
+    support_levels = low_prices[troughs].tolist() if len(troughs) > 0 else []
+    
+    resistance_levels.sort(reverse=True)
+    support_levels.sort()
+    
+    nearest_resistance = next((r for r in resistance_levels if r > current_price), None)
+    nearest_support = next((s for s in support_levels if s < current_price), None)
+    
+    return {
+        'resistance_levels': resistance_levels[:3],
+        'support_levels': support_levels[:3],
+        'nearest_resistance': float(nearest_resistance) if nearest_resistance else None,
+        'nearest_support': float(nearest_support) if nearest_support else None,
+        'resistance_distance_pct': ((nearest_resistance - current_price) / current_price * 100) if nearest_resistance else None,
+        'support_distance_pct': ((current_price - nearest_support) / current_price * 100) if nearest_support else None
+    }

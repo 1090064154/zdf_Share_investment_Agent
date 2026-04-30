@@ -250,7 +250,8 @@ def _send_key_reasoning(agent_name: str, reasoning_data: dict):
                 'price_ratios_signal': '估值比率',
                 'pb_roe_analysis': 'PB-ROE分析',
                 'cyclical_analysis': '周期分析',
-                'revenue_quality_analysis': '营收质量分析'
+                'revenue_quality_analysis': '营收质量分析',
+                'earnings_quality': '盈利质量'
             }
             if isinstance(reasoning, dict):
                 for key, value in reasoning.items():

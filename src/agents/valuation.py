@@ -10,6 +10,94 @@ import math
 # 初始化 logger
 logger = setup_logger('valuation_agent')
 
+# [NEW] 动态折现率（基于无风险利率）
+def _get_dynamic_discount_rate() -> float:
+    """
+    根据市场环境动态调整折现率
+    基准：10年期国债收益率 + 股权风险溢价
+    """
+    try:
+        import akshare as ak
+        try:
+            bond_df = ak.china_bond_yield曲线()
+            if bond_df is not None and len(bond_df) > 0:
+                ten_year_yield = float(bond_df.iloc[0].get('10年', 0) or 2.5)
+                risk_premium = 0.05
+                return min(0.15, max(0.08, ten_year_yield / 100 + risk_premium))
+        except Exception as e:
+            logger.debug(f"国债收益率获取失败: {e}")
+    except ImportError:
+        pass
+    return 0.10
+
+
+def _calculate_peg_ratio(pe_ratio: float, growth_rate: float) -> dict:
+    """
+    [NEW] 计算PEG估值
+    PEG = PE / 增长率
+    PEG < 0.8: 低估
+    0.8-1.2: 合理
+    PEG > 1.2: 高估
+    """
+    if not pe_ratio or pe_ratio <= 0 or not growth_rate or growth_rate <= 0:
+        return {'peg': None, 'signal': 'neutral', 'confidence': 0}
+    
+    peg = pe_ratio / (growth_rate * 100)
+    
+    if peg < 0.8:
+        signal = 'bullish'
+        confidence = min(0.7, 0.5 + (0.8 - peg) * 0.5)
+        reason = f"PEG={peg:.2f}，估值偏低"
+    elif peg > 1.2:
+        signal = 'bearish'
+        confidence = min(0.7, 0.5 + (peg - 1.2) * 0.3)
+        reason = f"PEG={peg:.2f}，估值偏高"
+    else:
+        signal = 'neutral'
+        confidence = 0.5
+        reason = f"PEG={peg:.2f}，估值合理"
+    
+    return {'peg': round(peg, 2), 'signal': signal, 'confidence': confidence, 'reason': reason}
+
+
+def _calculate_dividend_yield(market_cap: float, dividend_per_share: float, price: float) -> dict:
+    """
+    [NEW] 计算股息率估值
+    对比无风险利率（10年期国债）
+    """
+    if not price or price <= 0 or not dividend_per_share or dividend_per_share <= 0:
+        return {'yield': None, 'signal': 'neutral', 'confidence': 0}
+    
+    dividend_yield = (dividend_per_share / price) * 100
+    
+    try:
+        import akshare as ak
+        risk_free_rate = 2.5
+        try:
+            bond_df = ak.china_bond_yield曲线()
+            if bond_df is not None:
+                risk_free_rate = float(bond_df.iloc[0].get('10年', 0) or 2.5)
+        except:
+            pass
+    except ImportError:
+        risk_free_rate = 2.5
+    
+    if dividend_yield > risk_free_rate * 1.5:
+        signal = 'bullish'
+        confidence = min(0.7, 0.5 + (dividend_yield - risk_free_rate * 1.5) / risk_free_rate)
+        reason = f"股息率{dividend_yield:.2f}%超过无风险利率{risk_free_rate:.2f}%，具吸引力"
+    elif dividend_yield < risk_free_rate * 0.5:
+        signal = 'bearish'
+        confidence = min(0.6, 0.4 + (risk_free_rate * 0.5 - dividend_yield) / risk_free_rate)
+        reason = f"股息率{dividend_yield:.2f}%低于无风险利率，吸引力不足"
+    else:
+        signal = 'neutral'
+        confidence = 0.4
+        reason = f"股息率{dividend_yield:.2f}%处于合理区间"
+    
+    return {'yield': round(dividend_yield, 2), 'signal': signal, 'confidence': confidence, 'reason': reason, 'risk_free_rate': risk_free_rate}
+
+
 # [OPTIMIZED] A股行业分类 - 从fundamentals.py统一导入，避免重复定义
 
 
@@ -227,7 +315,7 @@ def valuation_agent(state: AgentState):
         reason = "估值输入不足：市值缺失或财务报表不可用。"
         message_content = {
             "signal": "neutral",
-            "confidence": "0%",
+            "confidence": 0.0,
             "reasoning": {
                 "fallback": {
                     "signal": "neutral",
@@ -262,7 +350,7 @@ def valuation_agent(state: AgentState):
         reason = "估值输入不足：关键现金流和利润字段缺失或均为0，回退为中性。"
         message_content = {
             "signal": "neutral",
-            "confidence": "0%",
+            "confidence": 0.0,
             "reasoning": {
                 "fallback": {
                     "signal": "neutral",
@@ -297,7 +385,12 @@ def valuation_agent(state: AgentState):
     working_capital_change = (current_financial_line_item.get(
         'working_capital') or 0) - (previous_financial_line_item.get('working_capital') or 0)
 
+    # [NEW] 获取动态折现率（必须在使用前定义）
+    dynamic_discount_rate = _get_dynamic_discount_rate()
+    logger.info(f"[估值] 动态折现率: {dynamic_discount_rate:.2%}")
+
     # Owner Earnings Valuation (Buffett Method)
+    required_return = dynamic_discount_rate + 0.05
     owner_earnings_value = calculate_owner_earnings_value(
         net_income=current_financial_line_item.get('net_income'),
         depreciation=current_financial_line_item.get(
@@ -305,7 +398,7 @@ def valuation_agent(state: AgentState):
         capex=current_financial_line_item.get('capital_expenditure'),
         working_capital_change=working_capital_change,
         growth_rate=metrics.get("earnings_growth", 0),
-        required_return=0.15,
+        required_return=required_return,
         margin_of_safety=0.25
     )
 
@@ -317,7 +410,7 @@ def valuation_agent(state: AgentState):
     dcf_value = calculate_intrinsic_value(
         free_cash_flow=fcff,
         growth_rate=metrics.get("earnings_growth", 0),
-        discount_rate=0.10,
+        discount_rate=dynamic_discount_rate,
         terminal_growth_rate=0.03,
         num_years=5,
     )
@@ -329,20 +422,19 @@ def valuation_agent(state: AgentState):
     # 获取股票类型
     industry = data.get('industry', '')
     stock_type = _identify_stock_type(data.get('ticker', ''), industry)
-
+    
     # [OPTIMIZED] 根据股票类型选择估值方法优先级
     # 周期股：相对估值(PB分位点) > 清算价值 > DCF
-    # 成长股：DCF > 相对估值 > PEG
+    # 成长股：DCF > PEG > 相对估值
     # 其他：相对估值 > DCF
 
-    # 1. PE/PB分位点分析（新增，相对估值）
+    # 1. PE/PB分位点分析（相对估值）
     pe_ratio = metrics.get("pe_ratio", 0)
     pb_ratio = metrics.get("price_to_book", 0)
     percentile_data = _calculate_pe_pb_percentile(pe_ratio, pb_ratio)
     relative_signal = _generate_relative_valuation_signal(percentile_data, industry)
 
     if relative_signal['signal'] != 'neutral' or percentile_data:
-        # 相对估值权重：周期股40%，其他25%
         weight = 0.40 if stock_type == 'cyclical' else 0.25
         valid_valuations.append({
             "method": "relative_valuation",
@@ -356,6 +448,45 @@ def valuation_agent(state: AgentState):
         }
         logger.info(f"  📊 相对估值: {relative_signal['signal']} - {relative_signal.get('reasoning', '')}")
         show_agent_reasoning({"reasoning": {"relative_analysis": {"signal": relative_signal['signal'], "details": relative_signal.get('reasoning', '')}}}, "估值分析师")
+
+    # [NEW] 2. PEG估值（成长股专用）
+    growth_rate = metrics.get("earnings_growth", 0) or 0
+    if stock_type == 'growth' and pe_ratio > 0 and growth_rate > 0:
+        peg_result = _calculate_peg_ratio(pe_ratio, growth_rate)
+        if peg_result.get('peg'):
+            valid_valuations.append({
+                "method": "peg_valuation",
+                "gap": peg_result.get('confidence', 0.5) * (1 if peg_result['signal'] == 'bullish' else -1),
+                "weight": 0.30,
+                "signal": peg_result['signal']
+            })
+            reasoning["peg_analysis"] = {
+                "signal": peg_result['signal'],
+                "details": f"PEG={peg_result['peg']:.2f}，{peg_result.get('reason', '')}"
+            }
+            logger.info(f"  📈 PEG估值: {peg_result['signal']} - {peg_result.get('reason', '')}")
+            show_agent_reasoning({"reasoning": {"peg_analysis": {"signal": peg_result['signal'], "details": f"PEG={peg_result['peg']:.2f} ({peg_result.get('reason', '')})"}}}, "估值分析师")
+
+    # [NEW] 3. 股息率估值
+    dividend_per_share = metrics.get("dividend_per_share", 0) or 0
+    peg_result = {'peg': None, 'signal': 'neutral'}
+    dividend_result = {'yield': None, 'signal': 'neutral'}
+    
+    if current_price > 0 and dividend_per_share > 0:
+        dividend_result = _calculate_dividend_yield(market_cap, dividend_per_share, current_price)
+        if dividend_result.get('yield'):
+            valid_valuations.append({
+                "method": "dividend_valuation",
+                "gap": dividend_result.get('confidence', 0.4) * (1 if dividend_result['signal'] == 'bullish' else -1),
+                "weight": 0.20,
+                "signal": dividend_result['signal']
+            })
+            reasoning["dividend_analysis"] = {
+                "signal": dividend_result['signal'],
+                "details": f"股息率{dividend_result['yield']:.2f}%，{dividend_result.get('reason', '')}"
+            }
+            logger.info(f"  💰 股息率: {dividend_result['signal']} - {dividend_result.get('reason', '')}")
+            show_agent_reasoning({"reasoning": {"dividend_analysis": {"signal": dividend_result['signal'], "details": f"股息率{dividend_result['yield']:.2f}%"}}}, "估值分析师")
 
     # [OPTIMIZED] 2. 周期股清算价值
     if stock_type == 'cyclical' and current_financial_line_item:
@@ -456,7 +587,7 @@ def valuation_agent(state: AgentState):
         logger.warning(reason)
         message_content = {
             "signal": "neutral",
-            "confidence": "0%",
+            "confidence": 0.0,
             "reasoning": {
                 "fallback": {
                     "signal": "neutral",
@@ -522,6 +653,8 @@ def valuation_agent(state: AgentState):
             "relative_valuation": "相对估值(PE/PB)",
             "liquidation_value": "清算价值",
             "revenue_analysis": "营收分析",
+            "peg_valuation": "PEG估值",
+            "dividend_valuation": "股息率估值",
         }
         name = method_name_map.get(v["method"], v["method"])
         signal_cn = {"bullish": "看多", "bearish": "看空", "neutral": "中性"}.get(v["signal"], v["signal"])
@@ -581,6 +714,12 @@ def valuation_agent(state: AgentState):
         "pe_ratio": pe_ratio if pe_ratio else None,
         "pb_ratio": pb_ratio if pb_ratio else None,
         "stock_type": stock_type,
+        "discount_rate": dynamic_discount_rate,
+        "dcf_value": round(dcf_value / 1e8, 2) if dcf_value else None,
+        "owner_earnings_value": round(owner_earnings_value / 1e8, 2) if owner_earnings_value else None,
+        "peg_ratio": peg_result.get('peg') if stock_type == 'growth' else None,
+        "dividend_yield": dividend_result.get('yield') if dividend_per_share > 0 else None,
+        "growth_rate": round(growth_rate * 100, 2) if growth_rate else None,
     }
 
     message = HumanMessage(

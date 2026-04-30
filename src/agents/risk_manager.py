@@ -93,6 +93,130 @@ def _calculate_component_score(value: float, thresholds: list, scores: list) -> 
         return scores[0]
 
 
+def _get_industry_risk_coefficient(industry: str) -> float:
+    """
+    根据行业获取风险系数
+    高风险行业需要更严格的风险控制
+    """
+    high_risk_industries = {
+        '半导体': 1.3, '集成电路': 1.3, '电子': 1.2, '软件': 1.2,
+        '互联网': 1.2, '新能源': 1.2, '锂电池': 1.3, '光伏': 1.2,
+        '军工': 1.3, '航空': 1.3, '证券': 1.2, '保险': 1.1
+    }
+    medium_risk_industries = {
+        '汽车': 1.1, '医药': 1.1, '化工': 1.1, '机械设备': 1.1,
+        '通信': 1.1, '电力': 1.0, '有色金属': 1.1, '钢铁': 1.1
+    }
+    low_risk_industries = {
+        '银行': 0.9, '白酒': 0.9, '食品': 0.9, '家电': 0.9,
+        '房地产': 1.0, '建筑': 0.9, '公用事业': 0.8, '高速公路': 0.8,
+        '铁路': 0.8, '港口': 0.8, '机场': 0.8, '煤炭': 1.0
+    }
+    
+    for key in high_risk_industries:
+        if key in industry:
+            return high_risk_industries[key]
+    for key in medium_risk_industries:
+        if key in industry:
+            return medium_risk_industries[key]
+    for key in low_risk_industries:
+        if key in industry:
+            return low_risk_industries[key]
+    
+    return 1.0  # 默认风险系数
+
+
+def _calculate_liquidity_score(daily_volume: float, avg_price: float, market_cap: float) -> float:
+    """
+    计算流动性风险评分（0-10）
+    考虑日均成交额、换手率、流通市值
+    """
+    # 日均成交额（万元）
+    daily_turnover = daily_volume * avg_price / 1e4
+    
+    # 换手率 = 日均成交额 / 流通市值
+    turnover_rate = daily_turnover / (market_cap / 1e8) if market_cap > 0 else 0
+    
+    score = 5  # 默认中性
+    
+    if daily_turnover < 1000:  # 日均成交 < 1000万
+        score = 9  # 极高风险
+    elif daily_turnover < 3000:  # 日均成交 < 3000万
+        score = 7
+    elif daily_turnover < 10000:  # 日均成交 < 1亿
+        score = 5
+    elif daily_turnover < 50000:  # 日均成交 < 5亿
+        score = 3
+    else:  # 日均成交 >= 5亿
+        score = 1
+    
+    # 换手率调整
+    if turnover_rate < 0.005:  # 换手率 < 0.5%
+        score += 2
+    elif turnover_rate < 0.01:  # 换手率 < 1%
+        score += 1
+    elif turnover_rate > 0.05:  # 换手率 > 5%
+        score -= 1
+    
+    return max(0, min(10, score))
+
+
+def _calculate_stop_loss_levels(var_95: float, cvar_95: float, max_drawdown: float, 
+                                 current_price: float, volatility: float) -> dict:
+    """
+    计算建议的止损价位
+    基于VaR、CVaR和历史最大回撤
+    """
+    # 激进止损：基于VaR
+    aggressive_stop = current_price * (1 + var_95)
+    
+    # 稳健止损：基于CVaR
+    conservative_stop = current_price * (1 + cvar_95)
+    
+    # 保守止损：基于最大回撤
+    conservative_dd_stop = current_price * (1 + max_drawdown)
+    
+    # 波动率止损：2倍ATR概念
+    volatility_stop = current_price * (1 - volatility * 0.5)
+    
+    return {
+        "激进止损": round(aggressive_stop, 2),
+        "稳健止损": round(conservative_stop, 2),
+        "保守止损": round(conservative_dd_stop, 2),
+        "波动率止损": round(volatility_stop, 2),
+        "建议止损": round(max(aggressive_stop, conservative_stop), 2)
+    }
+
+
+def _calculate_confidence_from_metrics(market_metrics: dict, stock_metrics: dict,
+                                        data_quality: dict) -> float:
+    """
+    计算风险评分的置信度
+    基于数据完整性和指标有效性
+    """
+    base_confidence = 0.5
+    
+    # 大盘数据完整性
+    if market_metrics.get('volatility') and market_metrics.get('var_95'):
+        base_confidence += 0.15
+    
+    # 个股数据完整性
+    if stock_metrics.get('volatility') and stock_metrics.get('var_95'):
+        base_confidence += 0.15
+    
+    # 数据质量
+    if data_quality.get('prices_count', 0) > 60:
+        base_confidence += 0.1
+    elif data_quality.get('prices_count', 0) > 30:
+        base_confidence += 0.05
+    
+    # 历史数据可信度
+    if data_quality.get('has_volume', False):
+        base_confidence += 0.1
+    
+    return min(base_confidence, 0.95)
+
+
 def _calculate_dynamic_threshold(historical_values: list, multiplier: float = 1.5) -> float:
     """
     计算动态阈值：均值 + multiplier × 标准差
@@ -118,7 +242,10 @@ def _calculate_risk_score(
     bull_confidence: float,
     bear_confidence: float,
     debate_confidence: float,
-    historical_risk_scores: list = None
+    historical_risk_scores: list = None,
+    industry: str = "",
+    liquidity_score: float = 5.0,
+    data_quality: dict = None
 ) -> dict:
     """
     综合计算风险评分
@@ -224,11 +351,23 @@ def _calculate_risk_score(
         stock_risk * 0.4 +
         relative_risk * 0.2
     )
+    
+    # [NEW] 行业风险系数调整
+    industry_risk_coef = _get_industry_risk_coefficient(industry) if industry else 1.0
+    if industry_risk_coef != 1.0:
+        raw_risk_score *= industry_risk_coef
+        logger.info(f"  行业风险系数: {industry_risk_coef}x ({industry})")
+    
+    # [NEW] 流动性风险调整
+    if liquidity_score > 7:  # 高流动性风险
+        raw_risk_score += 1.5
+    elif liquidity_score > 5:
+        raw_risk_score += 0.5
+    logger.info(f"  流动性风险: {liquidity_score}/10")
 
     # 辩论信号调整（±1分）
     confidence_diff = abs(bull_confidence - bear_confidence)
     if confidence_diff < 0.1:  # 多空极度一致
-        # 可能过度乐观或悲观，加1分风险
         raw_risk_score += 1
     elif debate_confidence < 0.25:  # 辩论置信度极低
         raw_risk_score += 1
@@ -253,14 +392,23 @@ def _calculate_risk_score(
         else:
             trading_action = "hold"
 
+    # [NEW] 计算风险评分置信度
+    confidence = _calculate_confidence_from_metrics(
+        market_metrics, stock_metrics, data_quality or {}
+    )
+    
     return {
         'risk_score': risk_score,
+        'confidence': round(confidence, 4),
         'trading_action': trading_action,
         'dynamic_threshold': dynamic_threshold,
+        'industry_risk_coef': industry_risk_coef,
+        'liquidity_score': liquidity_score,
         'components': {
             'market_risk': market_risk,
             'stock_risk': stock_risk,
-            'relative_risk': relative_risk
+            'relative_risk': relative_risk,
+            'liquidity_risk': min(liquidity_score, 10)
         },
         'metrics': {
             'market_volatility': market_metrics.get('volatility', 0),
@@ -410,6 +558,22 @@ def risk_management_agent(state: AgentState):
     debate_confidence = debate_results.get("confidence", 0.5)
     debate_signal = debate_results.get("signal", "neutral")
 
+    # ==================== 3.5 获取行业和流动性数据 ====================
+    industry = data.get("industry", "")
+    market_cap = data.get("market_cap", 0)
+    avg_price = prices_df['close'].iloc[-1] if len(prices_df) > 0 else 0
+    
+    # 计算日均成交量
+    daily_volume = prices_df['volume'].mean() if 'volume' in prices_df.columns and len(prices_df) > 0 else 0
+    liquidity_score = _calculate_liquidity_score(daily_volume, avg_price, market_cap) if daily_volume > 0 else 5.0
+    
+    data_quality = {
+        'prices_count': len(prices_df),
+        'has_volume': 'volume' in prices_df.columns
+    }
+
+    logger.info(f"  行业: {industry}, 流动性: {liquidity_score}/10")
+
     # ==================== 4. 计算综合风险评分 ====================
     logger.info("计算综合风险评分...")
 
@@ -424,7 +588,10 @@ def risk_management_agent(state: AgentState):
         bull_confidence=bull_confidence,
         bear_confidence=bear_confidence,
         debate_confidence=debate_confidence,
-        historical_risk_scores=historical_scores
+        historical_risk_scores=historical_scores,
+        industry=industry,
+        liquidity_score=liquidity_score,
+        data_quality=data_quality
     )
 
     risk_score = risk_result['risk_score']
@@ -495,14 +662,24 @@ def risk_management_agent(state: AgentState):
                 "组合影响": portfolio_impact
             }
 
-    # ==================== 7. 构建输出消息 ====================
+    # ==================== 7. 计算止损建议 ====================
+    stop_loss_levels = _calculate_stop_loss_levels(
+        var_95, cvar_95, max_drawdown, current_price, volatility
+    )
+
+    # ==================== 8. 构建输出消息 ====================
     message_content = {
         "最大持仓规模": float(max_position_size),
         "风险评分": risk_score,
+        "置信度": risk_result.get("confidence", 0.5),
         "交易行动": trading_action,
         "动态阈值": dynamic_threshold,
         "持仓周期": investment_horizon,
         "回撤窗口": drawdown_window,
+        "行业": industry,
+        "行业风险系数": risk_result.get("industry_risk_coef", 1.0),
+        "流动性评分": risk_result.get("liquidity_score", 5),
+        "止损建议": stop_loss_levels,
         "风险指标": {
             "波动率": float(volatility),
             "95%风险价值(VaR)": float(var_95),
@@ -515,6 +692,7 @@ def risk_management_agent(state: AgentState):
             "大盘风险评分": risk_result['components']['market_risk'],
             "个股风险评分": risk_result['components']['stock_risk'],
             "相对风险评分": risk_result['components']['relative_risk'],
+            "流动性风险评分": risk_result['components'].get('liquidity_risk', 5),
             "压力测试结果": {
                 "市场崩盘": stress_test_results.get("market_crash", {}),
                 "中度下跌": stress_test_results.get("moderate_decline", {}),
@@ -527,7 +705,7 @@ def risk_management_agent(state: AgentState):
             "辩论置信度": debate_confidence,
             "辩论信号": debate_signal
         },
-        "推理": f"综合风险评分 {risk_score}/10: "
+        "推理": f"综合风险评分 {risk_score}/10(置信度{risk_result.get('confidence', 0.5)*100:.0f}%): "
                 f"大盘风险={risk_result['components']['market_risk']}/10, "
                 f"个股风险={risk_result['components']['stock_risk']}/10, "
                 f"相对风险={risk_result['components']['relative_risk']}/10, "

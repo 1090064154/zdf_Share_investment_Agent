@@ -6,6 +6,8 @@ const App = {
     selectedAgent: null,
     isRunning: false,
     completedAgents: 0,
+    currentResult: null,
+    currentHistoryRunId: null,
 
     init() {
         this.initAgentGrid();
@@ -97,6 +99,21 @@ const App = {
                     this.executeAnalysis();
                 }
             });
+            
+            let searchTimeout;
+            tickerInput.addEventListener('input', (e) => {
+                clearTimeout(searchTimeout);
+                const q = e.target.value.trim();
+                if (q.length < 2) {
+                    this.hideStockSuggestions();
+                    return;
+                }
+                searchTimeout = setTimeout(() => this.searchStocks(q), 300);
+            });
+            
+            tickerInput.addEventListener('blur', () => {
+                setTimeout(() => this.hideStockSuggestions(), 200);
+            });
         }
 
         const grid = document.getElementById('agentGrid');
@@ -107,6 +124,50 @@ const App = {
                 const agentName = card.dataset.agent;
                 this.selectAgent(agentName);
             });
+        }
+    },
+
+    async searchStocks(q) {
+        try {
+            const resp = await fetch(`/api/stocks/search?q=${encodeURIComponent(q)}&limit=8`);
+            const data = await resp.json();
+            this.showStockSuggestions(data.results || []);
+        } catch (e) {
+            console.error('股票搜索失败:', e);
+        }
+    },
+
+    showStockSuggestions(results) {
+        const container = document.getElementById('stockSuggestions');
+        if (!container || results.length === 0) {
+            this.hideStockSuggestions();
+            return;
+        }
+        
+        container.innerHTML = results.map(s => `
+            <div class="stock-suggestion-item" data-code="${s.code}" data-name="${s.name}">
+                <span class="stock-suggestion-code">${s.code}</span>
+                <span class="stock-suggestion-name">${s.name}</span>
+            </div>
+        `).join('');
+        
+        container.querySelectorAll('.stock-suggestion-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                const code = e.currentTarget.dataset.code;
+                const name = e.currentTarget.dataset.name;
+                document.getElementById('ticker').value = code;
+                this.hideStockSuggestions();
+            });
+        });
+        
+        container.classList.add('active');
+    },
+
+    hideStockSuggestions() {
+        const container = document.getElementById('stockSuggestions');
+        if (container) {
+            container.classList.remove('active');
+            container.innerHTML = '';
         }
     },
 
@@ -259,6 +320,8 @@ const App = {
         this.updateLiveIndicator(false, '已完成');
 
         if (result) {
+            // 存储当前结果供PDF导出使用
+            this.currentResult = result;
             const actionText = Components.getActionText(result.action);
             const resultPanel = document.getElementById('resultPanel');
             resultPanel.style.display = 'block';
@@ -510,11 +573,15 @@ const App = {
 
         try {
             const flow = await Api.getRunFlow(runId);
-            
+
             // 从result_data获取各模块信号
             const resultData = flow.result_data || {};
             const agentSignals = resultData.agent_signals || [];
-            
+
+            // 存储历史数据供PDF导出使用
+            this.currentHistoryRunId = runId;
+            this.currentHistoryData = { flow, resultData, agentSignals };
+
             // 构建 Agent 状态
             const agentStates = {};
             for (const sig of agentSignals) {
@@ -525,7 +592,7 @@ const App = {
                     message: `${sig.agent_name} 执行完成`
                 };
             }
-            
+
             // 渲染历史详情（包含完整决策结果）
             detail.innerHTML = Components.createHistoryReplay(runId, flow, agentStates, agentSignals, resultData);
             modal.classList.add('active');
@@ -591,6 +658,103 @@ const App = {
             toast.style.animation = 'slideIn 0.3s ease reverse';
             setTimeout(() => toast.remove(), 300);
         }, 3000);
+    },
+
+    // ==================== PDF导出功能 ====================
+
+    exportCurrentResultToPDF() {
+        if (!this.currentResult) {
+            this.showToast('暂无分析结果可导出', 'error');
+            return;
+        }
+        const ticker = document.getElementById('ticker')?.value.trim() || '-';
+        const horizon = document.getElementById('horizon')?.value || 'medium';
+        const horizonMap = { short: '短线', medium: '中线', long: '长线' };
+        const html = Components.buildPDFReport({
+            ticker,
+            horizon: horizonMap[horizon] || horizon,
+            agentStates: this.agentStates,
+            agentLogs: this.agentLogs,
+            result: this.currentResult
+        });
+        this._renderAndDownloadPDF(html, `${ticker}_分析报告_${new Date().toISOString().slice(0,10)}.pdf`);
+    },
+
+    exportHistoryToPDF() {
+        if (!this.currentHistoryData) {
+            this.showToast('暂无历史数据可导出', 'error');
+            return;
+        }
+        const { flow, resultData, agentSignals } = this.currentHistoryData;
+        const ticker = flow.ticker || resultData.ticker || '-';
+        const horizonMap = { short: '短线', medium: '中线', long: '长线' };
+        const horizon = horizonMap[flow.investment_horizon] || flow.investment_horizon || '-';
+
+        // 构建 agentStates 和 agentLogs 兼容格式
+        const agentStates = {};
+        const agentLogs = {};
+        for (const sig of agentSignals) {
+            const name = sig.agent_name || sig.agent || '';
+            agentStates[name] = {
+                status: 'completed',
+                signal: sig.signal,
+                confidence: sig.confidence || 0,
+                message: name + ' 执行完成',
+                details: sig
+            };
+            agentLogs[name] = [{ timestamp: flow.end_time || '', level: 'success', message: (sig.signal || '') + ' 置信度:' + (sig.confidence || 0) }];
+        }
+
+        const html = Components.buildPDFReport({
+            ticker,
+            horizon,
+            agentStates,
+            agentLogs,
+            result: resultData
+        });
+        this._renderAndDownloadPDF(html, `${ticker}_历史分析报告_${(flow.start_time || '').slice(0,10)}.pdf`);
+    },
+
+    _renderAndDownloadPDF(html, filename) {
+        const container = document.getElementById('pdf-render-container');
+        if (!container) {
+            this.showToast('PDF容器未找到', 'error');
+            return;
+        }
+        container.innerHTML = html;
+
+        // 等待图片/字体渲染
+        setTimeout(() => {
+            const element = container.querySelector('.pdf-report');
+            if (!element || typeof html2pdf === 'undefined') {
+                this.showToast('PDF库未加载，请检查网络连接', 'error');
+                container.innerHTML = '';
+                return;
+            }
+            const opt = {
+                margin: [8, 8, 8, 8],
+                filename: filename,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: {
+                    scale: 2,
+                    useCORS: true,
+                    letterRendering: true,
+                    logging: false,
+                    scrollY: 0,
+                    y: 0,
+                    windowWidth: 794
+                },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                pagebreak: { mode: ['css', 'legacy'], before: '.page-break-before', after: '.page-break-after', avoid: '.page-break-avoid' }
+            };
+            html2pdf().set(opt).from(element).save().then(() => {
+                container.innerHTML = '';
+                this.showToast('PDF导出成功', 'success');
+            }).catch(() => {
+                container.innerHTML = '';
+                this.showToast('PDF导出失败', 'error');
+            });
+        }, 200);
     }
 };
 

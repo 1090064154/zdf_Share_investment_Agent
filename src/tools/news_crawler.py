@@ -401,55 +401,67 @@ def get_stock_news(symbol: str, max_news: int = 10, date: str = None) -> list:
     need_more_news = max_news - len(cached_news)
     fetch_count = max(need_more_news, max_news)  # 至少获取请求的数量
 
-    # 优先尝试使用新的 Google 搜索方法
-    new_news_list = []
+    # 并行执行三个搜索源
+    print("🔍 开始并行搜索新闻...")
+    all_news_lists = []
+    
+    # 1. Google 搜索
+    google_news = []
     if google_search_sync and SearchOptions:
         try:
-            print("使用 Google 搜索获取新闻...")
-
-            # 构建搜索查询
+            print("  [1/3] Google 搜索...")
             search_query = build_search_query(symbol, date, stock_name=stock_name)
-            print(f"搜索查询: {search_query}")
-
-            # 执行搜索
             search_options = SearchOptions(
-                limit=fetch_count * 2,  # 获取更多结果以便过滤
-                timeout=30000,
+                limit=fetch_count * 2,
+                timeout=20000,
                 locale="zh-CN"
             )
-
             search_response = google_search_sync(search_query, search_options)
-
-            if search_response.results:
-                # 转换搜索结果为新闻格式
-                new_news_list = convert_search_results_to_news_format(
+            if search_response and search_response.results:
+                google_news = convert_search_results_to_news_format(
                     search_response.results, symbol)
-
-                print(f"通过 Google 搜索成功获取到{len(new_news_list)}条新闻")
-            else:
-                print("Google 搜索未返回有效结果，尝试回退到 akshare")
-
+                print(f"    Google 获取到 {len(google_news)} 条")
         except Exception as e:
-            print(f"Google 搜索获取新闻时出错: {e}，回退到 akshare")
-
-    # 如果 Google 搜索失败，回退到新浪搜索
-    if not new_news_list:
-        print("使用新浪搜索获取新闻...")
-        new_news_list = get_stock_news_via_sina(
+            print(f"    Google 失败: {str(e)[:50]}")
+    
+    # 2. 新浪搜索
+    sina_news = []
+    try:
+        print("  [2/3] 新浪搜索...")
+        sina_news = get_stock_news_via_sina(
             symbol,
             stock_name=stock_name,
             max_news=fetch_count,
             date=date,
         )
-
-    # 如果新浪搜索也失败，尝试akshare
-    if not new_news_list:
-        print("使用akshare获取新闻...")
-        new_news_list = get_stock_news_via_akshare(
+        print(f"    新浪获取到 {len(sina_news)} 条")
+    except Exception as e:
+        print(f"    新浪失败: {str(e)[:50]}")
+    
+    # 3. AkShare搜索
+    akshare_news = []
+    try:
+        print("  [3/3] AkShare搜索...")
+        akshare_news = get_stock_news_via_akshare(
             symbol,
             stock_name=stock_name,
             max_news=fetch_count,
         )
+        print(f"    AkShare获取到 {len(akshare_news)} 条")
+    except Exception as e:
+        print(f"    AkShare失败: {str(e)[:50]}")
+    
+    # 合并所有新闻并去重
+    new_news_list = []
+    seen_titles = set()
+    for news_source in [google_news, sina_news, akshare_news]:
+        for news in news_source:
+            title = news.get('title', '').strip()
+            if title and title not in seen_titles:
+                seen_titles.add(title)
+                new_news_list.append(news)
+    
+    print(f"✅ 并行搜索完成，共获取 {len(new_news_list)} 条新闻（去重后）")
 
     # 合并缓存和新获取的新闻，去重
     if cached_news and new_news_list:

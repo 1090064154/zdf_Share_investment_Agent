@@ -79,14 +79,23 @@ def researcher_bull_agent(state: AgentState):
     # ============================================================
     logger.info("🔍 Step 2: 解析各Agent的信号...")
     technical_signals = _safe_parse_signal(technical_message)
+    technical_signals["dimension"] = "技术分析"
     fundamental_signals = _safe_parse_signal(fundamentals_message)
+    fundamental_signals["dimension"] = "基本面"
     sentiment_signals = _safe_parse_signal(sentiment_message)
+    sentiment_signals["dimension"] = "情绪分析"
     valuation_signals = _safe_parse_signal(valuation_message)
+    valuation_signals["dimension"] = "估值分析"
     industry_cycle_signals = _safe_parse_signal(industry_cycle_message)
+    industry_cycle_signals["dimension"] = "行业周期"
     institutional_signals = _safe_parse_signal(institutional_message)
+    institutional_signals["dimension"] = "机构持仓"
     expectation_diff_signals = _safe_parse_signal(expectation_diff_message)
+    expectation_diff_signals["dimension"] = "预期差"
     macro_news_signals = _safe_parse_signal(macro_news_message)
+    macro_news_signals["dimension"] = "宏观新闻"
     macro_analyst_signals = _safe_parse_signal(macro_analyst_message)
+    macro_analyst_signals["dimension"] = "宏观分析"
 
     # 打印各Agent的信号汇总
     logger.info("────────────────────────────────────────────────────────")
@@ -119,14 +128,37 @@ def researcher_bull_agent(state: AgentState):
         }
     }, "看多研究员")
 
-    # 统计信号分布
-    bullish_count = sum(1 for s in [technical_signals, fundamental_signals, sentiment_signals,
-                                   valuation_signals, industry_cycle_signals, institutional_signals,
-                                   expectation_diff_signals] if s.get("signal") == "bullish")
-    neutral_count = sum(1 for s in [technical_signals, fundamental_signals, sentiment_signals,
-                                  valuation_signals, industry_cycle_signals, institutional_signals,
-                                  expectation_diff_signals] if s.get("signal") == "neutral")
-    logger.info(f"📈 信号统计: 看涨={bullish_count}, 中性={neutral_count}, 看跌={7-bullish_count-neutral_count}")
+    # 统计信号分布（全部9个维度）
+    all_signals = [technical_signals, fundamental_signals, sentiment_signals,
+                   valuation_signals, industry_cycle_signals, institutional_signals,
+                   expectation_diff_signals, macro_news_signals, macro_analyst_signals]
+    
+    bullish_count = sum(1 for s in all_signals if s.get("signal") == "bullish")
+    neutral_count = sum(1 for s in all_signals if s.get("signal") == "neutral")
+    bearish_count = sum(1 for s in all_signals if s.get("signal") == "bearish")
+    logger.info(f"📈 信号统计: 看涨={bullish_count}, 中性={neutral_count}, 看跌={bearish_count}")
+    
+    # [NEW] 加权置信度计算（基于各维度置信度加权）
+    total_weight = 0
+    weighted_confidence = 0
+    for sig in all_signals:
+        raw_conf = sig.get("confidence", 0) or 0
+        if isinstance(raw_conf, str):
+            raw_conf = raw_conf.strip().replace('%', '')
+            try:
+                conf = float(raw_conf)
+                if conf > 1:
+                    conf = conf / 100.0
+            except (ValueError, TypeError):
+                conf = 0.0
+        else:
+            conf = float(raw_conf)
+        weight = conf if conf > 0 else 0.3  # 默认权重0.3
+        weighted_confidence += weight
+        total_weight += 1
+    
+    base_confidence = weighted_confidence / total_weight if total_weight > 0 else 0.5
+    logger.info(f"📊 加权置信度: {base_confidence:.2%}")
 
     # ============================================================
     # Step 3: 构建prompt并调用LLM
@@ -145,23 +177,39 @@ def researcher_bull_agent(state: AgentState):
 """
 
     # 调用LLM生成看多论点
+    # [NEW] 提取看跌因素用于风险分析
+    bearish_factors = []
+    for s in all_signals:
+        if s.get("signal") == "bearish":
+            bearish_factors.append(f"{s.get('dimension', '未知维度')}: {s.get('reasoning', '')[:100]}")
+    
+    risk_warning = ""
+    if bearish_factors:
+        risk_warning = f"【风险因素】当前存在{len(bearish_factors)}个不利因素: " + "; ".join(bearish_factors[:3])
+    
     llm_prompt = f"""你是一位专业的金融分析师，请从投资者的角度，基于以下9个维度的分析结果，从看多角度生成专业的投资论点。
 
 【9个维度分析结果】
 {analyst_summaries}
 
+{risk_warning}
+
 【任务要求】
 1. 综合分析以上9个维度的信息，提取看多的有利论据
 2. 如果某些维度不利于看多，也要分析其可能的改善空间或被低估的原因
-3. 生成3-5个有说服力的看多论点，每个论点需要说明依据
-4. 给出整体看多置信度（0.0-1.0）
-5. 用专业、理性的语言，避免过度乐观
+3. 分析当前的风险因素，评估其影响程度
+4. 生成3-5个有说服力的看多论点，每个论点需要说明依据
+5. 给出整体看多置信度（0.0-1.0）
+6. 给出风险提示和止损建议
+7. 用专业、理性的语言，避免过度乐观
 
 请以JSON格式回复：
 {{
     "perspective": "bullish",
     "confidence": 0.0-1.0,
     "thesis_points": ["论点1", "论点2", ...],
+    "risk_factors": ["风险1", "风险2"],
+    "stop_loss": "止损建议",
     "reasoning": "综合分析的主要理由"
 }}
 """
@@ -202,24 +250,40 @@ def researcher_bull_agent(state: AgentState):
     # 如果LLM失败，使用fallback逻辑
     if not llm_analysis:
         logger.warning("⚠️ 使用fallback规则生成看多论点")
-        llm_analysis = _generate_bullish_fallback(
-            technical_signals, fundamental_signals, sentiment_signals,
-            valuation_signals, industry_cycle_signals, institutional_signals,
-            expectation_diff_signals
-        )
+        llm_analysis = _generate_bullish_fallback(all_signals)
 
     # ============================================================
     # Step 4: 构建返回消息
     # ============================================================
     logger.info("📤 Step 4: 构建返回消息...")
+    
+    # [NEW] 提取风险因素
+    risk_factors = llm_analysis.get("risk_factors", [])
+    stop_loss = llm_analysis.get("stop_loss", "")
+    
+    # [NEW] 如果LLM没有返回风险因素，从负面信号中提取
+    if not risk_factors:
+        for s in all_signals:
+            if s.get("signal") == "bearish":
+                risk_factors.append(s.get("reasoning", "存在不利因素")[:80])
+    
     message_content = {
         "perspective": "bullish",
         "signal": "bullish",
-        "confidence": llm_analysis.get("confidence", 0.5),
+        "confidence": llm_analysis.get("confidence", round(base_confidence, 4)),
+        "base_confidence": round(base_confidence, 4),
         "thesis_points": llm_analysis.get("thesis_points", []),
-        "reasoning": llm_analysis.get("reasoning", "基于LLM分析得出看多观点"),
+        "risk_factors": risk_factors,
+        "stop_loss": stop_loss,
+        "reasoning": llm_analysis.get("reasoning", "基于9维度分析得出看多观点"),
         "bullish_count": bullish_count,
         "neutral_count": neutral_count,
+        "bearish_count": bearish_count,
+        "signal_distribution": {
+            "bullish": bullish_count,
+            "neutral": neutral_count,
+            "bearish": bearish_count
+        },
         "llm_used": llm_response is not None
     }
 
@@ -234,10 +298,14 @@ def researcher_bull_agent(state: AgentState):
     show_agent_reasoning({
         "signal": "bullish",
         "看涨信号数": bullish_count,
+        "看跌信号数": bearish_count,
         "最终信号": "看涨",
         "置信度": message_content.get("confidence"),
+        "基础置信度": message_content.get("base_confidence"),
         "论点数量": len(message_content.get("thesis_points", [])),
-        "thesis_points": message_content.get("thesis_points", [])
+        "thesis_points": message_content.get("thesis_points", []),
+        "风险因素": message_content.get("risk_factors", []),
+        "止损建议": message_content.get("stop_loss", "")
     }, "看多研究员")
 
     show_workflow_complete(
@@ -254,80 +322,53 @@ def researcher_bull_agent(state: AgentState):
     }
 
 
-def _generate_bullish_fallback(technical_signals, fundamental_signals, sentiment_signals,
-                         valuation_signals, industry_cycle_signals, institutional_signals,
-                         expectation_diff_signals) -> dict:
-    """当LLM失败时的fallback逻辑"""
+def _generate_bullish_fallback(all_signals: list) -> dict:
+    """当LLM失败时的fallback逻辑（支持全部9个维度）"""
     def parse_confidence(sig):
         try:
-            val = float(str(sig.get("confidence", "0")).replace("%", "")) / 100
+            raw = sig.get("confidence", "0")
+            if isinstance(raw, str):
+                raw = raw.strip().replace('%', '')
+                val = float(raw)
+                if val > 1:
+                    val = val / 100.0
+            else:
+                val = float(raw)
             return min(max(val, 0.0), 1.0)
         except:
             return 0.3
 
+    signal_names = ["技术分析", "基本面", "情绪分析", "估值分析", 
+                    "行业周期", "机构持仓", "预期差", "宏观新闻", "宏观分析"]
+    
     bullish_points = []
     confidence_scores = []
-
-    # Technical
-    if technical_signals.get("signal") == "bullish":
-        bullish_points.append(f"技术指标显示看多动能，置信度{technical_signals.get('confidence')}")
-        confidence_scores.append(parse_confidence(technical_signals))
-    else:
-        bullish_points.append("技术指标处于相对低位，提供向上空间")
-        confidence_scores.append(0.3)
-
-    # Fundamentals
-    if fundamental_signals.get("signal") == "bullish":
-        bullish_points.append(f"基本面表现强劲，置信度{fundamental_signals.get('confidence')}")
-        confidence_scores.append(parse_confidence(fundamental_signals))
-    else:
-        bullish_points.append("基本面存在改善潜力")
-        confidence_scores.append(0.3)
-
-    # Sentiment
-    if sentiment_signals.get("signal") == "bullish":
-        bullish_points.append(f"市场情绪积极，置信度{sentiment_signals.get('confidence')}")
-        confidence_scores.append(parse_confidence(sentiment_signals))
-    else:
-        bullish_points.append("悲观情绪可能过度，估值有修复空间")
-        confidence_scores.append(0.3)
-
-    # Valuation
-    if valuation_signals.get("signal") == "bullish":
-        bullish_points.append(f"估值偏低，置信度{valuation_signals.get('confidence')}")
-        confidence_scores.append(parse_confidence(valuation_signals))
-    else:
-        bullish_points.append("当前估值未充分反映增长潜力")
-        confidence_scores.append(0.3)
-
-    # Industry Cycle
-    if industry_cycle_signals.get("signal") == "bullish":
-        bullish_points.append(f"行业周期有利，置信度{industry_cycle_signals.get('confidence')}")
-        confidence_scores.append(parse_confidence(industry_cycle_signals))
-    else:
-        bullish_points.append("行业周期可能迎来拐点")
-        confidence_scores.append(0.3)
-
-    # Institutional
-    if institutional_signals.get("signal") == "bullish":
-        bullish_points.append(f"机构资金流入，置信度{institutional_signals.get('confidence')}")
-        confidence_scores.append(parse_confidence(institutional_signals))
-    else:
-        bullish_points.append("机构持仓有提升空间")
-        confidence_scores.append(0.3)
-
-    # Expectation Diff
-    if expectation_diff_signals.get("signal") == "bullish":
-        bullish_points.append(f"预期差正向，置信度{expectation_diff_signals.get('confidence')}")
-        confidence_scores.append(parse_confidence(expectation_diff_signals))
-    else:
-        bullish_points.append("预期差存在改善空间")
-        confidence_scores.append(0.3)
-
-    avg_confidence = sum(confidence_scores) / len(confidence_scores) if confidence_scores else 0.3
-
+    risk_factors = []
+    
+    for i, sig in enumerate(all_signals):
+        name = signal_names[i] if i < len(signal_names) else f"维度{i}"
+        if sig.get("signal") == "bullish":
+            bullish_points.append(f"{name}显示看多动能，置信度{sig.get('confidence'):.2%}")
+            confidence_scores.append(parse_confidence(sig))
+        elif sig.get("signal") == "bearish":
+            risk_factors.append(f"{name}: {sig.get('reasoning', '存在不利因素')[:50]}")
+        else:
+            bullish_points.append(f"{name}中性，可关注边际变化")
+            confidence_scores.append(0.3)
+    
+    # 计算加权置信度
+    total_weight = sum(confidence_scores) if confidence_scores else 0.3 * 9
+    avg_confidence = total_weight / len(all_signals) if all_signals else 0.3
+    
+    # 计算信号分布
+    b_count = sum(1 for s in all_signals if s.get("signal") == "bullish")
+    n_count = sum(1 for s in all_signals if s.get("signal") == "neutral")
+    be_count = sum(1 for s in all_signals if s.get("signal") == "bearish")
+    
     return {
-        "confidence": avg_confidence,
-        "thesis_points": bullish_points,
-        "reasoning": "基于9维度分析的综合看多观点"
+        "confidence": round(avg_confidence, 4),
+        "thesis_points": bullish_points[:5],
+        "risk_factors": risk_factors[:3],
+        "stop_loss": "建议设置8%-10%止损位",
+        "reasoning": f"基于9维度分析，看涨{b_count}个，中性{n_count}个，看跌{be_count}个，综合看多"
     }

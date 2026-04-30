@@ -12,6 +12,107 @@ import json
 logger = setup_logger('institutional_agent')
 
 
+def _get_shareholder_count(ticker: str) -> dict:
+    """
+    [NEW] 获取股东户数变化（筹码集中度分析）
+    股东户数减少 → 筹码集中 → 利好
+    股东户数增加 → 筹码分散 → 利空
+    """
+    try:
+        import akshare as ak
+        try:
+            holder_df = ak.stock_zh_a_gdhs(symbol=ticker)
+            if holder_df is not None and len(holder_df) >= 2:
+                latest = holder_df.iloc[0]
+                previous = holder_df.iloc[1]
+                
+                latest_count = float(latest.get('股东户数', 0) or 0)
+                previous_count = float(previous.get('股东户数', 0) or 0)
+                
+                if latest_count > 0 and previous_count > 0:
+                    change_pct = (latest_count - previous_count) / previous_count
+                    
+                    if change_pct < -0.05:
+                        signal = 'bullish'
+                        confidence = min(0.6 + abs(change_pct) * 2, 0.85)
+                        reason = f"股东户数减少{abs(change_pct)*100:.1f}%，筹码集中"
+                    elif change_pct > 0.05:
+                        signal = 'bearish'
+                        confidence = min(0.6 + change_pct * 2, 0.85)
+                        reason = f"股东户数增加{change_pct*100:.1f}%，筹码分散"
+                    else:
+                        signal = 'neutral'
+                        confidence = 0.5
+                        reason = f"股东户数变化{change_pct*100:.1f}%，筹码相对稳定"
+                    
+                    return {
+                        'signal': signal,
+                        'confidence': confidence,
+                        'holder_count': latest_count,
+                        'change_pct': change_pct * 100,
+                        'reason': reason,
+                        'source': 'shareholder'
+                    }
+        except Exception as e:
+            logger.debug(f"股东户数数据获取失败: {e}")
+    except ImportError:
+        pass
+    
+    return {'signal': 'neutral', 'confidence': 0, 'reason': '无法获取股东户数数据', 'source': 'shareholder'}
+
+
+def _get_holding_trend(ticker: str, days: int = 5) -> dict:
+    """
+    [NEW] 获取机构持仓趋势分析
+    分析多日净流入趋势
+    """
+    try:
+        import akshare as ak
+        try:
+            market = "sz" if ticker.startswith("00") or ticker.startswith("30") else "sh"
+            money_df = ak.stock_individual_money_flow(stock=ticker, market=market)
+            
+            if money_df is not None and len(money_df) >= days:
+                trend_inflow = 0
+                trend_days = min(days, len(money_df))
+                
+                for i in range(trend_days):
+                    super_large = float(money_df.iloc[i].get('超大单净流入净额', 0) or 0)
+                    large = float(money_df.iloc[i].get('大单净流入净额', 0) or 0)
+                    trend_inflow += (super_large + large) / 10000
+                
+                avg_inflow = trend_inflow / trend_days
+                
+                if avg_inflow > 1000:
+                    signal = 'bullish'
+                    confidence = min(0.6 + avg_inflow / 10000, 0.85)
+                    reason = f"{trend_days}日主力净流入平均{avg_inflow:.0f}万，持续买入"
+                elif avg_inflow < -1000:
+                    signal = 'bearish'
+                    confidence = min(0.6 + abs(avg_inflow) / 10000, 0.85)
+                    reason = f"{trend_days}日主力净流出平均{abs(avg_inflow):.0f}万，持续卖出"
+                else:
+                    signal = 'neutral'
+                    confidence = 0.5
+                    reason = f"{trend_days}日主力净流入平均{avg_inflow:.0f}万，方向不明"
+                
+                return {
+                    'signal': signal,
+                    'confidence': confidence,
+                    'trend_days': trend_days,
+                    'avg_inflow': avg_inflow,
+                    'total_inflow': trend_inflow,
+                    'reason': reason,
+                    'source': 'trend'
+                }
+        except Exception as e:
+            logger.debug(f"持仓趋势数据获取失败: {e}")
+    except ImportError:
+        pass
+    
+    return {'signal': 'neutral', 'confidence': 0, 'reason': '无法获取趋势数据', 'source': 'trend'}
+
+
 def _get_north_money_data(ticker: str) -> dict:
     """
     获取北向资金数据
@@ -273,39 +374,85 @@ def _get_margin_financing_data(ticker: str) -> dict:
     }
 
 
-def _analyze_institutional_signals(north_result: dict, fund_result: dict, money_flow_result: dict = None, margin_result: dict = None) -> dict:
+def _analyze_institutional_signals(north_result: dict, fund_result: dict, money_flow_result: dict = None, margin_result: dict = None, holder_result: dict = None, trend_result: dict = None) -> dict:
     """
-    综合分析机构持仓信号（含资金流分析）
+    [OPTIMIZED] 综合分析机构持仓信号（含资金流分析、趋势分析、股东户数）
+    使用加权组合：北向资金权重最高
     """
-    signals = []
-    confidences = []
-
-    # 北向资金
-    if north_result.get('confidence', 0) > 0:
-        signals.append(north_result['signal'])
-        confidences.append(north_result['confidence'])
-
-    # 基金持仓/主力资金
-    if fund_result.get('confidence', 0) > 0:
-        signals.append(fund_result['signal'])
-        confidences.append(fund_result['confidence'])
-
-    # 资金流（大单净流入、散户资金）
-    if money_flow_result and money_flow_result.get('confidence', 0) > 0:
-        signals.append(money_flow_result['signal'])
-        confidences.append(money_flow_result['confidence'])
-
-    # 融资融券（杠杆资金情绪）
-    if margin_result and margin_result.get('confidence', 0) > 0:
-        signals.append(margin_result['signal'])
-        confidences.append(margin_result['confidence'])
-
-    if not signals:
+    # [NEW] 定义各数据源权重
+    weights = {
+        'north': 0.25,
+        'fund': 0.15,
+        'money_flow': 0.20,
+        'margin': 0.15,
+        'holder': 0.15,
+        'trend': 0.10
+    }
+    
+    signal_values = {'bullish': 1, 'bearish': -1, 'neutral': 0}
+    results = {
+        'north': north_result,
+        'fund': fund_result,
+        'money_flow': money_flow_result,
+        'margin': margin_result,
+        'holder': holder_result,
+        'trend': trend_result
+    }
+    
+    weighted_sum = 0
+    total_weight = 0
+    
+    for source, result in results.items():
+        if result and result.get('confidence', 0) > 0:
+            signal_val = signal_values.get(result.get('signal', 'neutral'), 0)
+            weight = weights.get(source, 0.1)
+            confidence = result.get('confidence', 0)
+            
+            weighted_sum += signal_val * weight * confidence
+            total_weight += weight * confidence
+    
+    if total_weight == 0:
         return {
             'signal': 'neutral',
             'confidence': 0.3,
             'reason': '无机构持仓数据'
         }
+    
+    final_score = weighted_sum / total_weight
+    
+    if final_score > 0.2:
+        signal = 'bullish'
+        confidence = min(abs(final_score) + 0.3, 0.9)
+    elif final_score < -0.2:
+        signal = 'bearish'
+        confidence = min(abs(final_score) + 0.3, 0.9)
+    else:
+        signal = 'neutral'
+        confidence = max(0.4, 0.6 - abs(final_score))
+    
+    reason_parts = []
+    if north_result.get('confidence', 0) > 0:
+        reason_parts.append(f"北向{north_result.get('signal', 'neutral')}")
+    if fund_result.get('confidence', 0) > 0:
+        reason_parts.append(f"主力{fund_result.get('signal', 'neutral')}")
+    if holder_result and holder_result.get('confidence', 0) > 0:
+        reason_parts.append(f"筹码{holder_result.get('signal', 'neutral')}")
+    if trend_result and trend_result.get('confidence', 0) > 0:
+        reason_parts.append(f"趋势{trend_result.get('signal', 'neutral')}")
+    
+    reason = f"机构持仓：{' '.join(reason_parts)}"
+
+    return {
+        'signal': signal,
+        'confidence': confidence,
+        'reason': reason,
+        'north_analysis': north_result,
+        'fund_analysis': fund_result,
+        'money_flow_analysis': money_flow_result,
+        'margin_analysis': margin_result,
+        'holder_analysis': holder_result,
+        'trend_analysis': trend_result
+    }
 
     # 多数投票
     bullish_count = signals.count('bullish')
@@ -369,8 +516,18 @@ def institutional_agent(state: AgentState):
     margin_result = _get_margin_financing_data(ticker)
     logger.info(f"  融资融券: {margin_result.get('reason', 'N/A')}")
 
-    # 5. 综合分析（含资金流和融资融券）
-    combined = _analyze_institutional_signals(north_result, fund_result, money_flow_result, margin_result)
+    # [NEW] 5. 获取股东户数变化
+    logger.info("  获取股东户数变化...")
+    holder_result = _get_shareholder_count(ticker)
+    logger.info(f"  股东户数: {holder_result.get('reason', 'N/A')}")
+
+    # [NEW] 6. 获取持仓趋势
+    logger.info("  获取持仓趋势...")
+    trend_result = _get_holding_trend(ticker)
+    logger.info(f"  持仓趋势: {trend_result.get('reason', 'N/A')}")
+
+    # 7. 综合分析（含资金流、融资融券、股东户数、趋势）
+    combined = _analyze_institutional_signals(north_result, fund_result, money_flow_result, margin_result, holder_result, trend_result)
 
     conf_float = combined.get('confidence', 0.3)
     signal = combined['signal']
@@ -388,9 +545,10 @@ def institutional_agent(state: AgentState):
         "主力资金": f"{_sig_cn(fund_result)} | {fund_result.get('reason', '-')}",
         "资金流向": f"{_sig_cn(money_flow_result)} | {money_flow_result.get('reason', '-')}",
         "融资融券": f"{_sig_cn(margin_result)} | {margin_result.get('reason', '-')}",
+        "股东户数": f"{_sig_cn(holder_result)} | {holder_result.get('reason', '-')}",
+        "持仓趋势": f"{_sig_cn(trend_result)} | {trend_result.get('reason', '-')}",
         "综合信号": signal_cn,
         "置信度": f"{conf_float*100:.0f}%",
-        "决策预览": decision_preview
     }, "机构持仓分析师")
 
     # 构建详细的数据项
@@ -402,7 +560,14 @@ def institutional_agent(state: AgentState):
         return {"name": name, "signal": s, "signal_cn": sc, "reason": result.get('reason', ''), "confidence": result.get('confidence', 0)}
 
     details = []
-    for r, n in [(north_result, "北向资金"), (fund_result, "主力资金"), (money_flow_result, "资金流向"), (margin_result, "融资融券")]:
+    for r, n in [
+        (north_result, "北向资金"), 
+        (fund_result, "主力资金"), 
+        (money_flow_result, "资金流向"), 
+        (margin_result, "融资融券"),
+        (holder_result, "股东户数"),
+        (trend_result, "持仓趋势")
+    ]:
         d = _to_detail(r, n)
         if d and d["confidence"] > 0:
             details.append(d)
@@ -410,7 +575,7 @@ def institutional_agent(state: AgentState):
     # 构建决策逻辑
     parts = []
     for d_item in details:
-        parts.append(f"{d_item['name']}：{d_item['signal_cn']}（{d_item['reason']}）")
+        parts.append(f"{d_item['name']}：{d_item['signal_cn']}")
     decision_logic = "；".join(parts) if parts else "无有效机构数据"
 
     message_content = {
@@ -420,11 +585,13 @@ def institutional_agent(state: AgentState):
         "reason": combined.get('reason', ''),
         "decision_logic": decision_logic,
         "details": details,
-        "summary": f"机构持仓信号{signal_cn}（置信度{conf_float*100:.0f}%），{decision_logic}",
+        "summary": f"机构持仓{signal_cn}（置信度{conf_float*100:.0f}%），{decision_logic}",
         "north_money": north_result,
         "fund_holding": fund_result,
         "money_flow": money_flow_result,
         "margin": margin_result,
+        "shareholder": holder_result,
+        "trend": trend_result,
     }
 
     message = HumanMessage(

@@ -7,29 +7,128 @@ from src.utils.logging_config import setup_logger
 from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status, show_workflow_complete
 from src.utils.api_utils import agent_endpoint, log_llm_interaction
 from src.utils.error_handler import resilient_agent
+from src.agents.fundamentals import INDUSTRY_CYCLE_CLASSIFICATION
 import json
 
 logger = setup_logger('industry_cycle_agent')
 
-# 行业周期分类
-INDUSTRY_CYCLE = {
-    '强周期': [
-        '农林牧渔', '养殖', '猪', '禽', '饲料', '化肥',
-        '钢铁', '煤炭', '有色金属', '化工', '建材', '房地产',
-        '汽车', '交通运输', '工程机械', '航运', '港口'
-    ],
-    '弱周期': [
-        '食品饮料', '医药生物', '家用电器', '纺织服装', '日用化工',
-        '商贸零售', '旅游', '酒店', '餐饮'
-    ],
-    '成长': [
-        '电子', '半导体', '计算机', '软件', '通信', '5G',
-        '新能源', '光伏', '风电', '锂电池', '电动车', '芯片'
-    ],
-    '防御': [
-        '公用事业', '电力', '燃气', '水务', '银行', '保险', '券商'
-    ]
-}
+# [OPTIMIZED] 统一从fundamentals导入行业分类
+INDUSTRY_CYCLE = INDUSTRY_CYCLE_CLASSIFICATION
+
+
+def _get_inventory_cycle() -> dict:
+    """
+    [NEW] 获取库存周期分析
+    通过PMI荣枯线和企业库存变化判断库存周期阶段
+    """
+    try:
+        import akshare as ak
+        try:
+            pmi_df = ak.cn_pmi()
+            if pmi_df is not None and len(pmi_df) > 0:
+                latest_pmi = float(pmi_df.iloc[0].get('pmi', 50) or 50)
+                ppi_df = ak.cn_ppi()
+                ppi_change = 0
+                if ppi_df is not None and len(ppi_df) > 0:
+                    ppi_change = float(ppi_df.iloc[0].get('ppi', 0) or 0)
+                
+                if latest_pmi > 55:
+                    phase = '主动补库'
+                    signal = 'bullish'
+                    confidence = 0.7
+                elif latest_pmi > 50:
+                    phase = '被动补库'
+                    signal = 'neutral'
+                    confidence = 0.5
+                elif latest_pmi > 45:
+                    phase = '主动去库'
+                    signal = 'bearish'
+                    confidence = 0.6
+                else:
+                    phase = '被动去库'
+                    signal = 'neutral'
+                    confidence = 0.5
+                    
+                return {
+                    'phase': phase,
+                    'signal': signal,
+                    'confidence': confidence,
+                    'pmi': latest_pmi,
+                    'ppi_change': ppi_change,
+                    'reason': f'PMI={latest_pmi:.1f}，PPI同比{ppi_change:.1f}%'
+                }
+        except Exception as e:
+            logger.debug(f"库存周期数据获取失败: {e}")
+    except ImportError:
+        pass
+    
+    return {'phase': '未知', 'signal': 'neutral', 'confidence': 0.3, 'pmi': None, 'ppi_change': None}
+
+
+def _get_commodity_price(commodity_type: str) -> dict:
+    """
+    [NEW] 获取大宗商品价格
+    支持：钢材(螺纹钢)、煤炭(动力煤)、化工(MDI等)
+    """
+    result = {'price': None, 'change': None, 'signal': 'neutral', 'confidence': 0}
+    
+    try:
+        import akshare as ak
+        try:
+            if commodity_type == 'steel':
+                # 螺纹钢价格
+                steel_df = ak.reits_abstract_em(indicator='螺纹钢价:HRB400:20mm:上海')
+                if steel_df is not None and len(steel_df) > 0:
+                    price = float(steel_df.iloc[-1].get('close', 0) or 0)
+                    change = float(steel_df.iloc[-1].get('pct_chg', 0) or 0)
+                    result = _analyze_price_change(price, change, '螺纹钢')
+            elif commodity_type == 'coal':
+                # 动力煤价格
+                coal_df = ak.reits_abstract_em(indicator='动力煤期货收盘价')
+                if coal_df is not None and len(coal_df) > 0:
+                    price = float(coal_df.iloc[-1].get('close', 0) or 0)
+                    change = float(coal_df.iloc[-1].get('pct_chg', 0) or 0)
+                    result = _analyze_price_change(price, change, '动力煤')
+            elif commodity_type == 'chemical':
+                # 化工品价格(MDI)
+                chem_df = ak.reits_abstract_em(indicator='MDI聚合物价格')
+                if chem_df is not None and len(chem_df) > 0:
+                    price = float(chem_df.iloc[-1].get('close', 0) or 0)
+                    change = float(chem_df.iloc[-1].get('pct_chg', 0) or 0)
+                    result = _analyze_price_change(price, change, 'MDI')
+        except Exception as e:
+            logger.debug(f"商品价格获取失败: {e}")
+    except ImportError:
+        pass
+    
+    return result
+
+
+def _analyze_price_change(price: float, change: float, name: str) -> dict:
+    """分析价格变化"""
+    if change > 5:
+        signal = 'bullish'
+        confidence = 0.7
+    elif change > 0:
+        signal = 'neutral'
+        confidence = 0.5
+    elif change < -5:
+        signal = 'bearish'
+        confidence = 0.7
+    elif change < 0:
+        signal = 'neutral'
+        confidence = 0.5
+    else:
+        signal = 'neutral'
+        confidence = 0.3
+    
+    return {
+        'price': round(price, 2),
+        'change': round(change, 2),
+        'signal': signal,
+        'confidence': confidence,
+        'reason': f'{name}价格{"上涨" if change > 0 else "下跌" if change < 0 else "平稳"}{abs(change):.1f}%'
+    }
 
 
 def _identify_industry_cycle(industry: str) -> dict:
@@ -39,8 +138,8 @@ def _identify_industry_cycle(industry: str) -> dict:
     if not industry:
         return {'cycle_type': 'unknown', 'signal': 'neutral', 'confidence': 0.3}
 
-    for cycle_type, keywords in INDUSTRY_CYCLE.items():
-        if any(keyword in industry for keyword in keywords):
+    for cycle_type, industries in INDUSTRY_CYCLE.items():
+        if any(ind in industry for ind in industries):
             return {'cycle_type': cycle_type, 'signal': 'neutral', 'confidence': 0.5}
 
     return {'cycle_type': 'other', 'signal': 'neutral', 'confidence': 0.3}
@@ -181,8 +280,29 @@ def industry_cycle_agent(state: AgentState):
     # 2. 如果是周期行业，分析当前位置
     if cycle_type_result['cycle_type'] == '强周期':
         cycle_position = _analyze_cyclical_industry(ticker, industry)
+        
+        # [NEW] 获取库存周期
+        inventory_cycle = _get_inventory_cycle()
+        cycle_position['inventory_cycle'] = inventory_cycle
+        logger.info(f"  📊 库存周期: {inventory_cycle.get('phase', '未知')}")
+        
+        # [NEW] 获取对应大宗商品价格
+        commodity_data = {}
+        if any(k in industry for k in ['钢铁', '建材', '工程机械']):
+            commodity_data = _get_commodity_price('steel')
+        elif any(k in industry for k in ['煤炭', '能源']):
+            commodity_data = _get_commodity_price('coal')
+        elif any(k in industry for k in ['化工']):
+            commodity_data = _get_commodity_price('chemical')
+        
+        if commodity_data.get('price'):
+            cycle_position['commodity'] = commodity_data
+            logger.info(f"  📈 大宗商品: {commodity_data.get('reason', '')}")
     else:
         cycle_position = cycle_type_result
+        # 非强周期行业也获取库存周期作为参考
+        inventory_cycle = _get_inventory_cycle()
+        cycle_position['inventory_cycle'] = inventory_cycle
 
     # 3. 生成周期信号
     cycle_signal = _generate_cycle_signal(cycle_position)
@@ -228,6 +348,8 @@ def industry_cycle_agent(state: AgentState):
         "reason": reason,
         "decision_logic": decision_logic,
         "weight_factor": wf,
+        "inventory_cycle": cycle_position.get('inventory_cycle', {}),
+        "commodity": cycle_position.get('commodity', {}),
         "summary": f"{industry}：{cycle_type_cn}，{phase}，信号{signal_cn}（置信度{conf_float*100:.0f}%），{reason}"
     }
 
